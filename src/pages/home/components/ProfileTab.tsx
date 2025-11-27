@@ -30,37 +30,38 @@ export default function ProfileTab() {
   };
 
   return (
-    <div className="px-4 py-6 pb-20 bg-gray-50 min-h-screen">
-      <div className="max-w-md mx-auto">
+    <div className="px-4 py-6 pb-20 min-h-screen">
+      <div className="max-w-md mx-auto space-y-6">
         {/* 프로필 카드 */}
-        <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
-          <div className="text-center">
+        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-8 animate-slide-up relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-primary-100 to-secondary-100 opacity-50"></div>
+          <div className="relative text-center">
             {/* 프로필 사진 */}
             <div className="relative inline-block mb-4">
-              <img
-                src={profile.avatar || getDefaultAvatar(profile.gender)}
-                alt={profile.name}
-                className="w-24 h-24 rounded-full object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = getDefaultAvatar(profile.gender);
-                }}
-              />
-              <button className="absolute bottom-0 right-0 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-800 transition-colors cursor-pointer">
-                <div className="w-4 h-4 flex items-center justify-center">
-                  <i className="ri-camera-line"></i>
-                </div>
+              <div className="p-1 bg-white rounded-full shadow-lg">
+                <img
+                  src={profile.avatar || getDefaultAvatar(profile.gender)}
+                  alt={profile.name}
+                  className="w-28 h-28 rounded-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = getDefaultAvatar(profile.gender);
+                  }}
+                />
+              </div>
+              <button className="absolute bottom-2 right-2 w-9 h-9 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-black transition-colors cursor-pointer hover:scale-110 transform duration-300 border-2 border-white">
+                <i className="ri-camera-line text-lg"></i>
               </button>
             </div>
 
             {/* 기본 정보 */}
-            <h2 className="text-2xl font-bold text-gray-800 mb-1">{profile.name}</h2>
-            <p className="text-gray-600 mb-4">{profile.age}세 · {profile.location}</p>
+            <h2 className="text-2xl font-bold text-slate-800 mb-1 font-display">{profile.name}</h2>
+            <p className="text-slate-500 mb-6 font-medium">{profile.age}세 · {profile.location}</p>
 
             {/* 프로필 수정 버튼 */}
             <button
               onClick={handleEditProfile}
-              className="w-full bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
+              className="w-full bg-slate-800 text-white py-3.5 rounded-2xl font-bold hover:bg-black transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-slate-200 hover:shadow-xl transform hover:-translate-y-0.5"
             >
               프로필 수정하기
             </button>
@@ -68,60 +69,61 @@ export default function ProfileTab() {
         </div>
 
         {/* 매칭 관리 카드 */}
-        <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-3xl shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800 flex items-center">
-              <div className="w-5 h-5 flex items-center justify-center mr-2">
-                <i className="ri-heart-fill text-cyan-500"></i>
+        <div className="bg-gradient-to-br from-primary-500 to-secondary-600 rounded-[2rem] shadow-xl shadow-primary-500/20 p-6 animate-slide-up text-white relative overflow-hidden" style={{ animationDelay: '0.1s' }}>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -ml-10 -mb-10"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-lg flex items-center font-display">
+                <i className="ri-heart-fill text-pink-300 mr-2 text-xl animate-pulse-soft"></i>
+                매칭 현황
+              </h3>
+              <button
+                onClick={handleMatchingRequests}
+                className="text-white/80 text-sm font-medium hover:text-white cursor-pointer whitespace-nowrap bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm hover:bg-white/20 transition-colors"
+              >
+                전체보기
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center border border-white/10 hover:bg-white/20 transition-colors">
+                <div className="text-3xl font-bold mb-1 font-display">3</div>
+                <div className="text-xs text-white/80 font-medium">받은 요청</div>
               </div>
-              매칭 현황
-            </h3>
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center border border-white/10 hover:bg-white/20 transition-colors">
+                <div className="text-3xl font-bold mb-1 font-display">2</div>
+                <div className="text-xs text-white/80 font-medium">보낸 요청</div>
+              </div>
+            </div>
+
             <button
               onClick={handleMatchingRequests}
-              className="text-cyan-500 text-sm font-medium hover:text-cyan-600 cursor-pointer whitespace-nowrap"
+              className="w-full bg-white text-primary-600 py-3.5 rounded-2xl font-bold hover:bg-slate-50 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center shadow-lg"
             >
-              전체보기
+              <i className="ri-heart-line mr-2 text-lg"></i>
+              매칭 관리하기
             </button>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white rounded-2xl p-4 text-center">
-              <div className="text-2xl font-bold text-cyan-500 mb-1">3</div>
-              <div className="text-xs text-gray-600">받은 요청</div>
-            </div>
-            <div className="bg-white rounded-2xl p-4 text-center">
-              <div className="text-2xl font-bold text-blue-500 mb-1">2</div>
-              <div className="text-xs text-gray-600">보낸 요청</div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleMatchingRequests}
-            className="w-full mt-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-full font-medium hover:from-cyan-600 hover:to-blue-700 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center"
-          >
-            <div className="w-5 h-5 flex items-center justify-center mr-2">
-              <i className="ri-heart-line"></i>
-            </div>
-            매칭 관리하기
-          </button>
         </div>
 
         {/* 자기소개 */}
-        <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-            <div className="w-5 h-5 flex items-center justify-center mr-2">
-              <i className="ri-user-smile-line"></i>
+        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <h3 className="font-bold text-slate-800 mb-4 flex items-center font-display">
+            <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center mr-3 text-primary-500">
+              <i className="ri-user-smile-line text-lg"></i>
             </div>
             자기소개
           </h3>
-          <p className="text-gray-600 leading-relaxed">{profile.bio}</p>
+          <p className="text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl text-sm">{profile.bio}</p>
         </div>
 
         {/* 관심사 */}
-        <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-            <div className="w-5 h-5 flex items-center justify-center mr-2">
-              <i className="ri-heart-line"></i>
+        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          <h3 className="font-bold text-slate-800 mb-4 flex items-center font-display">
+            <div className="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-pink-500">
+              <i className="ri-heart-line text-lg"></i>
             </div>
             관심사
           </h3>
@@ -129,7 +131,7 @@ export default function ProfileTab() {
             {profile.interests.map((interest, index) => (
               <span
                 key={index}
-                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm"
+                className="bg-white border border-slate-100 text-slate-600 px-4 py-2 rounded-full text-sm font-medium shadow-sm hover:shadow-md hover:border-primary-200 hover:text-primary-600 transition-all cursor-default"
               >
                 {interest}
               </span>
@@ -138,48 +140,36 @@ export default function ProfileTab() {
         </div>
 
         {/* 메뉴 */}
-        <div className="bg-white rounded-3xl shadow-sm p-6">
+        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
           <div className="space-y-1">
-            <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
-                  <div className="w-5 h-5 flex items-center justify-center">
-                    <i className="ri-settings-3-line text-blue-600"></i>
-                  </div>
+            <button className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                  <i className="ri-settings-3-line text-blue-500 text-xl"></i>
                 </div>
-                <span className="font-medium text-gray-800">설정</span>
+                <span className="font-bold text-slate-700 group-hover:text-slate-900">설정</span>
               </div>
-              <div className="w-5 h-5 flex items-center justify-center">
-                <i className="ri-arrow-right-s-line text-gray-400"></i>
-              </div>
+              <i className="ri-arrow-right-s-line text-slate-300 group-hover:text-slate-500 text-xl transition-colors"></i>
             </button>
 
-            <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center">
-                  <div className="w-5 h-5 flex items-center justify-center">
-                    <i className="ri-shield-check-line text-green-600"></i>
-                  </div>
+            <button className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                  <i className="ri-shield-check-line text-green-500 text-xl"></i>
                 </div>
-                <span className="font-medium text-gray-800">개인정보 보호</span>
+                <span className="font-bold text-slate-700 group-hover:text-slate-900">개인정보 보호</span>
               </div>
-              <div className="w-5 h-5 flex items-center justify-center">
-                <i className="ri-arrow-right-s-line text-gray-400"></i>
-              </div>
+              <i className="ri-arrow-right-s-line text-slate-300 group-hover:text-slate-500 text-xl transition-colors"></i>
             </button>
 
-            <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center">
-                  <div className="w-5 h-5 flex items-center justify-center">
-                    <i className="ri-question-line text-purple-600"></i>
-                  </div>
+            <button className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                  <i className="ri-question-line text-purple-500 text-xl"></i>
                 </div>
-                <span className="font-medium text-gray-800">고객센터</span>
+                <span className="font-bold text-slate-700 group-hover:text-slate-900">고객센터</span>
               </div>
-              <div className="w-5 h-5 flex items-center justify-center">
-                <i className="ri-arrow-right-s-line text-gray-400"></i>
-              </div>
+              <i className="ri-arrow-right-s-line text-slate-300 group-hover:text-slate-500 text-xl transition-colors"></i>
             </button>
           </div>
         </div>

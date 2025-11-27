@@ -8,6 +8,9 @@ import ProfileDetailPage from "../pages/profile-detail/page";
 import AdminPage from "../pages/admin/page";
 import CoinShopPage from "../pages/coin-shop/page";
 import MatchingRequestsPage from "../pages/matching-requests/page";
+import PaymentSuccessPage from "../pages/payment/success";
+import PaymentFailPage from "../pages/payment/fail";
+import CreatePostPage from "../pages/post/create";
 
 const routes: RouteObject[] = [
   {
@@ -41,6 +44,18 @@ const routes: RouteObject[] = [
   {
     path: "/matching-requests",
     element: <MatchingRequestsPage />,
+  },
+  {
+    path: "/payment/success",
+    element: <PaymentSuccessPage />,
+  },
+  {
+    path: "/payment/fail",
+    element: <PaymentFailPage />,
+  },
+  {
+    path: "/post/create",
+    element: <CreatePostPage />,
   },
   {
     path: "*",

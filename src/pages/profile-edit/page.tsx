@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_PUBLIC_SUPABASE_URL,
-  import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from '../../lib/supabase';
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {

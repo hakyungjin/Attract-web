@@ -1,4 +1,4 @@
-import { useState } from 'react';
+
 
 interface TabBarProps {
   activeTab: string;
@@ -6,56 +6,41 @@ interface TabBarProps {
 }
 
 export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
+  const tabs = [
+    { id: 'matching', icon: 'ri-heart-3-line', activeIcon: 'ri-heart-3-fill', label: '매칭' },
+    { id: 'community', icon: 'ri-group-line', activeIcon: 'ri-group-fill', label: '커뮤니티' },
+    { id: 'chat', icon: 'ri-chat-3-line', activeIcon: 'ri-chat-3-fill', label: '채팅' },
+    { id: 'profile', icon: 'ri-user-line', activeIcon: 'ri-user-fill', label: 'My' },
+  ];
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-      <div className="flex items-center justify-around py-2">
-        <button
-          onClick={() => onTabChange('matching')}
-          className={`flex flex-col items-center justify-center py-2 px-2 transition-colors whitespace-nowrap cursor-pointer ${
-            activeTab === 'matching' ? 'text-pink-500' : 'text-gray-400'
-          }`}
-        >
-          <div className="w-6 h-6 flex items-center justify-center mb-1">
-            <i className="ri-heart-line text-xl"></i>
-          </div>
-          <span className="text-xs font-medium">매칭</span>
-        </button>
+    <div className="fixed bottom-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
+      <div className="glass rounded-full px-6 py-3 flex items-center justify-between shadow-2xl shadow-primary-500/20 pointer-events-auto max-w-md w-full">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 group ${isActive ? 'text-primary-600 -translate-y-2' : 'text-slate-400 hover:text-slate-600'
+                }`}
+            >
+              {isActive && (
+                <span className="absolute -top-2 w-1 h-1 bg-primary-500 rounded-full animate-bounce" />
+              )}
+              <i className={`text-2xl transition-all duration-300 ${isActive ? `${tab.activeIcon} scale-110 drop-shadow-md` : `${tab.icon} group-hover:scale-110`
+                }`}></i>
+              <span className={`text-[10px] font-medium mt-1 transition-all duration-300 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 absolute'
+                }`}>
+                {tab.label}
+              </span>
 
-        <button
-          onClick={() => onTabChange('community')}
-          className={`flex flex-col items-center justify-center py-2 px-2 transition-colors whitespace-nowrap cursor-pointer ${
-            activeTab === 'community' ? 'text-pink-500' : 'text-gray-400'
-          }`}
-        >
-          <div className="w-6 h-6 flex items-center justify-center mb-1">
-            <i className="ri-group-line text-xl"></i>
-          </div>
-          <span className="text-xs font-medium">커뮤니티</span>
-        </button>
-
-        <button
-          onClick={() => onTabChange('chat')}
-          className={`flex flex-col items-center justify-center py-2 px-2 transition-colors whitespace-nowrap cursor-pointer ${
-            activeTab === 'chat' ? 'text-pink-500' : 'text-gray-400'
-          }`}
-        >
-          <div className="w-6 h-6 flex items-center justify-center mb-1">
-            <i className="ri-chat-3-line text-xl"></i>
-          </div>
-          <span className="text-xs font-medium">채팅</span>
-        </button>
-
-        <button
-          onClick={() => onTabChange('profile')}
-          className={`flex flex-col items-center justify-center py-2 px-2 transition-colors whitespace-nowrap cursor-pointer ${
-            activeTab === 'profile' ? 'text-pink-500' : 'text-gray-400'
-          }`}
-        >
-          <div className="w-6 h-6 flex items-center justify-center mb-1">
-            <i className="ri-user-line text-xl"></i>
-          </div>
-          <span className="text-xs font-medium">My페이지</span>
-        </button>
+              {isActive && (
+                <div className="absolute inset-0 bg-primary-50 rounded-full -z-10 scale-0 animate-ping opacity-20" />
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

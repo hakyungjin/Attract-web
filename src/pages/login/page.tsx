@@ -1,10 +1,13 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -14,20 +17,71 @@ export default function LoginPage() {
     gender: 'male'
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 바로 로그인 처리
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userEmail', formData.email || 'user@example.com');
-    navigate('/');
+    setLoading(true);
+
+    try {
+      const { error } = await signIn(formData.email, formData.password);
+
+      if (error) {
+        // 이메일 확인 관련 에러 처리
+        if (error.message.includes('Email not confirmed')) {
+          alert('⚠️ 이메일 인증이 필요합니다.\n\n해결 방법:\n1. 가입 시 받은 이메일을 확인하고 인증 링크 클릭\n2. 또는 Supabase 대시보드에서 이메일 확인 비활성화\n   (Authentication > Settings > Email Confirmation 끄기)');
+        } else if (error.message.includes('Invalid login credentials')) {
+          alert('❌ 이메일 또는 비밀번호가 올바르지 않습니다.');
+        } else {
+          alert(`로그인 실패: ${error.message}`);
+        }
+        return;
+      }
+
+      // 로그인 성공
+      navigate('/');
+    } catch (error: any) {
+      alert(`로그인 오류: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 바로 회원가입 처리
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userEmail', formData.email || 'user@example.com');
-    navigate('/');
+
+    // 유효성 검사
+    if (formData.password !== formData.confirmPassword) {
+      alert('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      alert('비밀번호는 8자 이상이어야 합니다.');
+      return;
+    }
+
+    if (!formData.nickname) {
+      alert('닉네임을 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await signUp(formData.email, formData.password, formData.nickname);
+
+      if (error) {
+        alert(`회원가입 실패: ${error.message}`);
+        return;
+      }
+
+      // 회원가입 성공
+      alert('회원가입이 완료되었습니다! 이메일을 확인해주세요.');
+      setIsLogin(true);
+    } catch (error: any) {
+      alert(`회원가입 오류: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -110,9 +164,10 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-4 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg cursor-pointer whitespace-nowrap"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-4 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                로그인
+                {loading ? '로그인 중...' : '로그인'}
               </button>
             </form>
           ) : (
@@ -198,51 +253,14 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-4 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg cursor-pointer whitespace-nowrap"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-4 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                회원가입
+                {loading ? '가입 중...' : '회원가입'}
               </button>
             </form>
           )}
 
-          {/* 소셜 로그인 */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">또는</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <button 
-                onClick={handleLogin}
-                className="flex items-center justify-center py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                <div className="w-5 h-5 flex items-center justify-center">
-                  <i className="ri-kakao-talk-fill text-yellow-500 text-xl"></i>
-                </div>
-              </button>
-              <button 
-                onClick={handleLogin}
-                className="flex items-center justify-center py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                <div className="w-5 h-5 flex items-center justify-center">
-                  <i className="ri-google-fill text-red-500 text-xl"></i>
-                </div>
-              </button>
-              <button 
-                onClick={handleLogin}
-                className="flex items-center justify-center py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                <div className="w-5 h-5 flex items-center justify-center">
-                  <i className="ri-apple-fill text-gray-900 text-xl"></i>
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* 하단 링크 */}

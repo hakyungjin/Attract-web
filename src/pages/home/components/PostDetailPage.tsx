@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_PUBLIC_SUPABASE_URL,
-  import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from '../../../lib/supabase';
 
 interface Comment {
   id: number;
@@ -27,6 +22,11 @@ interface Post {
   comments: Comment[];
   timeAgo: string;
   isLiked: boolean;
+  age?: number;
+  location?: string;
+  job?: string;
+  views?: number;
+  category: 'dating' | 'chat';
 }
 
 interface PostDetailPageProps {
@@ -43,7 +43,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
+
     // 현재 사용자 정보 가져오기
     const getCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -53,7 +53,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
           .select('*')
           .eq('id', user.id)
           .single();
-        
+
         if (profile) {
           setCurrentUser({ ...user, profile });
         }
@@ -64,7 +64,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
 
   const handleLike = async () => {
     const newLikes = currentPost.isLiked ? currentPost.likes - 1 : currentPost.likes + 1;
-    
+
     const updatedPost = {
       ...currentPost,
       isLiked: !currentPost.isLiked,
@@ -95,10 +95,10 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
       comments: currentPost.comments.map(c =>
         c.id === commentId
           ? {
-              ...c,
-              isLiked: !c.isLiked,
-              likes: newLikes
-            }
+            ...c,
+            isLiked: !c.isLiked,
+            likes: newLikes
+          }
           : c
       )
     };
@@ -174,114 +174,115 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="flex items-center px-4 py-3">
+      <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-20">
+        <div className="flex items-center px-4 py-3 max-w-md mx-auto">
           <button
             onClick={onBack}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group"
           >
-            <i className="ri-arrow-left-line text-xl"></i>
+            <i className="ri-arrow-left-line text-xl text-slate-600 group-hover:text-primary-600 transition-colors"></i>
           </button>
-          <h1 className="flex-1 text-center font-semibold text-gray-800">게시글</h1>
+          <h1 className="flex-1 text-center font-bold text-slate-800 font-display">게시글</h1>
           <div className="w-10"></div>
         </div>
       </div>
 
       <div className="px-4 py-6 pb-20">
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md mx-auto space-y-6">
           {/* 게시글 상세 */}
-          <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-            <div className="flex items-center space-x-3 mb-3">
-              <img
-                src={currentPost.avatar}
-                alt={currentPost.author}
-                onClick={() => navigate('/profile-detail')}
-                className="w-12 h-12 rounded-full object-cover object-top cursor-pointer hover:opacity-80 transition-opacity"
-              />
+          <div className="bg-white rounded-3xl shadow-lg shadow-primary-500/5 p-6 animate-slide-up">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="relative group cursor-pointer" onClick={() => navigate('/profile-detail')}>
+                <img
+                  src={currentPost.avatar}
+                  alt={currentPost.author}
+                  className="w-14 h-14 rounded-2xl object-cover object-top shadow-md group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+              </div>
               <div className="flex-1">
-                <h4 
+                <h4
                   onClick={() => navigate('/profile-detail')}
-                  className="font-semibold text-gray-800 cursor-pointer hover:text-cyan-500 transition-colors"
+                  className="font-bold text-lg text-slate-800 cursor-pointer hover:text-primary-600 transition-colors font-display"
                 >
                   {currentPost.author}
                 </h4>
-                <p className="text-sm text-gray-500">{currentPost.timeAgo}</p>
+                <p className="text-xs font-medium text-slate-400">{currentPost.timeAgo}</p>
               </div>
+              <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-400">
+                <i className="ri-more-fill"></i>
+              </button>
             </div>
 
-            <p className="text-gray-700 mb-4 text-base leading-relaxed">{currentPost.content}</p>
+            <p className="text-slate-600 mb-6 text-base leading-relaxed whitespace-pre-wrap">{currentPost.content}</p>
 
             {currentPost.image && (
-              <img
-                src={currentPost.image}
-                alt="게시글 이미지"
-                className="w-full h-64 object-cover object-top rounded-lg mb-4"
-              />
+              <div className="rounded-2xl overflow-hidden mb-6 shadow-md">
+                <img
+                  src={currentPost.image}
+                  alt="게시글 이미지"
+                  className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
+                />
+              </div>
             )}
 
             {/* 좋아요/댓글 버튼 */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <div className="flex space-x-2 w-full">
+            <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+              <div className="flex space-x-3 w-full">
                 <button
                   onClick={handleLike}
-                  className={`flex-1 flex items-center justify-center space-x-2 py-3 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
-                    currentPost.isLiked
-                      ? 'bg-red-50 text-red-500'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                  }`}
+                  className={`flex-1 flex items-center justify-center space-x-2 py-3.5 rounded-xl transition-all cursor-pointer whitespace-nowrap group ${currentPost.isLiked
+                    ? 'bg-pink-50 text-pink-500 shadow-inner'
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                    }`}
                 >
-                  <div className="w-6 h-6 flex items-center justify-center">
-                    <i className={`${currentPost.isLiked ? 'ri-heart-fill' : 'ri-heart-line'}`}></i>
-                  </div>
-                  <span className="text-base font-medium">좋아요</span>
+                  <i className={`text-xl transition-transform group-hover:scale-110 ${currentPost.isLiked ? 'ri-heart-fill animate-pulse-soft' : 'ri-heart-line'}`}></i>
+                  <span className="text-sm font-bold">좋아요 {currentPost.likes > 0 && currentPost.likes}</span>
                 </button>
-                
-                <button className="flex-1 flex items-center justify-center space-x-2 py-3 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer whitespace-nowrap">
-                  <div className="w-6 h-6 flex items-center justify-center">
-                    <i className="ri-chat-3-line"></i>
-                  </div>
-                  <span className="text-base font-medium">댓글</span>
+
+                <button className="flex-1 flex items-center justify-center space-x-2 py-3.5 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-all cursor-pointer whitespace-nowrap group">
+                  <i className="ri-chat-3-line text-xl group-hover:scale-110 transition-transform"></i>
+                  <span className="text-sm font-bold">댓글 {currentPost.comments.length > 0 && currentPost.comments.length}</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* 댓글 섹션 */}
-          <div className="bg-white rounded-2xl shadow-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-4">
-              댓글 {currentPost.comments.length}개
+          <div className="bg-white rounded-3xl shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <h3 className="font-bold text-slate-800 mb-6 flex items-center">
+              댓글 <span className="ml-2 text-primary-500">{currentPost.comments.length}</span>
             </h3>
 
             {/* 댓글 작성 */}
-            <div className="flex space-x-3 mb-6 pb-4 border-b border-gray-100">
+            <div className="flex space-x-4 mb-8 pb-6 border-b border-slate-50">
               <img
                 src="https://readdy.ai/api/search-image?query=Korean%20person%20profile%20avatar%2C%20friendly%20expression%2C%20professional%20portrait%20photography%2C%20soft%20natural%20lighting%2C%20clean%20white%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=myavatar&orientation=squarish"
                 alt="내 프로필"
-                className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0"
+                className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 shadow-sm"
               />
               <div className="flex-1">
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="댓글을 입력하세요..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm resize-none"
-                  rows={3}
-                  maxLength={500}
-                />
-                <div className="flex justify-end mt-2">
+                <div className="relative">
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="댓글을 남겨보세요..."
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm resize-none bg-slate-50 transition-all placeholder-slate-400"
+                    rows={2}
+                    maxLength={500}
+                  />
                   <button
                     onClick={handleSubmitComment}
                     disabled={!newComment.trim()}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      newComment.trim()
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700'
-                        : 'bg-gray-200 text-gray-400'
-                    }`}
+                    className={`absolute bottom-3 right-3 p-2 rounded-full transition-all ${newComment.trim()
+                      ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-md transform hover:scale-105'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
                   >
-                    댓글 달기
+                    <i className="ri-send-plane-fill"></i>
                   </button>
                 </div>
               </div>
@@ -289,40 +290,39 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
 
             {/* 댓글 목록 */}
             {currentPost.comments.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {currentPost.comments.map((comment) => (
-                  <div key={comment.id} className="flex space-x-3">
+                  <div key={comment.id} className="flex space-x-3 group">
                     <img
                       src={comment.avatar}
                       alt={comment.author}
                       onClick={() => navigate('/profile-detail')}
-                      className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity shadow-sm"
                     />
                     <div className="flex-1">
-                      <div className="bg-gray-50 rounded-lg px-4 py-3">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span 
+                      <div className="bg-slate-50 rounded-2xl rounded-tl-none px-5 py-3.5 hover:bg-slate-100 transition-colors">
+                        <div className="flex items-center justify-between mb-1">
+                          <span
                             onClick={() => navigate('/profile-detail')}
-                            className="font-medium text-sm text-gray-800 cursor-pointer hover:text-cyan-500 transition-colors"
+                            className="font-bold text-sm text-slate-800 cursor-pointer hover:text-primary-600 transition-colors"
                           >
                             {comment.author}
                           </span>
-                          <span className="text-xs text-gray-500">{comment.timeAgo}</span>
+                          <span className="text-[10px] font-medium text-slate-400">{comment.timeAgo}</span>
                         </div>
-                        <p className="text-sm text-gray-700 leading-relaxed">{comment.content}</p>
+                        <p className="text-sm text-slate-600 leading-relaxed">{comment.content}</p>
                       </div>
-                      <div className="flex items-center space-x-4 mt-2 ml-4">
+                      <div className="flex items-center space-x-4 mt-2 ml-2">
                         <button
                           onClick={() => handleCommentLike(comment.id)}
-                          className={`flex items-center space-x-1 text-xs transition-colors cursor-pointer ${
-                            comment.isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                          }`}
+                          className={`flex items-center space-x-1 text-xs font-medium transition-colors cursor-pointer group/like ${comment.isLiked ? 'text-pink-500' : 'text-slate-400 hover:text-pink-500'
+                            }`}
                         >
-                          <i className={`${comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'}`}></i>
-                          {comment.likes > 0 && <span>{comment.likes}</span>}
+                          <i className={`${comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'} group-hover/like:scale-110 transition-transform`}></i>
+                          <span>{comment.likes > 0 ? comment.likes : '좋아요'}</span>
                         </button>
-                        <button className="text-xs text-gray-500 hover:text-gray-700 transition-colors cursor-pointer">
-                          답글
+                        <button className="text-xs font-medium text-slate-400 hover:text-primary-500 transition-colors cursor-pointer">
+                          답글달기
                         </button>
                       </div>
                     </div>
@@ -330,11 +330,11 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <i className="ri-chat-3-line text-4xl text-gray-300"></i>
+              <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <div className="w-16 h-16 flex items-center justify-center mx-auto mb-3 bg-white rounded-full shadow-sm">
+                  <i className="ri-chat-smile-2-line text-3xl text-primary-300"></i>
                 </div>
-                <p className="text-gray-500">첫 번째 댓글을 남겨보세요!</p>
+                <p className="text-slate-500 font-medium">첫 번째 댓글의 주인공이 되어보세요!</p>
               </div>
             )}
           </div>
