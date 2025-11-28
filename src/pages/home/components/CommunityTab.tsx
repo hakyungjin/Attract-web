@@ -379,6 +379,10 @@ export default function CommunityTab() {
         post={selectedPost}
         onBack={handleBackFromDetail}
         onUpdatePost={handleUpdatePost}
+        onDeletePost={(postId) => {
+          setPosts(posts.filter(p => p.id !== postId));
+          setSelectedPost(null);
+        }}
       />
     );
   }

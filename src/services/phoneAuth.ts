@@ -63,11 +63,13 @@ export const sendVerificationCode = async (phoneNumber: string): Promise<Confirm
  * 인증번호 확인 및 로그인/회원가입 분리
  * @param confirmationResult - SMS 전송 시 받은 결과
  * @param verificationCode - 사용자가 입력한 인증번호
+ * @param phoneNumber - 전화번호 (유령 회원 확인용)
  * @returns isNewUser: 신규 사용자 여부
  */
 export const verifyCode = async (
   confirmationResult: ConfirmationResult,
-  verificationCode: string
+  verificationCode: string,
+  phoneNumber?: string
 ) => {
   try {
     // Firebase로 인증
@@ -76,8 +78,8 @@ export const verifyCode = async (
 
     console.log('Firebase 인증 성공:', user.uid);
 
-    // Supabase에서 기존 사용자 확인
-    const { isNewUser, userData } = await checkUserExists(user.uid);
+    // Supabase에서 기존 사용자 확인 (전화번호도 함께 전달)
+    const { isNewUser, userData } = await checkUserExists(user.uid, phoneNumber);
 
     return {
       user,
@@ -98,21 +100,24 @@ export const verifyCode = async (
 
 /**
  * Supabase에서 사용자 존재 여부 확인
+ * firebase_uid로 먼저 확인하고, 없으면 전화번호로 확인 (유령 회원 대응)
  */
-const checkUserExists = async (firebaseUid: string) => {
+const checkUserExists = async (firebaseUid: string, phoneNumber?: string) => {
   try {
     console.log('🔍 Supabase 쿼리 시작:', {
       firebaseUid,
+      phoneNumber,
       supabaseClient: supabase ? '✅ 존재' : '❌ 없음'
     });
 
+    // 1. firebase_uid로 사용자 확인
     const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('*')
       .eq('firebase_uid', firebaseUid)
       .single();
 
-    console.log('🔍 Supabase 쿼리 결과:', {
+    console.log('🔍 firebase_uid 쿼리 결과:', {
       hasData: !!existingUser,
       error: checkError ? checkError.message : null,
       errorCode: checkError ? checkError.code : null
@@ -122,14 +127,63 @@ const checkUserExists = async (firebaseUid: string) => {
       throw checkError;
     }
 
-    // 사용자가 없으면 신규
-    if (!existingUser) {
-      console.log('신규 사용자');
-      return { isNewUser: true, userData: null };
-    } else {
-      console.log('기존 사용자 확인됨');
+    // firebase_uid로 찾았으면 기존 사용자
+    if (existingUser) {
+      console.log('✅ firebase_uid로 기존 사용자 확인됨');
       return { isNewUser: false, userData: existingUser };
     }
+
+    // 2. firebase_uid로 못 찾았고, 전화번호가 있으면 전화번호로 확인 (유령 회원)
+    if (phoneNumber) {
+      // 전화번호를 010XXXXXXXX 형식으로 변환 (DB 저장 형식과 일치)
+      // 010-1234-5678 → 01012345678
+      // +821012345678 → 01012345678
+      let cleanedPhone = phoneNumber.replace(/[^\d]/g, ''); // 숫자만 남기기
+
+      // +82로 시작하면 82 제거하고 0 추가
+      if (cleanedPhone.startsWith('82')) {
+        cleanedPhone = '0' + cleanedPhone.substring(2);
+      }
+
+      console.log('🔍 원본 전화번호:', phoneNumber);
+      console.log('🔍 변환된 전화번호:', cleanedPhone);
+
+      const { data: ghostUser, error: ghostError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('phone_number', cleanedPhone)
+        .is('firebase_uid', null)
+        .maybeSingle(); // single 대신 maybeSingle 사용 (0개 또는 1개 허용)
+
+      console.log('🔍 전화번호 쿼리 결과:', {
+        hasData: !!ghostUser,
+        error: ghostError ? ghostError.message : null,
+        searchedPhone: cleanedPhone
+      });
+
+      if (ghostUser) {
+        console.log('👻 유령 회원 발견! firebase_uid 업데이트 중...');
+
+        // 유령 회원에 firebase_uid 연결
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ firebase_uid: firebaseUid })
+          .eq('id', ghostUser.id);
+
+        if (updateError) {
+          console.error('firebase_uid 업데이트 실패:', updateError);
+        } else {
+          console.log('✅ firebase_uid 업데이트 완료');
+          ghostUser.firebase_uid = firebaseUid; // 로컬 데이터도 업데이트
+        }
+
+        return { isNewUser: false, userData: ghostUser };
+      }
+    }
+
+    // 사용자를 못 찾았으면 신규
+    console.log('❌ 신규 사용자');
+    return { isNewUser: true, userData: null };
   } catch (error) {
     console.error('사용자 확인 실패:', error);
     return { isNewUser: true, userData: null };
@@ -151,6 +205,17 @@ export const createUserProfile = async (
     gender?: string;
     location?: string;
     bio?: string;
+    mbti?: string;
+    school?: string;
+    height?: string;
+    body_type?: string;
+    style?: string;
+    religion?: string;
+    smoking?: string;
+    drinking?: string;
+    interests?: string[];
+    photos?: string[];
+    password?: string; // 비밀번호 추가
   }
 ) => {
   try {
@@ -159,7 +224,7 @@ export const createUserProfile = async (
 
     console.log('회원가입 전화번호 저장:', cleanedPhone);
 
-    const { data, error } = await supabase
+    const { data, error} = await supabase
       .from('users')
       .insert({
         firebase_uid: firebaseUid,
@@ -169,6 +234,17 @@ export const createUserProfile = async (
         gender: userData.gender,
         location: userData.location,
         bio: userData.bio,
+        mbti: userData.mbti,
+        school: userData.school,
+        height: userData.height,
+        body_type: userData.body_type,
+        style: userData.style,
+        religion: userData.religion,
+        smoking: userData.smoking,
+        drinking: userData.drinking,
+        interests: userData.interests,
+        photos: userData.photos,
+        password: userData.password || null, // 비밀번호 추가
         created_at: new Date().toISOString()
       })
       .select()
@@ -193,8 +269,8 @@ export const createUserProfile = async (
  * @returns +82 형식의 전화번호
  */
 export const formatPhoneNumber = (phoneNumber: string): string => {
-  // 공백, 하이픈 제거
-  let cleaned = phoneNumber.replace(/[\s-]/g, '');
+  // 숫자만 남기기
+  let cleaned = phoneNumber.replace(/[^\d]/g, '');
 
   // 0으로 시작하면 +82로 변경
   if (cleaned.startsWith('0')) {

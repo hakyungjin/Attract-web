@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Notification {
-  id: number;
+  id: string;
   type: 'like' | 'match' | 'message' | 'community';
   message: string;
   time: string;
@@ -11,50 +13,74 @@ interface Notification {
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      type: 'like',
-      message: '하얀눈방울e님이 회원님을 좋아합니다',
-      time: '5분 전',
-      isRead: false
-    },
-    {
-      id: 2,
-      type: 'match',
-      message: '새로운 매칭이 있습니다',
-      time: '1시간 전',
-      isRead: false
-    },
-    {
-      id: 3,
-      type: 'message',
-      message: '나만의아기고양이님이 메시지를 보냈습니다',
-      time: '2시간 전',
-      isRead: true
-    },
-    {
-      id: 4,
-      type: 'community',
-      message: '커뮤니티에 새 댓글이 달렸습니다',
-      time: '3시간 전',
-      isRead: true
-    },
-    {
-      id: 5,
-      type: 'like',
-      message: '눈망울e님이 회원님을 좋아합니다',
-      time: '5시간 전',
-      isRead: true
-    },
-    {
-      id: 6,
-      type: 'match',
-      message: '띠로리이님과 매칭되었습니다',
-      time: '1일 전',
-      isRead: true
+  const { user: authUser } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (authUser?.id) {
+      loadNotifications();
     }
-  ]);
+  }, [authUser?.id]);
+
+  const loadNotifications = async () => {
+    try {
+      if (!authUser?.id) {
+        setNotifications([]);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('알림 로드 시작:', authUser.id);
+
+      // Supabase에서 알림 데이터 로드 (RLS가 user_id 필터링)
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('알림 로드 오류:', error);
+        setNotifications([]);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('로드된 알림:', data);
+
+      // 데이터 변환
+      const formattedNotifications = (data || []).map(notification => ({
+        id: notification.id,
+        type: notification.type as 'like' | 'match' | 'message' | 'community',
+        message: notification.message || notification.content || '',
+        time: formatTimeAgo(notification.created_at),
+        isRead: notification.read || false
+      }));
+
+      setNotifications(formattedNotifications);
+    } catch (error) {
+      console.error('알림 로드 실패:', error);
+      setNotifications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 시간 포맷팅 함수
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return '방금 전';
+    if (diffMins < 60) return `${diffMins}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    if (diffDays < 7) return `${diffDays}일 전`;
+    return date.toLocaleDateString('ko-KR');
+  };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -75,7 +101,7 @@ export default function NotificationsPage() {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
-  const deleteNotification = (id: number) => {
+  const deleteNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
@@ -116,7 +142,11 @@ export default function NotificationsPage() {
 
       {/* 알림 목록 */}
       <main className="pt-16 pb-6">
-        {notifications.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full"></div>
+          </div>
+        ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <div className="w-10 h-10 flex items-center justify-center">

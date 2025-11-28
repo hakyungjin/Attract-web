@@ -5,14 +5,14 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signInPhone, signUpPhone } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
+    phoneNumber: '',
     password: '',
     confirmPassword: '',
-    nickname: '',
+    name: '',
     age: '',
     gender: 'male'
   });
@@ -22,22 +22,28 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { error } = await signIn(formData.email, formData.password);
+      if (!formData.phoneNumber || !formData.password) {
+        alert('전화번호와 비밀번호를 입력해주세요.');
+        setLoading(false);
+        return;
+      }
+
+      // 전화번호에서 '-' 제거
+      const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
+      const { error, profileCompleted } = await signInPhone(cleanPhoneNumber, formData.password);
 
       if (error) {
-        // 이메일 확인 관련 에러 처리
-        if (error.message.includes('Email not confirmed')) {
-          alert('⚠️ 이메일 인증이 필요합니다.\n\n해결 방법:\n1. 가입 시 받은 이메일을 확인하고 인증 링크 클릭\n2. 또는 Supabase 대시보드에서 이메일 확인 비활성화\n   (Authentication > Settings > Email Confirmation 끄기)');
-        } else if (error.message.includes('Invalid login credentials')) {
-          alert('❌ 이메일 또는 비밀번호가 올바르지 않습니다.');
-        } else {
-          alert(`로그인 실패: ${error.message}`);
-        }
+        alert(`로그인 실패: ${error.message}`);
         return;
       }
 
       // 로그인 성공
-      navigate('/');
+      // 프로필이 완성되지 않으면 프로필 완성 페이지로 리다이렉트
+      if (!profileCompleted) {
+        navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       alert(`로그인 오류: ${error.message}`);
     } finally {
@@ -49,6 +55,26 @@ export default function LoginPage() {
     e.preventDefault();
 
     // 유효성 검사
+    if (!formData.phoneNumber) {
+      alert('전화번호를 입력해주세요.');
+      return;
+    }
+
+    if (!formData.name) {
+      alert('이름을 입력해주세요.');
+      return;
+    }
+
+    if (!formData.age) {
+      alert('나이를 입력해주세요.');
+      return;
+    }
+
+    if (!formData.gender || formData.gender === '') {
+      alert('성별을 선택해주세요.');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       alert('비밀번호가 일치하지 않습니다.');
       return;
@@ -59,24 +85,25 @@ export default function LoginPage() {
       return;
     }
 
-    if (!formData.nickname) {
-      alert('닉네임을 입력해주세요.');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const { error } = await signUp(formData.email, formData.password, formData.nickname);
+      // 전화번호에서 '-' 제거
+      const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
+      const { error } = await signUpPhone(cleanPhoneNumber, formData.password, {
+        name: formData.name,
+        age: parseInt(formData.age),
+        gender: formData.gender,
+      });
 
       if (error) {
         alert(`회원가입 실패: ${error.message}`);
         return;
       }
 
-      // 회원가입 성공
-      alert('회원가입이 완료되었습니다! 이메일을 확인해주세요.');
-      setIsLogin(true);
+      // 회원가입 성공 - 프로필 완성 페이지로 이동
+      alert('회원가입이 완료되었습니다! 프로필을 완성해주세요.');
+      navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
     } catch (error: any) {
       alert(`회원가입 오류: ${error.message}`);
     } finally {
@@ -111,17 +138,15 @@ export default function LoginPage() {
           <div className="flex bg-gray-100 rounded-full p-1 mb-6">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-3 rounded-full font-medium transition-all cursor-pointer whitespace-nowrap ${
-                isLogin ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md' : 'text-gray-600'
-              }`}
+              className={`flex-1 py-3 rounded-full font-medium transition-all cursor-pointer whitespace-nowrap ${isLogin ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md' : 'text-gray-600'
+                }`}
             >
               로그인
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-3 rounded-full font-medium transition-all cursor-pointer whitespace-nowrap ${
-                !isLogin ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md' : 'text-gray-600'
-              }`}
+              className={`flex-1 py-3 rounded-full font-medium transition-all cursor-pointer whitespace-nowrap ${!isLogin ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md' : 'text-gray-600'
+                }`}
             >
               회원가입
             </button>
@@ -131,13 +156,13 @@ export default function LoginPage() {
           {isLogin ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">이메일</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">전화번호</label>
                 <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                  placeholder="이메일을 입력하세요"
+                  placeholder="010-1234-5678"
                 />
               </div>
 
@@ -146,7 +171,7 @@ export default function LoginPage() {
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                   placeholder="비밀번호를 입력하세요"
                 />
@@ -174,47 +199,52 @@ export default function LoginPage() {
             /* 회원가입 폼 */
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">이메일</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">전화번호 <span className="text-red-500">*</span></label>
                 <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  type="tel"
+                  required
+                  value={formData.phoneNumber}
+                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                  placeholder="이메일을 입력하세요"
+                  placeholder="010-1234-5678"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">닉네임</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">이름 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
-                  value={formData.nickname}
-                  onChange={(e) => setFormData({...formData, nickname: e.target.value})}
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                  placeholder="닉네임을 입력하세요"
+                  placeholder="이름을 입력하세요"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">나이</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">나이 <span className="text-red-500">*</span></label>
                   <input
                     type="number"
+                    required
                     min="19"
                     max="99"
                     value={formData.age}
-                    onChange={(e) => setFormData({...formData, age: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                     placeholder="나이"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">성별</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">성별 <span className="text-red-500">*</span></label>
                   <select
+                    required
                     value={formData.gender}
-                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm pr-8"
                   >
+                    <option value="">성별을 선택하세요</option>
                     <option value="male">남성</option>
                     <option value="female">여성</option>
                   </select>
@@ -222,23 +252,26 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">비밀번호</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">비밀번호 <span className="text-red-500">*</span></label>
                 <input
                   type="password"
+                  required
                   minLength={8}
                   value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                   placeholder="8자 이상 입력하세요"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">비밀번호 확인</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">비밀번호 확인 <span className="text-red-500">*</span></label>
                 <input
                   type="password"
+                  required
+                  minLength={8}
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                   placeholder="비밀번호를 다시 입력하세요"
                 />

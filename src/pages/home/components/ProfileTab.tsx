@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
-  if (gender === '남자') {
+  if (gender === '남자' || gender === 'male') {
     return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
   }
   return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
@@ -11,6 +13,7 @@ const getDefaultAvatar = (gender?: string) => {
 
 export default function ProfileTab() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [profile, setProfile] = useState({
     name: '사용자',
     age: 0,
@@ -28,32 +31,75 @@ export default function ProfileTab() {
 
   // 현재 사용자 정보 로드
   useEffect(() => {
-    const loadUserProfile = () => {
-      try {
-        // 로컬 스토리지에서 사용자 정보 가져오기
-        const localUser = localStorage.getItem('user');
-        if (localUser) {
-          const userData = JSON.parse(localUser);
-          setProfile({
-            name: userData.name || '사용자',
-            age: userData.age || 0,
-            gender: userData.gender || '여자',
-            location: userData.location || '위치 미설정',
-            avatar: userData.avatar_url || '',
-            bio: userData.bio || '',
-            interests: userData.interests || []
-          });
-          console.log('프로필 로드 완료:', userData);
-        }
-      } catch (error) {
-        console.error('프로필 로드 실패:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadUserProfile();
-  }, []);
+    loadMatchingStats();
+  }, [authUser?.id]);
+
+  const loadUserProfile = async () => {
+    try {
+      if (!authUser?.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Supabase에서 최신 사용자 데이터 로드
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error) {
+        console.error('프로필 로드 실패:', error);
+        setIsLoading(false);
+        return;
+      }
+
+      if (userData) {
+        setProfile({
+          name: userData.name || '사용자',
+          age: userData.age || 0,
+          gender: userData.gender === 'male' ? '남자' : '여자',
+          location: userData.location || '위치 미설정',
+          avatar: userData.avatar_url || userData.profile_image || '',
+          bio: userData.bio || '',
+          interests: userData.interests || []
+        });
+        console.log('프로필 로드 완료:', userData);
+      }
+    } catch (error) {
+      console.error('프로필 로드 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadMatchingStats = async () => {
+    try {
+      if (!authUser?.id) return;
+
+      // 받은 매칭 요청 개수
+      const { count: receivedCount } = await supabase
+        .from('matching_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('to_user_id', authUser.id)
+        .eq('status', 'pending');
+
+      // 보낸 매칭 요청 개수
+      const { count: sentCount } = await supabase
+        .from('matching_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('from_user_id', authUser.id)
+        .eq('status', 'pending');
+
+      setMatchingStats({
+        received: receivedCount || 0,
+        sent: sentCount || 0
+      });
+    } catch (error) {
+      console.error('매칭 통계 로드 실패:', error);
+    }
+  };
 
   if (isLoading) {
     return (

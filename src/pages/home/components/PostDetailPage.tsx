@@ -35,13 +35,15 @@ interface PostDetailPageProps {
   post: Post;
   onBack: () => void;
   onUpdatePost: (updatedPost: Post) => void;
+  onDeletePost?: (postId: number) => void;
 }
 
-export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetailPageProps) {
+export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePost }: PostDetailPageProps) {
   const navigate = useNavigate();
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -191,6 +193,41 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
     }
   };
 
+  const handleDeletePost = async () => {
+    if (currentPost.userId !== currentUser?.id && currentPost.userId !== currentUser?.profile?.id) {
+      alert('자신의 게시글만 삭제할 수 있습니다.');
+      return;
+    }
+
+    if (!window.confirm('게시글을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // 게시글 삭제
+      const { error } = await supabase
+        .from('community_posts')
+        .delete()
+        .eq('id', currentPost.id);
+
+      if (error) throw error;
+
+      // 콜백 실행
+      if (onDeletePost) {
+        onDeletePost(currentPost.id);
+      }
+
+      alert('게시글이 삭제되었습니다.');
+      onBack();
+    } catch (error) {
+      console.error('게시글 삭제 오류:', error);
+      alert('게시글 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* 헤더 */}
@@ -229,8 +266,20 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
                 </h4>
                 <p className="text-xs font-medium text-slate-400">{currentPost.timeAgo}</p>
               </div>
-              <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-400">
-                <i className="ri-more-fill"></i>
+              <button 
+                onClick={() => {
+                  if (currentPost.userId === currentUser?.id || currentPost.userId === currentUser?.profile?.id) {
+                    handleDeletePost();
+                  }
+                }}
+                disabled={isDeleting || (currentPost.userId !== currentUser?.id && currentPost.userId !== currentUser?.profile?.id)}
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-slate-400 transition-all ${
+                  currentPost.userId === currentUser?.id || currentPost.userId === currentUser?.profile?.id
+                    ? 'hover:bg-red-50 hover:text-red-500 cursor-pointer'
+                    : 'cursor-default opacity-0'
+                }`}
+              >
+                <i className={`ri-${isDeleting ? 'loader-4-line animate-spin' : 'delete-bin-line'}`}></i>
               </button>
             </div>
 

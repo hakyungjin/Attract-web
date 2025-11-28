@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Profile {
   id: number;
@@ -23,34 +25,46 @@ interface Profile {
   drinking?: string;
 }
 
-// 기본 프로필 이미지 헬퍼 함수
-const getDefaultAvatar = (gender: string) => {
-  if (gender === '남자') {
-    return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
-  }
-  return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
-};
-
 export default function ProfileDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const { user: authUser } = useAuth();
+
   // profile 또는 authorData를 받음
   const profile = (location.state?.profile || location.state?.authorData) as Profile;
-  
+
   const [userRating, setUserRating] = useState(0);
   const [showLikeToast, setShowLikeToast] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
-  // 프로필 사진 배열 (기본 이미지 포함)
-  const profilePhotos = profile?.photos?.length 
-    ? profile.photos 
-    : [
-        profile?.avatar_url || profile?.avatar || getDefaultAvatar(profile?.gender || '여자'),
-        'https://readdy.ai/api/search-image?query=young%20Korean%20woman%20casual%20lifestyle%20photo%20portrait%20natural%20lighting%20soft%20smile%20wearing%20comfortable%20clothes%20indoor%20setting%20warm%20atmosphere%20clean%20background%20professional%20photography&width=400&height=500&seq=profile-photo-2&orientation=portrait',
-        'https://readdy.ai/api/search-image?query=young%20Korean%20woman%20outdoor%20photo%20portrait%20natural%20daylight%20friendly%20expression%20casual%20style%20street%20photography%20urban%20background%20clean%20aesthetic%20professional%20quality&width=400&height=500&seq=profile-photo-3&orientation=portrait'
-      ];
+  // 현재 로그인한 사용자 확인
+  const getCurrentUserId = () => {
+    const localUser = localStorage.getItem('user');
+    if (!localUser) return null;
+    try {
+      const userData = JSON.parse(localUser);
+      return userData.id;
+    } catch {
+      return null;
+    }
+  };
+
+  const currentUserId = getCurrentUserId();
+  const isOwnProfile = currentUserId && profile?.id === currentUserId;
+
+  // 기본 프로필 이미지
+  const getDefaultAvatar = (gender: string) => {
+    if (gender === '남자' || gender === 'male') {
+      return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
+    }
+    return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
+  };
+
+  // 프로필 사진 배열 - 사진이 없으면 기본 이미지 사용
+  const profilePhotos = profile?.photos && profile.photos.length > 0
+    ? profile.photos
+    : [getDefaultAvatar(profile?.gender || '')];
 
   const handleBack = () => {
     navigate(-1);
@@ -83,15 +97,62 @@ export default function ProfileDetailPage() {
 
   const interests = profile?.interests || ['관심사'];
 
-  const handleLike = () => {
-    if (profile.hasLikedMe) {
-      setShowMatchModal(true);
-    } else {
-      setShowLikeToast(true);
-      setTimeout(() => {
-        setShowLikeToast(false);
-        navigate(-1);
-      }, 2000);
+  const handleLike = async () => {
+    try {
+      if (!authUser?.id || !profile?.id) {
+        alert('로그인 후 이용해주세요');
+        return;
+      }
+
+      // 이미 매칭 요청이 있는지 확인 (양방향)
+      const { data: existingRequest1, error: checkError1 } = await supabase
+        .from('matching_requests')
+        .select('*')
+        .eq('from_user_id', authUser.id)
+        .eq('to_user_id', profile.id);
+
+      if (checkError1) throw checkError1;
+
+      const { data: existingRequest2, error: checkError2 } = await supabase
+        .from('matching_requests')
+        .select('*')
+        .eq('from_user_id', profile.id)
+        .eq('to_user_id', authUser.id);
+
+      if (checkError2) throw checkError2;
+
+      const allRequests = [...(existingRequest1 || []), ...(existingRequest2 || [])];
+
+      if (allRequests.length > 0) {
+        alert('이미 매칭이 성사된 상대입니다');
+        return;
+      }
+
+      // matching_requests 테이블에 매칭 요청 저장
+      const { error } = await supabase
+        .from('matching_requests')
+        .insert({
+          from_user_id: authUser.id,
+          to_user_id: profile.id,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+
+      if (profile.hasLikedMe) {
+        // 상호 매칭인 경우
+        setShowMatchModal(true);
+      } else {
+        // 일반 매칭 요청인 경우
+        setShowLikeToast(true);
+        setTimeout(() => {
+          setShowLikeToast(false);
+          navigate(-1);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('매칭 요청 실패:', error);
+      alert('매칭 요청에 실패했습니다');
     }
   };
 
@@ -105,12 +166,12 @@ export default function ProfileDetailPage() {
 
   const startChatWithMatch = () => {
     setShowMatchModal(false);
-    const event = new CustomEvent('openChat', { 
-      detail: { 
-        userId: profile.id, 
+    const event = new CustomEvent('openChat', {
+      detail: {
+        userId: profile.id,
         userName: profile.name,
-        userAvatar: profile.character || getDefaultAvatar(profile.gender)
-      } 
+        userAvatar: profilePhotos[0] || ''
+      }
     });
     window.dispatchEvent(event);
     navigate('/');
@@ -121,7 +182,7 @@ export default function ProfileDetailPage() {
       {/* 헤더 */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-3">
-          <button 
+          <button
             onClick={handleBack}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
           >
@@ -129,13 +190,9 @@ export default function ProfileDetailPage() {
           </button>
           <div className="flex items-center space-x-2">
             <img
-              src={profile.avatar_url || profile.avatar || getDefaultAvatar(profile?.gender || '여자')}
+              src={profilePhotos[0]}
               alt={profile.name}
               className="w-8 h-8 rounded-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = getDefaultAvatar(profile?.gender || '여자');
-              }}
             />
             <span className="font-medium text-gray-800">{profile.name}</span>
           </div>
@@ -152,12 +209,8 @@ export default function ProfileDetailPage() {
             src={profilePhotos[currentPhotoIndex]}
             alt={`${profile.name} 사진 ${currentPhotoIndex + 1}`}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = getDefaultAvatar(profile.gender);
-            }}
           />
-          
+
           {/* 좌우 네비게이션 버튼 */}
           {profilePhotos.length > 1 && (
             <>
@@ -175,7 +228,7 @@ export default function ProfileDetailPage() {
               </button>
             </>
           )}
-          
+
           {/* 사진 인디케이터 */}
           {profilePhotos.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
@@ -183,9 +236,8 @@ export default function ProfileDetailPage() {
                 <button
                   key={index}
                   onClick={() => setCurrentPhotoIndex(index)}
-                  className={`w-2 h-2 rounded-full transition-colors cursor-pointer ${
-                    index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
-                  }`}
+                  className={`w-2 h-2 rounded-full transition-colors cursor-pointer ${index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
+                    }`}
                 />
               ))}
             </div>
@@ -216,35 +268,35 @@ export default function ProfileDetailPage() {
           <div className="grid grid-cols-2">
             <div className="border-b border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">학교</div>
-              <div className="font-medium text-gray-800">{profile?.school || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.school}</div>
             </div>
             <div className="border-b border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">키</div>
-              <div className="font-medium text-gray-800">{profile?.height || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.height}</div>
             </div>
             <div className="border-b border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">체형</div>
-              <div className="font-medium text-gray-800">{profile?.bodyType || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.bodyType}</div>
             </div>
             <div className="border-b border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">스타일</div>
-              <div className="font-medium text-gray-800">{profile?.style || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.style}</div>
             </div>
             <div className="border-b border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">종교</div>
-              <div className="font-medium text-gray-800">{profile?.religion || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.religion}</div>
             </div>
             <div className="border-b border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">MBTI</div>
-              <div className="font-medium text-gray-800">{profile?.mbti || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.mbti}</div>
             </div>
             <div className="border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">흡연</div>
-              <div className="font-medium text-gray-800">{profile?.smoking || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.smoking}</div>
             </div>
             <div className="p-4">
               <div className="text-xs text-gray-500 mb-1">음주</div>
-              <div className="font-medium text-gray-800">{profile?.drinking || '정보없음'}</div>
+              <div className="font-medium text-gray-800">{profileInfo.drinking}</div>
             </div>
           </div>
         </div>
@@ -267,10 +319,11 @@ export default function ProfileDetailPage() {
             관심사
           </h3>
           <div className="flex flex-wrap gap-2">
-            <span className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">음악</span>
-            <span className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">영화</span>
-            <span className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">카페</span>
-            <span className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">독서</span>
+            {interests.map((interest, index) => (
+              <span key={index} className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">
+                {interest}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -284,21 +337,23 @@ export default function ProfileDetailPage() {
         </div>
       </div>
 
-      {/* 하단 액션 버튼 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-cyan-50 px-8 py-6 flex justify-center space-x-8">
-        <button 
-          onClick={handleLike}
-          className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-cyan-200"
-        >
-          <i className="ri-heart-fill text-cyan-400 text-2xl"></i>
-        </button>
-        <button 
-          onClick={handlePass}
-          className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-gray-200"
-        >
-          <i className="ri-close-line text-gray-400 text-2xl"></i>
-        </button>
-      </div>
+      {/* 하단 액션 버튼 - 자기 자신의 프로필이 아닐 때만 표시 */}
+      {!isOwnProfile && (
+        <div className="fixed bottom-0 left-0 right-0 bg-cyan-50 px-8 py-6 flex justify-center space-x-8">
+          <button
+            onClick={handleLike}
+            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-cyan-200"
+          >
+            <i className="ri-heart-fill text-cyan-400 text-2xl"></i>
+          </button>
+          <button
+            onClick={handlePass}
+            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-gray-200"
+          >
+            <i className="ri-close-line text-gray-400 text-2xl"></i>
+          </button>
+        </div>
+      )}
 
       {/* 좋아요 토스트 */}
       {showLikeToast && (

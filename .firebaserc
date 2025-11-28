@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "attract--web"
-  }
+  },
+  "targets": {
+    "attract--web": {
+      "hosting": {
+        "demo": [
+          "attract-web-demo"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

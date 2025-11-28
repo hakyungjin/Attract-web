@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface ChatUser {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   lastMessage: string;
@@ -13,7 +15,7 @@ interface ChatUser {
 
 interface Message {
   id: number;
-  senderId: number;
+  senderId: string;
   content: string;
   timestamp: string;
   isRead: boolean;
@@ -21,19 +23,20 @@ interface Message {
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
-  if (gender === '남자') {
+  if (gender === 'male') {
     return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
   }
   return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
 };
 
 export default function ChatTab() {
-  const [selectedChat, setSelectedChat] = useState<number | null>(null);
+  const { user: authUser } = useAuth();
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
-  const [messages, setMessages] = useState<Record<number, Message[]>>({});
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
 
   // 메시지 목록이 변경될 때 스크롤을 아래로 이동
   useEffect(() => {
@@ -42,86 +45,158 @@ export default function ChatTab() {
     }
   }, [messages, selectedChat]);
 
-  // 하트 수락으로 새 채팅방 열기 이벤트 리스너
+  // 채팅 목록 로드
   useEffect(() => {
-    const handleOpenChat = (event: CustomEvent) => {
-      const { userId, userName, userAvatar } = event.detail;
-
-      // 이미 존재하는 채팅인지 확인
-      const existingChat = chatUsers.find(user => user.id === userId);
-
-      if (!existingChat) {
-        // 새 채팅 사용자 추가
-        const newChatUser: ChatUser = {
-          id: userId,
-          name: userName,
-          avatar: userAvatar,
-          lastMessage: '매칭되었습니다! 안녕하세요 😊',
-          lastMessageTime: '방금 전',
-          unreadCount: 0,
-          isOnline: true,
-          gender: '여자'
-        };
-
-        setChatUsers(prev => [newChatUser, ...prev]);
-
-        // 초기 메시지 추가
-        setMessages(prev => ({
-          ...prev,
-          [userId]: [
-            {
-              id: 1,
-              senderId: 0,
-              content: '매칭되었습니다! 안녕하세요 😊',
-              timestamp: new Date().toLocaleTimeString('ko-KR', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              }),
-              isRead: true
-            }
-          ]
-        }));
-      }
-
-      // 해당 채팅방으로 이동
-      setSelectedChat(userId);
-    };
-
-    window.addEventListener('openChat', handleOpenChat as EventListener);
+    if (!authUser?.id) return;
+    loadChatList();
+    
+    // 실시간 메시지 구독
+    const subscription = supabase
+      .channel('messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          loadChatList();
+          if (selectedChat) {
+            loadMessages(selectedChat);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      window.removeEventListener('openChat', handleOpenChat as EventListener);
+      subscription.unsubscribe();
     };
-  }, [chatUsers]);
+  }, [authUser?.id, selectedChat]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() && selectedChat) {
-      const newMsg: Message = {
-        id: (messages[selectedChat]?.length || 0) + 1,
-        senderId: 0, // 내가 보낸 메시지
-        content: newMessage,
-        timestamp: new Date().toLocaleTimeString('ko-KR', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }),
-        isRead: true
-      };
+  const loadChatList = async () => {
+    if (!authUser?.id) return;
 
-      setMessages(prev => ({
-        ...prev,
-        [selectedChat]: [...(prev[selectedChat] || []), newMsg]
-      }));
+    try {
+      // 내가 참여한 모든 대화 상대 찾기
+      const { data: sentMessages } = await supabase
+        .from('messages')
+        .select('sender_id, recipient_id')
+        .or(`sender_id.eq.${authUser.id},recipient_id.eq.${authUser.id}`)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-      // 채팅 목록에서 마지막 메시지 업데이트
-      setChatUsers(prev => prev.map(user =>
-        user.id === selectedChat
-          ? { ...user, lastMessage: newMessage, lastMessageTime: '방금 전' }
-          : user
-      ));
+      if (!sentMessages) return;
 
+      // 대화 상대 리스트 추출 및 중복 제거
+      const partners = new Set<string>();
+      sentMessages.forEach(msg => {
+        if (msg.sender_id === authUser.id) {
+          partners.add(msg.recipient_id);
+        } else {
+          partners.add(msg.sender_id);
+        }
+      });
+
+      // 각 파트너의 정보와 마지막 메시지 로드
+      const chatList: ChatUser[] = [];
+      for (const partnerId of partners) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id, name, profile_image, gender')
+          .eq('id', partnerId)
+          .single();
+
+        const { data: lastMsg } = await supabase
+          .from('messages')
+          .select('content, created_at, is_read')
+          .or(`sender_id.eq.${partnerId},recipient_id.eq.${partnerId}`)
+          .or(`sender_id.eq.${authUser.id},recipient_id.eq.${authUser.id}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (userData) {
+          chatList.push({
+            id: userData.id,
+            name: userData.name || '사용자',
+            avatar: userData.profile_image || getDefaultAvatar(userData.gender),
+            lastMessage: lastMsg?.content || 'Conversation started',
+            lastMessageTime: lastMsg ? new Date(lastMsg.created_at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true }) : '방금 전',
+            unreadCount: lastMsg && !lastMsg.is_read ? 1 : 0,
+            isOnline: true,
+            gender: userData.gender
+          });
+        }
+      }
+
+      setChatUsers(chatList.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()));
+    } catch (error) {
+      console.error('채팅 목록 로드 실패:', error);
+    }
+  };
+
+  const loadMessages = async (partnerId: string) => {
+    if (!authUser?.id) return;
+
+    try {
+      const { data } = await supabase
+        .from('messages')
+        .select('id, sender_id, content, created_at, is_read')
+        .or(`sender_id.eq.${authUser.id},recipient_id.eq.${authUser.id}`)
+        .or(`sender_id.eq.${partnerId},recipient_id.eq.${partnerId}`)
+        .order('created_at', { ascending: true });
+
+      if (data) {
+        const formattedMessages: Message[] = data.map(msg => ({
+          id: msg.id,
+          senderId: msg.sender_id,
+          content: msg.content,
+          timestamp: new Date(msg.created_at).toLocaleTimeString('ko-KR', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }),
+          isRead: msg.is_read
+        }));
+        setMessages(prev => ({
+          ...prev,
+          [partnerId]: formattedMessages
+        }));
+
+        // 메시지 읽음 표시
+        await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .eq('recipient_id', authUser.id)
+          .eq('sender_id', partnerId);
+      }
+    } catch (error) {
+      console.error('메시지 로드 실패:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedChat || !authUser?.id) return;
+
+    try {
+      // DB에 메시지 저장
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: authUser.id,
+          recipient_id: selectedChat,
+          content: newMessage,
+          is_read: false
+        });
+
+      if (error) throw error;
+
+      // UI 업데이트 (DB 구독으로 자동 반영됨)
       setNewMessage('');
+    } catch (error) {
+      console.error('메시지 전송 실패:', error);
+      alert('메시지 전송에 실패했습니다.');
     }
   };
 
@@ -132,13 +207,9 @@ export default function ChatTab() {
     }
   };
 
-  const handleChatSelect = (userId: number) => {
+  const handleChatSelect = (userId: string) => {
     setSelectedChat(userId);
-
-    // 읽지 않은 메시지 수 초기화
-    setChatUsers(prev => prev.map(user =>
-      user.id === userId ? { ...user, unreadCount: 0 } : user
-    ));
+    loadMessages(userId);
   };
 
   if (selectedChat) {
@@ -193,10 +264,10 @@ export default function ChatTab() {
           {chatMessages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${message.senderId === 0 ? 'justify-end' : 'justify-start'} animate-slide-up`}
+              className={`flex ${message.senderId === authUser?.id ? 'justify-end' : 'justify-start'} animate-slide-up`}
             >
               <div className="flex items-end space-x-2 max-w-[80%]">
-                {message.senderId !== 0 && (
+                {message.senderId !== authUser?.id && (
                   <img
                     src={currentUser?.avatar || getDefaultAvatar(currentUser?.gender)}
                     alt={currentUser?.name}
@@ -208,7 +279,7 @@ export default function ChatTab() {
                   />
                 )}
                 <div
-                  className={`px-5 py-3 rounded-2xl shadow-sm ${message.senderId === 0
+                  className={`px-5 py-3 rounded-2xl shadow-sm ${message.senderId === authUser?.id
                       ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-none'
                       : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
                     }`}

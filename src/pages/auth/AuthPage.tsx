@@ -34,13 +34,13 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      // 전화번호 정규화 - DB에 저장된 형식(하이픈 포함)으로 변환
-      const formattedPhone = phoneNumber; // 이미 010-XXXX-XXXX 형식
+      // 전화번호 정규화 - 숫자만 추출
+      const cleanedPhone = phoneNumber.replace(/[^\d]/g, '');
 
-      console.log('검색할 전화번호:', formattedPhone);
+      console.log('검색할 전화번호:', cleanedPhone);
 
       // 전화번호로 사용자 찾기 - userService 사용
-      const { user, error } = await userService.findUserByPhoneNumber(formattedPhone);
+      const { user, error } = await userService.findUserByPhoneNumber(cleanedPhone);
 
       if (error || !user) {
         alert('등록되지 않은 전화번호입니다.');

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
@@ -12,6 +13,7 @@ const getDefaultAvatar = (gender?: string) => {
 
 export default function ProfileEditPage() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [formData, setFormData] = useState({
     nickname: '',
     name: '',
@@ -32,29 +34,42 @@ export default function ProfileEditPage() {
   });
 
   const [newInterest, setNewInterest] = useState('');
-  const [showLocationModal, setShowLocationModal] = useState(false);
-  const [selectedCity, setSelectedCity] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
   const [showSaveAlert, setShowSaveAlert] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 로컬 스토리지에서 현재 사용자 정보 가져오기 (Firebase 인증 사용)
-    const getCurrentUser = () => {
-      const localUser = localStorage.getItem('user');
-      if (localUser) {
-        try {
-          const userData = JSON.parse(localUser);
-          setCurrentUserId(userData.id);
+    const loadUserProfile = async () => {
+      if (!authUser?.id) {
+        console.log('사용자 정보 없음');
+        setLoading(false);
+        return;
+      }
 
+      try {
+        // Supabase에서 최신 사용자 데이터 로드
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+
+        if (error) {
+          console.error('사용자 데이터 로드 실패:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (userData) {
           // 기존 프로필 데이터로 폼 초기화
+          const profileImage = userData.profile_image || '';
+          setUploadedImageUrl(''); // 초기화
           setFormData({
             nickname: userData.name || '',
             name: userData.name || '',
             age: userData.age || 20,
-            gender: userData.gender || '여자',
+            gender: userData.gender === 'female' ? '여자' : '남자',
             location: userData.location || '',
             bio: userData.bio || '',
             mbti: userData.mbti || '',
@@ -66,38 +81,21 @@ export default function ProfileEditPage() {
             smoking: userData.smoking || '비흡연',
             drinking: userData.drinking || '가끔',
             interests: userData.interests || [],
-            avatar: userData.avatar_url || ''
+            avatar: profileImage
           });
-        } catch (error) {
-          console.error('사용자 정보 로드 실패:', error);
         }
+      } catch (error) {
+        console.error('프로필 로드 중 오류:', error);
+      } finally {
+        setLoading(false);
       }
     };
-    getCurrentUser();
-  }, []);
+
+    loadUserProfile();
+  }, [authUser?.id]);
 
   const handleBack = () => {
     navigate(-1);
-  };
-
-  // 지역 데이터
-  const locationData: Record<string, string[]> = {
-    '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
-    '인천': ['계양구', '남동구', '동구', '미추홀구', '부평구', '서구', '연수구', '중구', '강화군', '옹진군'],
-    '부산': ['강서구', '금정구', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구', '기장군'],
-    '대구': ['남구', '달서구', '동구', '북구', '서구', '수성구', '중구', '달성군'],
-    '대전': ['대덕구', '동구', '서구', '유성구', '중구'],
-    '광주': ['광산구', '남구', '동구', '북구', '서구'],
-    '울산': ['남구', '동구', '북구', '중구', '울주군'],
-    '경기': ['고양시', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시', '수원시', '시흥시', '안산시', '안성시', '안양시', '양주시', '여주시', '오산시', '용인시', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시'],
-    '강원': ['강릉시', '동해시', '삼척시', '속초시', '원주시', '춘천시', '태백시', '고성군', '양구군', '양양군', '영월군', '인제군', '정선군', '철원군', '평창군', '홍천군', '화천군', '횡성군'],
-    '충북': ['제천시', '청주시', '충주시', '괴산군', '단양군', '보은군', '영동군', '옥천군', '음성군', '증평군', '진천군'],
-    '충남': ['계룡시', '공주시', '논산시', '당진시', '보령시', '서산시', '아산시', '천안시', '금산군', '부여군', '서천군', '예산군', '청양군', '태안군', '홍성군'],
-    '전북': ['군산시', '김제시', '남원시', '익산시', '전주시', '정읍시', '고창군', '무주군', '부안군', '순창군', '완주군', '임실군', '장수군', '진안군'],
-    '전남': ['광양시', '나주시', '목포시', '순천시', '여수시', '강진군', '고흥군', '곡성군', '구례군', '담양군', '무안군', '보성군', '신안군', '영광군', '영암군', '완도군', '장성군', '장흥군', '진도군', '함평군', '해남군', '화순군'],
-    '경북': ['경산시', '경주시', '구미시', '김천시', '문경시', '상주시', '안동시', '영주시', '영천시', '포항시', '고령군', '군위군', '봉화군', '성주군', '영덕군', '영양군', '예천군', '울릉군', '울진군', '의성군', '청도군', '청송군', '칠곡군'],
-    '경남': ['거제시', '김해시', '밀양시', '사천시', '양산시', '진주시', '창원시', '통영시', '거창군', '고성군', '남해군', '산청군', '의령군', '창녕군', '하동군', '함안군', '함양군', '합천군'],
-    '제주': ['제주시', '서귀포시']
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -125,7 +123,7 @@ export default function ProfileEditPage() {
   };
 
   const handleSave = async () => {
-    if (!currentUserId) {
+    if (!authUser?.id) {
       alert('로그인이 필요합니다.');
       navigate('/login');
       return;
@@ -138,11 +136,12 @@ export default function ProfileEditPage() {
       const profileData = {
         name: formData.name,
         age: formData.age,
-        gender: formData.gender,
+        gender: formData.gender === '여자' ? 'female' : 'male',
         location: formData.location,
         bio: formData.bio,
         mbti: formData.mbti,
         school: formData.school,
+        job: formData.name, // job 필드 추가
         height: formData.height,
         body_type: formData.bodyType,
         style: formData.style,
@@ -150,17 +149,15 @@ export default function ProfileEditPage() {
         smoking: formData.smoking,
         drinking: formData.drinking,
         interests: formData.interests,
-        avatar_url: uploadedImageUrl || formData.avatar,
+        profile_image: uploadedImageUrl || formData.avatar,
         updated_at: new Date().toISOString()
       };
 
-      // users 테이블에 데이터 저장 (upsert)
+      // users 테이블에 데이터 저장 (update)
       const { error: dbError } = await supabase
         .from('users')
-        .upsert({
-          id: currentUserId,
-          ...profileData
-        });
+        .update(profileData)
+        .eq('id', authUser.id);
 
       if (dbError) {
         console.error('데이터베이스 저장 에러:', dbError);
@@ -169,16 +166,16 @@ export default function ProfileEditPage() {
         return;
       }
 
-      // 로컬 스토리지도 업데이트
-      const localUser = localStorage.getItem('user');
-      if (localUser) {
-        const userData = JSON.parse(localUser);
+      // localStorage의 auth_user 업데이트
+      const storedUser = localStorage.getItem('auth_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
         const updatedUser = {
           ...userData,
-          ...profileData,
-          body_type: formData.bodyType // DB 컬럼명과 맞춤
+          name: formData.name,
+          profile_image: uploadedImageUrl || formData.avatar
         };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+        localStorage.setItem('auth_user', JSON.stringify(updatedUser));
       }
 
       console.log('저장된 데이터:', profileData);
@@ -190,27 +187,6 @@ export default function ProfileEditPage() {
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddInterest();
-    }
-  };
-
-  const handleCitySelect = (city: string) => {
-    setSelectedCity(city);
-    setSelectedDistrict('');
-  };
-
-  const handleDistrictSelect = (district: string) => {
-    setSelectedDistrict(district);
-    const newLocation = `${selectedCity} ${district}`;
-    handleInputChange('location', newLocation);
-    setShowLocationModal(false);
-    setSelectedCity('');
-    setSelectedDistrict('');
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,29 +211,37 @@ export default function ProfileEditPage() {
 
     try {
       // 파일명 생성 (타임스탬프 + 랜덤 문자열)
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const fileName = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Supabase Storage에 업로드
-      const { error: uploadError } = await supabase.storage
+      // Supabase Storage에 업로드 - profile-images 버킷 사용
+      const { error: uploadError, data } = await supabase.storage
         .from('profile-images')
-        .upload(filePath, file, {
+        .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
         });
 
       if (uploadError) {
-        console.error('업로드 에러:', uploadError);
-        throw new Error(uploadError.message || '이미지 업로드에 실패했습니다.');
+        let errorMsg = uploadError.message || '이미지 업로드에 실패했습니다.';
+        
+        // Bucket not found 오류 처리
+        if (errorMsg.includes('Bucket not found')) {
+          errorMsg = '⚠️ Supabase Storage가 제대로 설정되지 않았습니다.\n관리자에게 문의해주세요.\n\n기술 정보: "user-profiles" bucket이 없습니다.';
+        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+          errorMsg = '⚠️ 인증 오류: Supabase 설정을 확인해주세요.';
+        }
+        
+        console.error('업로드 에러 상세:', uploadError);
+        throw new Error(errorMsg);
       }
 
-      // 업로드된 이미지의 공개 URL 가져오기
-      const { data: urlData } = supabase.storage
-        .from('profile-images')
-        .getPublicUrl(filePath);
+      console.log('업로드 성공:', data);
 
-      const publicUrl = urlData.publicUrl;
+      // 공개 URL 생성 - Supabase 기본 형식
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
+      
+      console.log('생성된 공개 URL:', publicUrl);
       setUploadedImageUrl(publicUrl);
 
       // 미리보기용으로 로컬 이미지도 설정
@@ -277,6 +261,36 @@ export default function ProfileEditPage() {
       setIsUploading(false);
     }
   };
+
+  // 로그인 여부 확인
+  if (!authUser) {
+    return (
+      <div className="min-h-screen bg-cyan-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">로그인이 필요합니다</h1>
+          <p className="text-gray-600 mb-8">프로필을 수정하려면 먼저 로그인해주세요.</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-semibold hover:from-cyan-600 hover:to-blue-600 transition-all cursor-pointer"
+          >
+            로그인하기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 로딩 중
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cyan-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">프로필 정보를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cyan-50 pb-20">

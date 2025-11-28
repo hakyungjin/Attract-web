@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface Profile {
-  id: string | number;
+  id: string;
   name: string;
   age: number;
   gender: string;
@@ -12,25 +13,47 @@ interface Profile {
   mbti: string;
   character: string;
   bio: string;
+  photos?: string[];
   hasLikedMe?: boolean;
   isMatched?: boolean;
 }
 
-// 기본 프로필 이미지 헬퍼 함수
-const getDefaultAvatar = (gender: string) => {
-  if (gender === '남자') {
-    return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
-  }
-  return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
-};
-
 export default function MatchingTab() {
   const navigate = useNavigate();
-  const [selectedGender, setSelectedGender] = useState('여자');
+  const { user: authUser } = useAuth();
+  const [selectedGender, setSelectedGender] = useState<string>(''); // 초기값을 빈 문자열로
   const [showFilter, setShowFilter] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+
+  // 컴포넌트 마운트 시 로그인 사용자 성별에 따라 반대 성별로 초기화
+  useEffect(() => {
+    const loadCurrentUserInfo = async () => {
+      if (authUser?.id) {
+        try {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('gender')
+            .eq('id', authUser.id)
+            .single();
+
+          if (userData?.gender) {
+            // 내 성별의 반대 성별을 보여줌
+            if (userData.gender === 'male') {
+              setSelectedGender('female');
+            } else if (userData.gender === 'female') {
+              setSelectedGender('male');
+            }
+          }
+        } catch (error) {
+          console.error('사용자 정보 로드 실패:', error);
+        }
+      }
+    };
+    loadCurrentUserInfo();
+  }, [authUser?.id]);
 
   // 마운트 시 데이터 로드
   useEffect(() => {
@@ -40,48 +63,60 @@ export default function MatchingTab() {
   const loadProfiles = async () => {
     setIsLoading(true);
     try {
-      // 로컬 스토리지에서 현재 사용자 정보 가져오기 (Firebase 인증 사용)
-      const localUser = localStorage.getItem('user');
-      let currentUserId = null;
-
-      if (localUser) {
-        const userData = JSON.parse(localUser);
-        currentUserId = userData.id; // users 테이블의 id (UUID)
-      }
-
-      // 사용자 데이터 조회 (나 자신 제외)
+      // 성별 필터링
       let query = supabase
         .from('users')
         .select('*');
 
       // 로그인한 경우에만 내 프로필 제외
-      if (currentUserId) {
-        query = query.neq('id', currentUserId);
+      if (authUser?.id) {
+        query = query.neq('id', authUser.id);
       }
 
-      // 성별 필터링
+      // 성별이 선택된 경우에만 필터링 (성별 미입력 사용자 제외)
       if (selectedGender) {
         query = query.eq('gender', selectedGender);
+      } else {
+        // selectedGender가 비어있으면 특정 성별로 필터링하지 않음
+        // 하지만 보통 초기 선택 후 로드되므로, 이 경우는 로딩 중
+        return;
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
 
+      console.log('📊 전체 사용자 데이터:', data);
+      console.log('📊 선택된 성별:', selectedGender);
+
       if (data) {
         // DB 데이터를 Profile 인터페이스에 맞게 변환
-        const formattedProfiles: Profile[] = data.map((user: any) => ({
-          id: user.id, // UUID string but interface says number? We might need to update interface
-          name: user.name || '알 수 없음',
-          age: user.age || 20,
-          gender: user.gender || '무관',
-          location: user.location || '위치 미설정',
-          school: user.school || '학교 미설정',
-          mbti: user.mbti || 'MBTI',
-          character: user.avatar_url || '', // Use avatar_url for character image
-          bio: user.bio || '자기소개가 없습니다.',
-          hasLikedMe: false // This would require a separate 'likes' table check
-        }));
+        // avatar_url 또는 profile_image가 있는 프로필만 표시
+        const formattedProfiles: Profile[] = data
+          .filter((user: any) => {
+            // avatar_url 또는 profile_image 중 하나라도 있으면 됨
+            const hasAvatar = user.avatar_url || user.profile_image;
+            console.log(`👤 ${user.name} - 성별: ${user.gender}, 사진: ${hasAvatar ? '있음' : '없음'}`, { avatar_url: user.avatar_url, profile_image: user.profile_image });
+            return !!hasAvatar;
+          })
+          .map((user: any) => {
+            const avatarUrl = user.avatar_url || user.profile_image || '';
+            return {
+              id: user.id,
+              name: user.name || '알 수 없음',
+              age: user.age || 20,
+              gender: user.gender || '무관',
+              location: user.location || '위치 미설정',
+              school: user.school || '학교 미설정',
+              mbti: user.mbti || 'MBTI',
+              character: avatarUrl,
+              bio: user.bio || '자기소개가 없습니다.',
+              hasLikedMe: false,
+              photos: avatarUrl ? [avatarUrl] : [] // photos 배열 추가
+            };
+          });
+
+        console.log('✅ 필터링된 프로필 수:', formattedProfiles.length);
         setProfiles(formattedProfiles);
       }
     } catch (error) {
@@ -91,9 +126,6 @@ export default function MatchingTab() {
       setIsLoading(false);
     }
   };
-
-  // TODO: 실제 데이터 연동 시 Supabase에서 프로필 목록을 가져와야 합니다.
-  const [profiles, setProfiles] = useState<Profile[]>([]);
 
   const filteredProfiles = profiles.filter(profile => profile.gender === selectedGender);
 
@@ -133,26 +165,7 @@ export default function MatchingTab() {
     <div className="px-4 py-6 min-h-screen">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setSelectedGender('소개팅')}
-            className={`px-6 py-2.5 rounded-full font-bold transition-all duration-300 whitespace-nowrap cursor-pointer shadow-sm ${selectedGender === '소개팅'
-              ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-primary-500/30 shadow-lg scale-105'
-              : 'bg-white text-slate-500 hover:bg-slate-50'
-              }`}
-          >
-            소개팅
-          </button>
-          <button
-            onClick={() => setSelectedGender('미팅')}
-            className={`px-6 py-2.5 rounded-full font-bold transition-all duration-300 whitespace-nowrap cursor-pointer shadow-sm ${selectedGender === '미팅'
-              ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-primary-500/30 shadow-lg scale-105'
-              : 'bg-white text-slate-500 hover:bg-slate-50'
-              }`}
-          >
-            미팅
-          </button>
-        </div>
+        <h2 className="text-2xl font-bold text-slate-800">매칭</h2>
 
         <div className="flex items-center space-x-2">
           <button
@@ -181,7 +194,7 @@ export default function MatchingTab() {
 
             {/* 성별 아이콘 */}
             <div className="absolute top-3 left-3 w-8 h-8 glass rounded-full flex items-center justify-center z-10">
-              <i className="ri-women-line text-primary-500 font-bold"></i>
+              <i className={`${profile.gender === 'female' ? 'ri-women-line text-pink-500' : 'ri-men-line text-blue-500'} font-bold`}></i>
             </div>
 
             {/* MBTI 태그 */}
@@ -194,7 +207,7 @@ export default function MatchingTab() {
             {/* 캐릭터 이미지 */}
             <div className="relative h-72 overflow-hidden bg-slate-100">
               <img
-                src={profile.character || getDefaultAvatar(profile.gender)}
+                src={profile.character}
                 alt={profile.name}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
@@ -255,8 +268,8 @@ export default function MatchingTab() {
                 <h4 className="font-bold text-slate-800 mb-4 text-lg">성별</h4>
                 <div className="flex space-x-4">
                   <button
-                    onClick={() => setSelectedGender('여자')}
-                    className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === '여자'
+                    onClick={() => setSelectedGender('female')}
+                    className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === 'female'
                       ? 'border-primary-500 bg-primary-50 text-primary-600'
                       : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
                       }`}
@@ -264,8 +277,8 @@ export default function MatchingTab() {
                     여자
                   </button>
                   <button
-                    onClick={() => setSelectedGender('남자')}
-                    className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === '남자'
+                    onClick={() => setSelectedGender('male')}
+                    className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === 'male'
                       ? 'border-primary-500 bg-primary-50 text-primary-600'
                       : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
                       }`}
@@ -298,7 +311,10 @@ export default function MatchingTab() {
                 닫기
               </button>
               <button
-                onClick={() => setShowFilter(false)}
+                onClick={() => {
+                  setShowFilter(false);
+                  loadProfiles();
+                }}
                 className="flex-1 py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-2xl font-bold cursor-pointer shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all"
               >
                 적용하기

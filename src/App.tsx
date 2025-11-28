@@ -3,9 +3,23 @@ import { AppRoutes } from "./router";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { useEffect } from "react";
+import { cleanupExpiredMatchingRequests } from "./services/matchingService";
 
 function AppContent() {
   const { loading } = useAuth();
+
+  useEffect(() => {
+    // 앱 시작 시 만료된 매칭 요청 정리
+    cleanupExpiredMatchingRequests();
+    
+    // 1시간마다 자동 정리
+    const interval = setInterval(() => {
+      cleanupExpiredMatchingRequests();
+    }, 60 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) {
     return (

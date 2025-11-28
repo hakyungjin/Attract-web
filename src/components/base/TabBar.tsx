@@ -14,7 +14,7 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
   ];
 
   return (
-    <div className="fixed bottom-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-2 flex justify-center pointer-events-none" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
       <div className="glass rounded-full px-6 py-3 flex items-center justify-between shadow-2xl shadow-primary-500/20 pointer-events-auto max-w-md w-full">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -22,7 +22,7 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 group ${isActive ? 'text-primary-600 -translate-y-2' : 'text-slate-400 hover:text-slate-600'
+              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 group ${isActive ? 'text-primary-600' : 'text-slate-400 hover:text-slate-600'
                 }`}
             >
               {isActive && (

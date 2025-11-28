@@ -139,6 +139,11 @@ export default function QuickSignupPage() {
       return;
     }
 
+    if (!selectedFile && !formData.profileImage) {
+      alert('프로필 사진을 최소 1장 이상 업로드해주세요.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -148,7 +153,17 @@ export default function QuickSignupPage() {
         const uploadedUrl = await uploadImage();
         if (uploadedUrl) {
           imageUrl = uploadedUrl;
+        } else {
+          alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+          setLoading(false);
+          return;
         }
+      }
+
+      if (!imageUrl) {
+        alert('프로필 사진을 업로드해주세요.');
+        setLoading(false);
+        return;
       }
 
       // 전화번호 중복 확인
@@ -165,6 +180,9 @@ export default function QuickSignupPage() {
         return;
       }
 
+      // 사진을 배열로 저장 (photos 필드)
+      const photosArray = imageUrl ? [imageUrl] : [];
+
       // 유령 회원 생성 (firebase_uid 없이)
       const { data, error } = await supabase
         .from('users')
@@ -175,7 +193,7 @@ export default function QuickSignupPage() {
           gender: formData.gender,
           location: formData.location.trim() || null,
           bio: formData.bio.trim() || null,
-          profile_image: imageUrl || null,
+          photos: photosArray,
           created_at: new Date().toISOString()
         })
         .select()
@@ -308,7 +326,7 @@ export default function QuickSignupPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 성별 <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, gender: 'male' }))}
@@ -318,7 +336,7 @@ export default function QuickSignupPage() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  남성
+                  남자
                 </button>
                 <button
                   type="button"
@@ -329,18 +347,7 @@ export default function QuickSignupPage() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  여성
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, gender: 'other' }))}
-                  className={`py-3 rounded-xl font-medium transition-all ${
-                    formData.gender === 'other'
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  기타
+                  여자
                 </button>
               </div>
             </div>
@@ -364,7 +371,7 @@ export default function QuickSignupPage() {
             {/* 프로필 이미지 업로드 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                프로필 이미지
+                프로필 이미지 <span className="text-red-500">*</span>
               </label>
 
               {/* 미리보기 */}

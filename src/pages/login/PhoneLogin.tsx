@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ConfirmationResult } from 'firebase/auth';
+import type { ConfirmationResult } from 'firebase/auth';
 import {
   sendVerificationCode,
   verifyCode,
@@ -112,7 +112,8 @@ export default function PhoneLoginPage() {
     setLoading(true);
 
     try {
-      const { user, error, isNewUser, userData } = await verifyCode(confirmationResult, verificationCode);
+      // 전화번호도 함께 전달 (유령 회원 확인용)
+      const { user, error, isNewUser, userData } = await verifyCode(confirmationResult, verificationCode, phoneNumber);
 
       if (error) {
         alert(error.message);
@@ -133,6 +134,10 @@ export default function PhoneLoginPage() {
         // 기존 사용자 - 로그인 성공
         alert('로그인 성공!');
         console.log('사용자 정보:', userData);
+
+        // 로컬 스토리지에 사용자 정보 저장
+        localStorage.setItem('user', JSON.stringify(userData));
+
         navigate('/');
       }
     } catch (error: any) {

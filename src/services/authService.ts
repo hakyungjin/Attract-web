@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { verifyPassword, hashPassword } from './passwordService';
+import { hashPassword } from './passwordService';
 
 export interface LoginResult {
   success: boolean;
@@ -37,24 +37,31 @@ export const loginWithPhone = async (
     }
 
     // 비밀번호 확인
-    if (!user.password) {
+    if (!user.password_hash) {
       return {
         success: false,
         error: '비밀번호가 설정되지 않았습니다.'
       };
     }
 
-    const isPasswordValid = await verifyPassword(password, user.password);
+    // SHA-256으로 입력받은 비밀번호를 해시
+    const hashedInput = await hashPassword(password);
 
-    if (!isPasswordValid) {
+    if (user.password_hash !== hashedInput) {
       return {
         success: false,
         error: '비밀번호가 일치하지 않습니다.'
       };
     }
 
+    // 마지막 로그인 시간 업데이트
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
     // 로그인 성공 - 민감한 정보 제거
-    const { password: _, ...userWithoutPassword } = user;
+    const { password_hash: _, ...userWithoutPassword } = user;
     return {
       success: true,
       user: userWithoutPassword
@@ -82,7 +89,7 @@ export const updateUserPassword = async (
 
     const { error } = await supabase
       .from('users')
-      .update({ password: hashedPassword })
+      .update({ password_hash: hashedPassword })
       .eq('phone_number', phoneNumber);
 
     if (error) {

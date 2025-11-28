@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface HeaderProps {
   coins?: number;
@@ -7,9 +9,41 @@ interface HeaderProps {
 
 export default function Header({ coins = 0 }: HeaderProps) {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadCount = 2; // 읽지 않은 알림 수
+  // 읽지 않은 알림 개수 로드
+  useEffect(() => {
+    if (!authUser?.id) return;
+    
+    loadUnreadCount();
+
+    // 30초마다 알림 개수 갱신
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [authUser?.id]);
+
+  const loadUnreadCount = async () => {
+    try {
+      if (!authUser?.id) {
+        setUnreadCount(0);
+        return;
+      }
+
+      // RLS 정책이 자동으로 user_id를 필터링하므로 user_id 필터는 추가하지 않음
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('read', false);
+
+      if (!error && count !== null) {
+        setUnreadCount(count);
+      }
+    } catch (error) {
+      console.error('알림 개수 로드 실패:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
@@ -85,10 +119,43 @@ export default function Header({ coins = 0 }: HeaderProps) {
 
             <div className="py-2">
               {[
-                { icon: 'ri-user-line', label: '마이페이지', action: () => { } },
-                { icon: 'ri-settings-line', label: '설정', action: () => { } },
-                { icon: 'ri-question-line', label: 'FAQ', action: () => { } },
-                { icon: 'ri-customer-service-line', label: '1:1문의', action: () => { } },
+                {
+                  icon: 'ri-user-line',
+                  label: '마이페이지',
+                  action: () => {
+                    setShowMenu(false);
+                    navigate('/');
+                    // 프로필 탭으로 전환하는 이벤트 발생
+                    setTimeout(() => {
+                      const event = new CustomEvent('switchTab', { detail: { tab: 'profile' } });
+                      window.dispatchEvent(event);
+                    }, 100);
+                  }
+                },
+                {
+                  icon: 'ri-settings-line',
+                  label: '설정',
+                  action: () => {
+                    setShowMenu(false);
+                    navigate('/settings');
+                  }
+                },
+                {
+                  icon: 'ri-question-line',
+                  label: 'FAQ',
+                  action: () => {
+                    setShowMenu(false);
+                    navigate('/faq');
+                  }
+                },
+                {
+                  icon: 'ri-customer-service-line',
+                  label: '1:1문의',
+                  action: () => {
+                    setShowMenu(false);
+                    navigate('/support');
+                  }
+                },
               ].map((item, index) => (
                 <button
                   key={index}
