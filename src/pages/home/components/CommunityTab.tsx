@@ -119,6 +119,17 @@ export default function CommunityTab() {
         .from('community_posts')
         .select(`
           *,
+          users!user_id (
+            id,
+            name,
+            avatar_url,
+            age,
+            location,
+            gender,
+            bio,
+            school,
+            job
+          ),
           post_comments (
             id,
             author_name,
@@ -148,42 +159,45 @@ export default function CommunityTab() {
           userLikes = likesData?.map(like => like.post_id) || [];
         }
 
-        const formattedPosts: Post[] = data.map((post: any) => ({
-          id: post.id,
-          author: post.title,
-          avatar: post.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=400&height=500&seq=default&orientation=portrait',
-          content: post.content,
-          image: post.image_url,
-          likes: post.likes,
-          comments: post.post_comments?.map((comment: any) => ({
-            id: comment.id,
-            author: comment.author_name,
-            avatar: comment.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=default&orientation=squarish',
-            content: comment.content,
-            timeAgo: getTimeAgo(comment.created_at),
-            likes: comment.likes,
-            isLiked: false
-          })) || [],
-          timeAgo: getTimeAgo(post.created_at),
-          isLiked: userLikes.includes(post.id),
-          age: post.age,
-          location: post.location,
-          job: post.job,
-          views: post.views,
-          category: post.category,
-          userId: post.user_id,
-          authorData: {
-            id: post.user_id,
-            name: post.author_name,
-            avatar_url: post.avatar_url,
-            age: post.age,
-            location: post.location,
-            gender: post.gender,
-            bio: post.bio,
-            school: post.school,
-            job: post.job
-          }
-        }));
+        const formattedPosts: Post[] = data.map((post: any) => {
+          const author = post.users;
+          return {
+            id: post.id,
+            author: author?.name || '익명',
+            avatar: author?.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=400&height=500&seq=default&orientation=portrait',
+            content: post.content,
+            image: post.image_url,
+            likes: post.likes,
+            comments: post.post_comments?.map((comment: any) => ({
+              id: comment.id,
+              author: comment.author_name,
+              avatar: comment.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=default&orientation=squarish',
+              content: comment.content,
+              timeAgo: getTimeAgo(comment.created_at),
+              likes: comment.likes,
+              isLiked: false
+            })) || [],
+            timeAgo: getTimeAgo(post.created_at),
+            isLiked: userLikes.includes(post.id),
+            age: author?.age,
+            location: author?.location,
+            job: author?.job,
+            views: post.views,
+            category: post.category,
+            userId: post.user_id,
+            authorData: {
+              id: author?.id,
+              name: author?.name || '익명',
+              avatar_url: author?.avatar_url,
+              age: author?.age,
+              location: author?.location,
+              gender: author?.gender,
+              bio: author?.bio,
+              school: author?.school,
+              job: author?.job
+            }
+          };
+        });
         setPosts(formattedPosts);
       } else {
         throw new Error('No data');

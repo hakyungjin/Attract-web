@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS users (
     auth_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- Supabase Auth (이메일 로그인)
     email TEXT,
     phone_number TEXT UNIQUE, -- 전화번호 (Firebase Phone Auth)
+    password TEXT, -- 해시된 비밀번호
     name TEXT NOT NULL,
     profile_image TEXT,
     avatar_url TEXT,

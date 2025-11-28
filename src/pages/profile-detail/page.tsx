@@ -34,7 +34,9 @@ const getDefaultAvatar = (gender: string) => {
 export default function ProfileDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const profile = location.state?.profile as Profile;
+  
+  // profile 또는 authorData를 받음
+  const profile = (location.state?.profile || location.state?.authorData) as Profile;
   
   const [userRating, setUserRating] = useState(0);
   const [showLikeToast, setShowLikeToast] = useState(false);
@@ -45,7 +47,7 @@ export default function ProfileDetailPage() {
   const profilePhotos = profile?.photos?.length 
     ? profile.photos 
     : [
-        getDefaultAvatar(profile?.gender || '여자'),
+        profile?.avatar_url || profile?.avatar || getDefaultAvatar(profile?.gender || '여자'),
         'https://readdy.ai/api/search-image?query=young%20Korean%20woman%20casual%20lifestyle%20photo%20portrait%20natural%20lighting%20soft%20smile%20wearing%20comfortable%20clothes%20indoor%20setting%20warm%20atmosphere%20clean%20background%20professional%20photography&width=400&height=500&seq=profile-photo-2&orientation=portrait',
         'https://readdy.ai/api/search-image?query=young%20Korean%20woman%20outdoor%20photo%20portrait%20natural%20daylight%20friendly%20expression%20casual%20style%20street%20photography%20urban%20background%20clean%20aesthetic%20professional%20quality&width=400&height=500&seq=profile-photo-3&orientation=portrait'
       ];
@@ -69,17 +71,17 @@ export default function ProfileDetailPage() {
 
   // 프로필 정보 (기본값 설정)
   const profileInfo = {
-    school: profile.school || '전문대학교',
-    height: profile.height || '160~165',
-    bodyType: profile.bodyType || '보통 체형',
-    style: profile.style || '유머있는, 낙천적인, 신중한',
-    religion: profile.religion || '무교',
-    mbti: profile.mbti || 'ESTP',
-    smoking: profile.smoking || '비흡연자',
-    drinking: profile.drinking || '어느정도 즐기는 편이에요'
+    school: profile?.school || '정보없음',
+    height: profile?.height || '정보없음',
+    bodyType: profile?.bodyType || '정보없음',
+    style: profile?.style || '정보없음',
+    religion: profile?.religion || '정보없음',
+    mbti: profile?.mbti || 'ESTP',
+    smoking: profile?.smoking || '정보없음',
+    drinking: profile?.drinking || '정보없음'
   };
 
-  const interests = profile.interests || ['환승연애4'];
+  const interests = profile?.interests || ['관심사'];
 
   const handleLike = () => {
     if (profile.hasLikedMe) {
@@ -127,12 +129,12 @@ export default function ProfileDetailPage() {
           </button>
           <div className="flex items-center space-x-2">
             <img
-              src={profile.avatar || getDefaultAvatar(profile.gender)}
+              src={profile.avatar_url || profile.avatar || getDefaultAvatar(profile?.gender || '여자')}
               alt={profile.name}
               className="w-8 h-8 rounded-full object-cover"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = getDefaultAvatar(profile.gender);
+                target.src = getDefaultAvatar(profile?.gender || '여자');
               }}
             />
             <span className="font-medium text-gray-800">{profile.name}</span>
@@ -214,35 +216,35 @@ export default function ProfileDetailPage() {
           <div className="grid grid-cols-2">
             <div className="border-b border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">학교</div>
-              <div className="font-medium text-gray-800">{profile.school}</div>
+              <div className="font-medium text-gray-800">{profile?.school || '정보없음'}</div>
             </div>
             <div className="border-b border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">키</div>
-              <div className="font-medium text-gray-800">{profile.height || '160~165'}</div>
+              <div className="font-medium text-gray-800">{profile?.height || '정보없음'}</div>
             </div>
             <div className="border-b border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">체형</div>
-              <div className="font-medium text-gray-800">{profile.bodyType || '보통'}</div>
+              <div className="font-medium text-gray-800">{profile?.bodyType || '정보없음'}</div>
             </div>
             <div className="border-b border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">스타일</div>
-              <div className="font-medium text-gray-800">{profile.style || '캐주얼'}</div>
+              <div className="font-medium text-gray-800">{profile?.style || '정보없음'}</div>
             </div>
             <div className="border-b border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">종교</div>
-              <div className="font-medium text-gray-800">{profile.religion || '무교'}</div>
+              <div className="font-medium text-gray-800">{profile?.religion || '정보없음'}</div>
             </div>
             <div className="border-b border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">MBTI</div>
-              <div className="font-medium text-gray-800">{profile.mbti}</div>
+              <div className="font-medium text-gray-800">{profile?.mbti || '정보없음'}</div>
             </div>
             <div className="border-r border-gray-100 p-4">
               <div className="text-xs text-gray-500 mb-1">흡연</div>
-              <div className="font-medium text-gray-800">{profile.smoking || '비흡연'}</div>
+              <div className="font-medium text-gray-800">{profile?.smoking || '정보없음'}</div>
             </div>
             <div className="p-4">
               <div className="text-xs text-gray-500 mb-1">음주</div>
-              <div className="font-medium text-gray-800">{profile.drinking || '가끔'}</div>
+              <div className="font-medium text-gray-800">{profile?.drinking || '정보없음'}</div>
             </div>
           </div>
         </div>
@@ -278,7 +280,7 @@ export default function ProfileDetailPage() {
             <i className="ri-chat-quote-line mr-2 text-cyan-500"></i>
             자기소개
           </h3>
-          <p className="text-gray-700 leading-relaxed">{profile.bio}</p>
+          <p className="text-gray-700 leading-relaxed">{profile?.bio || '자기소개가 없습니다.'}</p>
         </div>
       </div>
 

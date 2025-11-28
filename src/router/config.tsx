@@ -3,7 +3,8 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
 import PhoneLoginPage from "../pages/login/PhoneLogin";
-import AuthPage from "../pages/auth/AuthPage";
+import AuthPageSignup from "../pages/auth/index";
+import AuthPageLogin from "../pages/auth/login";
 import SignupPage from "../pages/signup/SignupPage";
 import QuickSignupPage from "../pages/signup/QuickSignupPage";
 import ProfileEditPage from "../pages/profile-edit/page";
@@ -23,7 +24,11 @@ const routes: RouteObject[] = [
   },
   {
     path: "/login",
-    element: <AuthPage />,
+    element: <AuthPageSignup />,
+  },
+  {
+    path: "/login/signin",
+    element: <AuthPageLogin />,
   },
   {
     path: "/login/email",

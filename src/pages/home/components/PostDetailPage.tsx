@@ -27,6 +27,8 @@ interface Post {
   job?: string;
   views?: number;
   category: 'dating' | 'chat';
+  userId?: string;
+  authorData?: any; // 글 작성자의 전체 user 정보
 }
 
 interface PostDetailPageProps {
@@ -40,7 +42,6 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [postAuthor, setPostAuthor] = useState<any>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -77,23 +78,6 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
       }
     };
     getCurrentUser();
-
-    // 글 작성자 정보 가져오기
-    const getPostAuthor = async () => {
-      try {
-        const { data: users, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', post.id);
-        
-        if (!error && users && users.length > 0) {
-          setPostAuthor(users[0]);
-        }
-      } catch (err) {
-        console.error('글 작성자 정보 조회 실패:', err);
-      }
-    };
-    getPostAuthor();
   }, [post]);
 
   const handleLike = async () => {
