@@ -69,10 +69,13 @@ DROP TABLE IF EXISTS users CASCADE;
 -- ============================================
 
 -- 1. users 테이블 (사용자 프로필)
--- auth.users와 연동되는 프로필 테이블
+-- Firebase Auth와 Supabase Auth 모두 지원
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    firebase_uid TEXT UNIQUE, -- Firebase Auth UID (전화번호 로그인)
+    auth_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- Supabase Auth (이메일 로그인)
     email TEXT,
+    phone_number TEXT UNIQUE, -- 전화번호 (Firebase Phone Auth)
     name TEXT NOT NULL,
     profile_image TEXT,
     avatar_url TEXT,

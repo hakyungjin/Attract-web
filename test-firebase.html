@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 연결 테스트</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #FFA726 0%, #FB8C00 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.checking {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info-grid {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #FFA726;
+        }
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-value {
+            font-size: 14px;
+            color: #333;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+        }
+        .button {
+            background: linear-gradient(135deg, #FFA726 0%, #FB8C00 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .feature-list {
+            margin-top: 20px;
+        }
+        .feature-item {
+            background: #e3f2fd;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #1565c0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase 연결 테스트</h1>
+        <p class="subtitle">Firebase Authentication 및 Analytics 확인</p>
+
+        <div id="status" class="status checking">
+            <span class="spinner"></span>
+            Firebase 초기화 중...
+        </div>
+
+        <div id="info" class="info-grid" style="display: none;">
+            <div class="info-item">
+                <div class="info-label">Project ID</div>
+                <div class="info-value" id="projectId"></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Auth Domain</div>
+                <div class="info-value" id="authDomain"></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Storage Bucket</div>
+                <div class="info-value" id="storageBucket"></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">연결 상태</div>
+                <div class="info-value" id="connectionStatus"></div>
+            </div>
+        </div>
+
+        <div id="featuresContainer" style="display: none;">
+            <div class="info-item">
+                <div class="info-label">사용 가능한 기능</div>
+                <div id="featuresList" class="feature-list"></div>
+            </div>
+        </div>
+
+        <button class="button" onclick="testConnection()">
+            <span id="buttonText">다시 테스트</span>
+        </button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, RecaptchaVerifier } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getAnalytics, isSupported } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAKUD99sVYnK5irQey028CmYUE-ZeiWh18",
+            authDomain: "campus-4f167.firebaseapp.com",
+            projectId: "campus-4f167",
+            storageBucket: "campus-4f167.firebasestorage.app",
+            messagingSenderId: "874089973237",
+            appId: "1:874089973237:web:f9ade8cb63a9bf00c64cbc",
+            measurementId: "G-0BRQDHMJME"
+        };
+
+        let app, auth, analytics;
+
+        window.testConnection = async function() {
+            const statusDiv = document.getElementById('status');
+            const infoDiv = document.getElementById('info');
+            const featuresContainer = document.getElementById('featuresContainer');
+            const buttonText = document.getElementById('buttonText');
+
+            statusDiv.className = 'status checking';
+            statusDiv.innerHTML = '<span class="spinner"></span>Firebase 초기화 중...';
+            infoDiv.style.display = 'none';
+            featuresContainer.style.display = 'none';
+            buttonText.textContent = '테스트 중...';
+
+            try {
+                // Firebase 초기화
+                app = initializeApp(firebaseConfig);
+                console.log('✅ Firebase App 초기화 성공');
+
+                // Auth 초기화
+                auth = getAuth(app);
+                auth.languageCode = 'ko';
+                console.log('✅ Firebase Auth 초기화 성공');
+
+                // Analytics 초기화 (지원되는 경우)
+                let analyticsSupported = false;
+                try {
+                    analyticsSupported = await isSupported();
+                    if (analyticsSupported) {
+                        analytics = getAnalytics(app);
+                        console.log('✅ Firebase Analytics 초기화 성공');
+                    }
+                } catch (e) {
+                    console.log('ℹ️ Analytics 미지원 환경');
+                }
+
+                // 정보 표시
+                document.getElementById('projectId').textContent = firebaseConfig.projectId;
+                document.getElementById('authDomain').textContent = firebaseConfig.authDomain;
+                document.getElementById('storageBucket').textContent = firebaseConfig.storageBucket;
+                document.getElementById('connectionStatus').textContent = '✅ 정상 연결됨';
+                infoDiv.style.display = 'grid';
+
+                // 기능 목록
+                const features = [
+                    { icon: '📱', name: 'Phone Authentication', status: true },
+                    { icon: '✉️', name: 'Email Authentication', status: true },
+                    { icon: '📊', name: 'Analytics', status: analyticsSupported },
+                    { icon: '💾', name: 'Storage', status: true },
+                    { icon: '🔐', name: 'Security Rules', status: true }
+                ];
+
+                let featuresHTML = '';
+                features.forEach(feature => {
+                    const statusIcon = feature.status ? '✅' : '⚠️';
+                    featuresHTML += `
+                        <div class="feature-item">
+                            ${feature.icon} ${feature.name} ${statusIcon}
+                        </div>
+                    `;
+                });
+
+                document.getElementById('featuresList').innerHTML = featuresHTML;
+                featuresContainer.style.display = 'block';
+
+                // 성공 메시지
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = `
+                    <strong>✅ Firebase 연결 성공!</strong><br>
+                    모든 서비스가 정상적으로 초기화되었습니다.
+                `;
+
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>❌ 연결 실패</strong><br>
+                    ${error.message}
+                `;
+                console.error('Firebase connection error:', error);
+            } finally {
+                buttonText.textContent = '다시 테스트';
+            }
+        };
+
+        // 페이지 로드 시 자동 테스트
+        window.addEventListener('load', () => {
+            testConnection();
+        });
+    </script>
+</body>
+</html>

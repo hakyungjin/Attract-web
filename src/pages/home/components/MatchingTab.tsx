@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../../lib/supabase';
 
 interface Profile {
-  id: number;
+  id: string | number;
   name: string;
   age: number;
   gender: string;
@@ -29,98 +30,70 @@ export default function MatchingTab() {
   const [showFilter, setShowFilter] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const profiles: Profile[] = [
-    {
-      id: 1,
-      name: '하얀눈방울e',
-      age: 22,
-      gender: '여자',
-      location: '서울 금천구',
-      school: '서울디지털대학교',
-      mbti: 'ISFP',
-      character: '',
-      bio: '음악을 좋아하는 조용한 성격이에요',
-      hasLikedMe: true
-    },
-    {
-      id: 2,
-      name: '나만의아기고양이',
-      age: 20,
-      gender: '여자',
-      location: '대전 중구',
-      school: '한밭대학교',
-      mbti: 'ISTP',
-      character: '',
-      bio: '빵 만들기를 좋아해요'
-    },
-    {
-      id: 3,
-      name: '눈망울e',
-      age: 22,
-      gender: '여자',
-      location: '부산 동구',
-      school: '부산디지털대학교',
-      mbti: 'ISFP',
-      character: '',
-      bio: '헤드폰으로 음악 듣는 걸 좋아해요'
-    },
-    {
-      id: 4,
-      name: '세잎이',
-      age: 19,
-      gender: '여자',
-      location: '충남 아산시',
-      school: '선문대학교',
-      mbti: 'ESTP',
-      character: '',
-      bio: '컴퓨터 작업하는 걸 좋아해요'
-    },
-    {
-      id: 5,
-      name: '띠로리이',
-      age: 27,
-      gender: '여자',
-      location: '서울 금천구',
-      school: '서울대학교',
-      mbti: 'ESTJ',
-      character: '',
-      bio: '베이킹을 좋아하는 활발한 성격이에요'
-    },
-    {
-      id: 6,
-      name: '으아니',
-      age: 19,
-      gender: '여자',
-      location: '서울 광진구',
-      school: '세종대학교',
-      mbti: 'ISTJ',
-      character: '',
-      bio: '고양이를 좋아해요'
-    },
-    {
-      id: 7,
-      name: '달콤소소찡',
-      age: 23,
-      gender: '여자',
-      location: '전북 전주시',
-      school: '예원예술대학교',
-      mbti: 'ENTP',
-      character: '',
-      bio: '예술을 사랑하는 자유로운 영혼이에요'
-    },
-    {
-      id: 8,
-      name: '어피치',
-      age: 24,
-      gender: '여자',
-      location: '서울 강남구',
-      school: '한양대학교',
-      mbti: 'ESTP',
-      character: '',
-      bio: '탁구치는 걸 좋아해요'
+  // 마운트 시 데이터 로드
+  useEffect(() => {
+    loadProfiles();
+  }, [selectedGender]);
+
+  const loadProfiles = async () => {
+    setIsLoading(true);
+    try {
+      // 로컬 스토리지에서 현재 사용자 정보 가져오기 (Firebase 인증 사용)
+      const localUser = localStorage.getItem('user');
+      let currentUserId = null;
+
+      if (localUser) {
+        const userData = JSON.parse(localUser);
+        currentUserId = userData.id; // users 테이블의 id (UUID)
+      }
+
+      // 사용자 데이터 조회 (나 자신 제외)
+      let query = supabase
+        .from('users')
+        .select('*');
+
+      // 로그인한 경우에만 내 프로필 제외
+      if (currentUserId) {
+        query = query.neq('id', currentUserId);
+      }
+
+      // 성별 필터링
+      if (selectedGender) {
+        query = query.eq('gender', selectedGender);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      if (data) {
+        // DB 데이터를 Profile 인터페이스에 맞게 변환
+        const formattedProfiles: Profile[] = data.map((user: any) => ({
+          id: user.id, // UUID string but interface says number? We might need to update interface
+          name: user.name || '알 수 없음',
+          age: user.age || 20,
+          gender: user.gender || '무관',
+          location: user.location || '위치 미설정',
+          school: user.school || '학교 미설정',
+          mbti: user.mbti || 'MBTI',
+          character: user.avatar_url || '', // Use avatar_url for character image
+          bio: user.bio || '자기소개가 없습니다.',
+          hasLikedMe: false // This would require a separate 'likes' table check
+        }));
+        setProfiles(formattedProfiles);
+      }
+    } catch (error) {
+      console.error('프로필 로드 실패:', error);
+      setProfiles([]);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
+
+  // TODO: 실제 데이터 연동 시 Supabase에서 프로필 목록을 가져와야 합니다.
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
   const filteredProfiles = profiles.filter(profile => profile.gender === selectedGender);
 
@@ -133,6 +106,29 @@ export default function MatchingTab() {
     navigate('/profile-detail', { state: { profile } });
   };
 
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 border-4 border-slate-200 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div className="text-sm font-medium text-slate-500">프로필 로드 중...</div>
+      </div>
+    );
+  }
+
+  // 데이터 없음
+  if (filteredProfiles.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4 px-4">
+        <i className="ri-search-line text-6xl text-slate-300"></i>
+        <p className="text-center text-slate-600 font-medium">조건에 맞는 프로필이 없습니다</p>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-6 min-h-screen">
       {/* 헤더 */}
@@ -141,8 +137,8 @@ export default function MatchingTab() {
           <button
             onClick={() => setSelectedGender('소개팅')}
             className={`px-6 py-2.5 rounded-full font-bold transition-all duration-300 whitespace-nowrap cursor-pointer shadow-sm ${selectedGender === '소개팅'
-                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-primary-500/30 shadow-lg scale-105'
-                : 'bg-white text-slate-500 hover:bg-slate-50'
+              ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-primary-500/30 shadow-lg scale-105'
+              : 'bg-white text-slate-500 hover:bg-slate-50'
               }`}
           >
             소개팅
@@ -150,8 +146,8 @@ export default function MatchingTab() {
           <button
             onClick={() => setSelectedGender('미팅')}
             className={`px-6 py-2.5 rounded-full font-bold transition-all duration-300 whitespace-nowrap cursor-pointer shadow-sm ${selectedGender === '미팅'
-                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-primary-500/30 shadow-lg scale-105'
-                : 'bg-white text-slate-500 hover:bg-slate-50'
+              ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-primary-500/30 shadow-lg scale-105'
+              : 'bg-white text-slate-500 hover:bg-slate-50'
               }`}
           >
             미팅
@@ -198,7 +194,7 @@ export default function MatchingTab() {
             {/* 캐릭터 이미지 */}
             <div className="relative h-72 overflow-hidden bg-slate-100">
               <img
-                src={getDefaultAvatar(profile.gender)}
+                src={profile.character || getDefaultAvatar(profile.gender)}
                 alt={profile.name}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
@@ -261,8 +257,8 @@ export default function MatchingTab() {
                   <button
                     onClick={() => setSelectedGender('여자')}
                     className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === '여자'
-                        ? 'border-primary-500 bg-primary-50 text-primary-600'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                      ? 'border-primary-500 bg-primary-50 text-primary-600'
+                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
                       }`}
                   >
                     여자
@@ -270,8 +266,8 @@ export default function MatchingTab() {
                   <button
                     onClick={() => setSelectedGender('남자')}
                     className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === '남자'
-                        ? 'border-primary-500 bg-primary-50 text-primary-600'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                      ? 'border-primary-500 bg-primary-50 text-primary-600'
+                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
                       }`}
                   >
                     남자

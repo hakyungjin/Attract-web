@@ -15,9 +15,12 @@ export default function Home() {
   const [coins] = useState(150);
 
   useEffect(() => {
-    // 로그인 체크 - Supabase 인증 사용
-    if (!loading && !user) {
-      navigate('/login');
+    // 로그인 체크 - Supabase 인증 또는 로컬 스토리지 확인
+    if (!loading) {
+      const localUser = localStorage.getItem('user');
+      if (!user && !localUser) {
+        navigate('/login');
+      }
     }
   }, [loading, user, navigate]);
 

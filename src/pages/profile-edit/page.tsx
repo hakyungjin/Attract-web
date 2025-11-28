@@ -13,21 +13,21 @@ const getDefaultAvatar = (gender?: string) => {
 export default function ProfileEditPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    nickname: '하얀눈방울e',
-    name: '하얀눈방울e',
-    age: 22,
+    nickname: '',
+    name: '',
+    age: 20,
     gender: '여자',
-    location: '서울 금천구',
-    bio: '음악을 좋아하는 조용한 성격이에요 🎵\n커피와 책을 좋아합니다 ☕📚',
-    mbti: 'ISFP',
-    school: '서울디지털대학교',
+    location: '',
+    bio: '',
+    mbti: '',
+    school: '',
     height: '160~165',
     bodyType: '보통',
     style: '캐주얼',
     religion: '무교',
     smoking: '비흡연',
     drinking: '가끔',
-    interests: ['음악 감상', '카페 투어', '독서', '영화', '사진', '여행'],
+    interests: [] as string[],
     avatar: ''
   });
 
@@ -41,11 +41,36 @@ export default function ProfileEditPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // 현재 로그인한 사용자 정보 가져오기
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
+    // 로컬 스토리지에서 현재 사용자 정보 가져오기 (Firebase 인증 사용)
+    const getCurrentUser = () => {
+      const localUser = localStorage.getItem('user');
+      if (localUser) {
+        try {
+          const userData = JSON.parse(localUser);
+          setCurrentUserId(userData.id);
+
+          // 기존 프로필 데이터로 폼 초기화
+          setFormData({
+            nickname: userData.name || '',
+            name: userData.name || '',
+            age: userData.age || 20,
+            gender: userData.gender || '여자',
+            location: userData.location || '',
+            bio: userData.bio || '',
+            mbti: userData.mbti || '',
+            school: userData.school || '',
+            height: userData.height || '160~165',
+            bodyType: userData.body_type || '보통',
+            style: userData.style || '캐주얼',
+            religion: userData.religion || '무교',
+            smoking: userData.smoking || '비흡연',
+            drinking: userData.drinking || '가끔',
+            interests: userData.interests || [],
+            avatar: userData.avatar_url || ''
+          });
+        } catch (error) {
+          console.error('사용자 정보 로드 실패:', error);
+        }
       }
     };
     getCurrentUser();
@@ -144,6 +169,18 @@ export default function ProfileEditPage() {
         return;
       }
 
+      // 로컬 스토리지도 업데이트
+      const localUser = localStorage.getItem('user');
+      if (localUser) {
+        const userData = JSON.parse(localUser);
+        const updatedUser = {
+          ...userData,
+          ...profileData,
+          body_type: formData.bodyType // DB 컬럼명과 맞춤
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+
       console.log('저장된 데이터:', profileData);
       setShowSaveAlert(true);
 
@@ -180,6 +217,20 @@ export default function ProfileEditPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 파일 타입 검증
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      alert('JPG, PNG, WEBP, GIF 형식의 이미지만 업로드 가능합니다.');
+      return;
+    }
+
+    // 파일 크기 검증 (5MB 제한)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      alert('이미지 크기는 5MB 이하여야 합니다.');
+      return;
+    }
+
     setIsUploading(true);
 
     try {
@@ -189,7 +240,7 @@ export default function ProfileEditPage() {
       const filePath = `avatars/${fileName}`;
 
       // Supabase Storage에 업로드
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('profile-images')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -198,9 +249,7 @@ export default function ProfileEditPage() {
 
       if (uploadError) {
         console.error('업로드 에러:', uploadError);
-        alert('이미지 업로드에 실패했습니다.');
-        setIsUploading(false);
-        return;
+        throw new Error(uploadError.message || '이미지 업로드에 실패했습니다.');
       }
 
       // 업로드된 이미지의 공개 URL 가져오기
@@ -221,9 +270,9 @@ export default function ProfileEditPage() {
       };
       reader.readAsDataURL(file);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('이미지 업로드 중 오류:', error);
-      alert('이미지 업로드에 실패했습니다.');
+      alert(error.message || '이미지 업로드에 실패했습니다.');
     } finally {
       setIsUploading(false);
     }
@@ -234,7 +283,7 @@ export default function ProfileEditPage() {
       {/* 헤더 */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-4">
-          <button 
+          <button
             onClick={handleBack}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
           >
@@ -244,9 +293,8 @@ export default function ProfileEditPage() {
           <button
             onClick={handleSave}
             disabled={isUploading}
-            className={`font-medium cursor-pointer whitespace-nowrap ${
-              isUploading ? 'text-gray-400' : 'text-cyan-500'
-            }`}
+            className={`font-medium cursor-pointer whitespace-nowrap ${isUploading ? 'text-gray-400' : 'text-cyan-500'
+              }`}
           >
             {isUploading ? '저장 중...' : '저장'}
           </button>
@@ -282,9 +330,8 @@ export default function ProfileEditPage() {
               />
               <label
                 htmlFor="avatar-upload"
-                className={`absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all ${
-                  isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:from-cyan-600 hover:to-blue-700 cursor-pointer'
-                }`}
+                className={`absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:from-cyan-600 hover:to-blue-700 cursor-pointer'
+                  }`}
               >
                 <i className="ri-camera-line"></i>
               </label>
@@ -299,7 +346,7 @@ export default function ProfileEditPage() {
             <i className="ri-user-line mr-2 text-cyan-500"></i>
             기본 정보
           </h3>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -334,21 +381,19 @@ export default function ProfileEditPage() {
               <div className="flex space-x-3">
                 <button
                   onClick={() => setFormData({ ...formData, gender: '여자' })}
-                  className={`flex-1 py-3 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                    formData.gender === '여자'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
+                  className={`flex-1 py-3 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.gender === '여자'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                    }`}
                 >
                   여자
                 </button>
                 <button
                   onClick={() => setFormData({ ...formData, gender: '남자' })}
-                  className={`flex-1 py-3 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                    formData.gender === '남자'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
+                  className={`flex-1 py-3 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.gender === '남자'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                    }`}
                 >
                   남자
                 </button>
@@ -376,7 +421,7 @@ export default function ProfileEditPage() {
             <i className="ri-file-list-3-line mr-2 text-cyan-500"></i>
             상세 정보
           </h3>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -400,11 +445,10 @@ export default function ProfileEditPage() {
                   <button
                     key={height}
                     onClick={() => handleInputChange('height', height)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      formData.height === height
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.height === height
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     {height}
                   </button>
@@ -421,11 +465,10 @@ export default function ProfileEditPage() {
                   <button
                     key={type}
                     onClick={() => handleInputChange('bodyType', type)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      formData.bodyType === type
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.bodyType === type
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     {type}
                   </button>
@@ -442,11 +485,10 @@ export default function ProfileEditPage() {
                   <button
                     key={style}
                     onClick={() => handleInputChange('style', style)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      formData.style === style
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.style === style
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     {style}
                   </button>
@@ -463,11 +505,10 @@ export default function ProfileEditPage() {
                   <button
                     key={religion}
                     onClick={() => handleInputChange('religion', religion)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      formData.religion === religion
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.religion === religion
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     {religion}
                   </button>
@@ -498,11 +539,10 @@ export default function ProfileEditPage() {
                   <button
                     key={smoking}
                     onClick={() => handleInputChange('smoking', smoking)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      formData.smoking === smoking
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.smoking === smoking
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     {smoking}
                   </button>
@@ -519,11 +559,10 @@ export default function ProfileEditPage() {
                   <button
                     key={drinking}
                     onClick={() => handleInputChange('drinking', drinking)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      formData.drinking === drinking
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.drinking === drinking
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     {drinking}
                   </button>

@@ -2,6 +2,10 @@ import type { RouteObject } from "react-router-dom";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
+import PhoneLoginPage from "../pages/login/PhoneLogin";
+import AuthPage from "../pages/auth/AuthPage";
+import SignupPage from "../pages/signup/SignupPage";
+import QuickSignupPage from "../pages/signup/QuickSignupPage";
 import ProfileEditPage from "../pages/profile-edit/page";
 import NotificationsPage from "../pages/notifications/page";
 import ProfileDetailPage from "../pages/profile-detail/page";
@@ -19,7 +23,23 @@ const routes: RouteObject[] = [
   },
   {
     path: "/login",
+    element: <AuthPage />,
+  },
+  {
+    path: "/login/email",
     element: <LoginPage />,
+  },
+  {
+    path: "/signup",
+    element: <SignupPage />,
+  },
+  {
+    path: "/signup/phone",
+    element: <PhoneLoginPage />,
+  },
+  {
+    path: "/signup/quick",
+    element: <QuickSignupPage />,
   },
   {
     path: "/profile-edit",

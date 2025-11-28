@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이미지 업로드 도구 - Attract Web</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f0ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8e8ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .bucket-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .bucket-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .bucket-btn:hover {
+            border-color: #667eea;
+        }
+
+        .bucket-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .preview-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+            aspect-ratio: 1;
+        }
+
+        .preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+            padding: 10px;
+            color: white;
+            font-size: 12px;
+        }
+
+        .preview-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .preview-size {
+            font-size: 10px;
+            opacity: 0.8;
+        }
+
+        .remove-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255,255,255,0.9);
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .remove-btn:hover {
+            background: #ff4444;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .upload-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .upload-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+        }
+
+        .upload-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .result-list {
+            margin-top: 20px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-success {
+            border-left-color: #28a745;
+        }
+
+        .result-error {
+            border-left-color: #dc3545;
+        }
+
+        .result-url {
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            margin-top: 5px;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .copy-btn {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 5px;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖼️ 이미지 업로드 도구</h1>
+            <p>Supabase Storage에 이미지를 업로드하세요</p>
+        </div>
+
+        <div class="content">
+            <div id="statusMessage"></div>
+
+            <div class="section">
+                <div class="section-title">📁 버킷 선택</div>
+                <div class="bucket-selector">
+                    <button class="bucket-btn active" data-bucket="avatars" onclick="selectBucket('avatars')">
+                        👤 Avatars<br><small>프로필 이미지</small>
+                    </button>
+                    <button class="bucket-btn" data-bucket="posts" onclick="selectBucket('posts')">
+                        📝 Posts<br><small>게시글 이미지</small>
+                    </button>
+                    <button class="bucket-btn" data-bucket="community" onclick="selectBucket('community')">
+                        💬 Community<br><small>커뮤니티 이미지</small>
+                    </button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">📤 파일 선택</div>
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-text">클릭하거나 파일을 드래그하세요</div>
+                    <div class="upload-hint">JPG, PNG, GIF, WebP (최대 10MB)</div>
+                </div>
+                <input type="file" id="fileInput" multiple accept="image/*">
+
+                <div id="previewContainer" class="preview-grid"></div>
+
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+
+                <button class="upload-btn" id="uploadBtn" onclick="uploadFiles()" disabled>
+                    <span id="uploadBtnText">이미지를 선택하세요</span>
+                </button>
+            </div>
+
+            <div class="section" id="resultSection" style="display: none;">
+                <div class="section-title">✅ 업로드 결과</div>
+                <div id="resultList" class="result-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ytffobltrwkgxiedorsd.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZmZvYmx0cndrZ3hpZWRvcnNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNTAxODcsImV4cCI6MjA3OTgyNjE4N30.LT6RINgyyjIriwdBV4DGP3GeXl2AVRetT1rStFFXpn8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let selectedBucket = 'avatars';
+        let selectedFiles = [];
+
+        // 버킷 선택
+        function selectBucket(bucket) {
+            selectedBucket = bucket;
+            document.querySelectorAll('.bucket-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-bucket="${bucket}"]`).classList.add('active');
+        }
+
+        // 파일 입력 이벤트
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        // 드래그 앤 드롭
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // 파일 처리
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            displayPreviews();
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+            document.getElementById('uploadBtnText').textContent =
+                selectedFiles.length > 0 ? `${selectedFiles.length}개 이미지 업로드` : '이미지를 선택하세요';
+        }
+
+        // 미리보기 표시
+        function displayPreviews() {
+            const container = document.getElementById('previewContainer');
+            container.innerHTML = '';
+
+            selectedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const item = document.createElement('div');
+                    item.className = 'preview-item';
+                    item.innerHTML = `
+                        <img src="${e.target.result}" class="preview-img">
+                        <div class="preview-overlay">
+                            <div class="preview-name">${file.name}</div>
+                            <div class="preview-size">${(file.size / 1024).toFixed(1)} KB</div>
+                        </div>
+                        <button class="remove-btn" onclick="removeFile(${index})">×</button>
+                    `;
+                    container.appendChild(item);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 파일 제거
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            displayPreviews();
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+            document.getElementById('uploadBtnText').textContent =
+                selectedFiles.length > 0 ? `${selectedFiles.length}개 이미지 업로드` : '이미지를 선택하세요';
+        }
+
+        // 상태 메시지 표시
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            statusDiv.style.display = 'block';
+        }
+
+        // 업로드 실행
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) return;
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const resultSection = document.getElementById('resultSection');
+            const resultList = document.getElementById('resultList');
+
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="spinner"></span> 업로드 중...';
+            progressBar.style.display = 'block';
+            resultList.innerHTML = '';
+            resultSection.style.display = 'block';
+
+            showStatus('이미지 업로드 중...', 'info');
+
+            const results = [];
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const progress = ((i + 1) / selectedFiles.length) * 100;
+                progressFill.style.width = `${progress}%`;
+
+                try {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+
+                    const { data, error } = await supabase.storage
+                        .from(selectedBucket)
+                        .upload(fileName, file, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
+
+                    if (error) throw error;
+
+                    const { data: { publicUrl } } = supabase.storage
+                        .from(selectedBucket)
+                        .getPublicUrl(fileName);
+
+                    results.push({
+                        success: true,
+                        fileName: file.name,
+                        url: publicUrl
+                    });
+
+                } catch (error) {
+                    results.push({
+                        success: false,
+                        fileName: file.name,
+                        error: error.message
+                    });
+                }
+            }
+
+            // 결과 표시
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.className = `result-item ${result.success ? 'result-success' : 'result-error'}`;
+
+                if (result.success) {
+                    item.innerHTML = `
+                        <div><strong>✅ ${result.fileName}</strong></div>
+                        <div class="result-url">${result.url}</div>
+                        <button class="copy-btn" onclick="copyToClipboard('${result.url}')">
+                            📋 URL 복사
+                        </button>
+                    `;
+                } else {
+                    item.innerHTML = `
+                        <div><strong>❌ ${result.fileName}</strong></div>
+                        <div style="color: #dc3545; font-size: 12px; margin-top: 5px;">
+                            ${result.error}
+                        </div>
+                    `;
+                }
+                resultList.appendChild(item);
+            });
+
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+
+            if (failCount === 0) {
+                showStatus(`✅ ${successCount}개 이미지가 성공적으로 업로드되었습니다!`, 'success');
+            } else {
+                showStatus(`⚠️ ${successCount}개 성공, ${failCount}개 실패`, 'error');
+            }
+
+            // 초기화
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<span id="uploadBtnText">이미지를 선택하세요</span>';
+            progressBar.style.display = 'none';
+            progressFill.style.width = '0%';
+            selectedFiles = [];
+            document.getElementById('previewContainer').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+        }
+
+        // 클립보드 복사
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('URL이 클립보드에 복사되었습니다!');
+            });
+        }
+
+        // 초기 상태 메시지
+        showStatus('💡 먼저 버킷을 선택하고 이미지를 업로드하세요. 업로드 전에 STORAGE_SETUP.md를 참고하여 버킷을 생성하세요.', 'info');
+    </script>
+</body>
+</html>

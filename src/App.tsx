@@ -28,11 +28,11 @@ function AppContent() {
 function App() {
   return (
     <I18nextProvider i18n={i18n}>
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
           <AppContent />
-        </BrowserRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </I18nextProvider>
   );
 }

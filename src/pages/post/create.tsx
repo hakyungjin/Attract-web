@@ -14,6 +14,13 @@ export default function CreatePostPage() {
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
 
+  // 현재 로그인한 사용자 (Supabase 또는 로컬 스토리지)
+  const getCurrentUser = () => {
+    if (user) return user;
+    const localUser = localStorage.getItem('user');
+    return localUser ? JSON.parse(localUser) : null;
+  };
+
   // 이미지 선택 핸들러
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -63,7 +70,8 @@ export default function CreatePostPage() {
       return;
     }
 
-    if (!user) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
       alert('로그인이 필요합니다.');
       navigate('/login');
       return;
@@ -72,28 +80,22 @@ export default function CreatePostPage() {
     setPosting(true);
 
     try {
-      // 사용자 프로필 정보 가져오기
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
+      // 로컬 스토리지 사용자 정보 사용
       const { data, error } = await supabase
         .from('community_posts')
         .insert({
-          user_id: user.id,
-          author_name: profile?.name || user.email?.split('@')[0] || '익명',
-          avatar_url: profile?.avatar_url || '',
+          user_id: currentUser.id,
+          author_name: currentUser.name || '익명',
+          avatar_url: currentUser.avatar_url || '',
           title: content.substring(0, 50),
           content: content.trim(),
           image_url: images.length > 0 ? images[0] : null,
           likes: 0,
           views: 0,
           category: category,
-          age: profile?.age,
-          location: profile?.location,
-          job: profile?.school || profile?.job,
+          age: currentUser.age,
+          location: currentUser.location,
+          job: currentUser.school || currentUser.job,
         })
         .select()
         .single();

@@ -27,6 +27,8 @@ interface Post {
   job?: string;
   views?: number;
   category: 'dating' | 'chat';
+  userId?: string;
+  authorData?: any; // 글 작성자의 전체 user 정보
 }
 
 import PostDetailPage from './PostDetailPage';
@@ -45,28 +47,53 @@ export default function CommunityTab() {
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        // 먼저 Supabase 인증 사용자 확인
+        const { data: { user } } = await supabase.auth.getUser();
 
-        if (error || !user) return;
+        if (user) {
+          setCurrentUser(user);
 
-        setCurrentUser(user);
+          // 사용자 프로필 정보 가져오기
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', user.id)
+              .single();
 
-        // 사용자 프로필 정보 가져오기
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-          if (!profileError && profile) {
-            setCurrentUser({ ...user, profile });
+            if (!profileError && profile) {
+              setCurrentUser({ ...user, profile });
+            }
+          } catch (err) {
+            // Profile fetch failed, continue with basic user info
           }
-        } catch (err) {
-          // Profile fetch failed, continue with basic user info
+        } else {
+          // Supabase 사용자 없으면 로컬 스토리지 확인
+          const localUser = localStorage.getItem('user');
+          if (localUser) {
+            try {
+              const parsedUser = JSON.parse(localUser);
+              setCurrentUser(parsedUser);
+              console.log('로컬 스토리지 사용자:', parsedUser);
+            } catch (err) {
+              console.error('로컬 스토리지 파싱 실패:', err);
+              setCurrentUser(null);
+            }
+          } else {
+            setCurrentUser(null);
+          }
         }
       } catch (err) {
-        console.error('User fetch error:', err);
+        console.error('사용자 정보 조회 실패:', err);
+        // 최후의 수단: 로컬 스토리지 확인
+        const localUser = localStorage.getItem('user');
+        if (localUser) {
+          try {
+            setCurrentUser(JSON.parse(localUser));
+          } catch (err) {
+            setCurrentUser(null);
+          }
+        }
       }
     };
     getCurrentUser();
@@ -143,46 +170,29 @@ export default function CommunityTab() {
           location: post.location,
           job: post.job,
           views: post.views,
-          category: post.category
+          category: post.category,
+          userId: post.user_id,
+          authorData: {
+            id: post.user_id,
+            name: post.author_name,
+            avatar_url: post.avatar_url,
+            age: post.age,
+            location: post.location,
+            gender: post.gender,
+            bio: post.bio,
+            school: post.school,
+            job: post.job
+          }
         }));
         setPosts(formattedPosts);
       } else {
         throw new Error('No data');
       }
     } catch (error: any) {
-      // DB 연결 실패 시 Mock 데이터 사용
-      setPosts([
-        {
-          id: 1,
-          author: '익명의 사용자',
-          avatar: 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=400&height=500&seq=user1&orientation=portrait',
-          content: '안녕하세요! 오늘 날씨가 정말 좋네요. 다들 좋은 하루 보내세요~',
-          likes: 12,
-          comments: [],
-          timeAgo: '2시간 전',
-          isLiked: false,
-          age: 24,
-          location: '서울 강남구',
-          job: '대학생',
-          views: 45,
-          category: 'dating'
-        },
-        {
-          id: 2,
-          author: '카페 애호가',
-          avatar: 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=400&height=500&seq=user2&orientation=portrait',
-          content: '홍대에서 같이 카페 투어 하실 분 계신가요? ☕',
-          likes: 8,
-          comments: [],
-          timeAgo: '5시간 전',
-          isLiked: false,
-          age: 22,
-          location: '서울 마포구',
-          job: '직장인',
-          views: 32,
-          category: 'chat'
-        }
-      ]);
+      // 에러 로깅
+      console.error('게시글 로드 실패:', error);
+      // Mock 데이터 없이 빈 배열 표시
+      setPosts([]);
     } finally {
       setIsLoading(false);
     }

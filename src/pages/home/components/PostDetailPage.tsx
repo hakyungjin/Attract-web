@@ -40,27 +40,61 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [postAuthor, setPostAuthor] = useState<any>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
 
     // 현재 사용자 정보 가져오기
     const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+      try {
+        // Supabase 인증 사용자 확인
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-        if (profile) {
-          setCurrentUser({ ...user, profile });
+          if (profile) {
+            setCurrentUser({ ...user, profile });
+          }
+        } else {
+          // 로컬 스토리지 사용자
+          const localUser = localStorage.getItem('user');
+          if (localUser) {
+            setCurrentUser(JSON.parse(localUser));
+          }
+        }
+      } catch (err) {
+        console.error('사용자 정보 조회 실패:', err);
+        // 로컬 스토리지 폴백
+        const localUser = localStorage.getItem('user');
+        if (localUser) {
+          setCurrentUser(JSON.parse(localUser));
         }
       }
     };
     getCurrentUser();
-  }, []);
+
+    // 글 작성자 정보 가져오기
+    const getPostAuthor = async () => {
+      try {
+        const { data: users, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', post.id);
+        
+        if (!error && users && users.length > 0) {
+          setPostAuthor(users[0]);
+        }
+      } catch (err) {
+        console.error('글 작성자 정보 조회 실패:', err);
+      }
+    };
+    getPostAuthor();
+  }, [post]);
 
   const handleLike = async () => {
     const newLikes = currentPost.isLiked ? currentPost.likes - 1 : currentPost.likes + 1;
@@ -194,7 +228,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
           {/* 게시글 상세 */}
           <div className="bg-white rounded-3xl shadow-lg shadow-primary-500/5 p-6 animate-slide-up">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="relative group cursor-pointer" onClick={() => navigate('/profile-detail')}>
+              <div className="relative group cursor-pointer" onClick={() => navigate('/profile-detail', { state: { authorData: currentPost.authorData || { id: currentPost.id, name: currentPost.author, avatar_url: currentPost.avatar } } })}>
                 <img
                   src={currentPost.avatar}
                   alt={currentPost.author}
@@ -204,7 +238,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
               </div>
               <div className="flex-1">
                 <h4
-                  onClick={() => navigate('/profile-detail')}
+                  onClick={() => navigate('/profile-detail', { state: { authorData: currentPost.authorData || { id: currentPost.id, name: currentPost.author, avatar_url: currentPost.avatar } } })}
                   className="font-bold text-lg text-slate-800 cursor-pointer hover:text-primary-600 transition-colors font-display"
                 >
                   {currentPost.author}
@@ -257,20 +291,21 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
             </h3>
 
             {/* 댓글 작성 */}
-            <div className="flex space-x-4 mb-8 pb-6 border-b border-slate-50">
+            <div className="flex space-x-4 mb-8 pb-6 border-b border-slate-100">
               <img
-                src="https://readdy.ai/api/search-image?query=Korean%20person%20profile%20avatar%2C%20friendly%20expression%2C%20professional%20portrait%20photography%2C%20soft%20natural%20lighting%2C%20clean%20white%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=myavatar&orientation=squarish"
-                alt="내 프로필"
-                className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 shadow-sm"
+                src={currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20profile%20avatar%2C%20friendly%20expression%2C%20professional%20portrait%20photography%2C%20soft%20natural%20lighting%2C%20clean%20white%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=myavatar&orientation=squarish'}
+                alt={currentUser?.name || '내 프로필'}
+                className="w-12 h-12 rounded-full object-cover object-top flex-shrink-0 shadow-sm border-2 border-primary-100"
               />
               <div className="flex-1">
+                <p className="text-xs font-bold text-slate-600 mb-2">{currentUser?.name || '사용자'}</p>
                 <div className="relative">
                   <textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="댓글을 남겨보세요..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm resize-none bg-slate-50 transition-all placeholder-slate-400"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm resize-none bg-white transition-all placeholder-slate-400 shadow-sm"
                     rows={2}
                     maxLength={500}
                   />
@@ -290,38 +325,48 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
 
             {/* 댓글 목록 */}
             {currentPost.comments.length > 0 ? (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {currentPost.comments.map((comment) => (
-                  <div key={comment.id} className="flex space-x-3 group">
+                  <div key={comment.id} className="flex space-x-3 group pb-5 border-b border-slate-50 last:border-b-0">
+                    {/* 프로필 이미지 */}
                     <img
                       src={comment.avatar}
                       alt={comment.author}
-                      onClick={() => navigate('/profile-detail')}
-                      className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity shadow-sm"
+                      onClick={() => navigate('/profile-detail', { state: { userId: comment.id } })}
+                      className="w-11 h-11 rounded-full object-cover object-top flex-shrink-0 cursor-pointer hover:opacity-80 transition-all shadow-sm border-2 border-slate-100 group-hover:border-primary-300"
                     />
-                    <div className="flex-1">
-                      <div className="bg-slate-50 rounded-2xl rounded-tl-none px-5 py-3.5 hover:bg-slate-100 transition-colors">
-                        <div className="flex items-center justify-between mb-1">
-                          <span
-                            onClick={() => navigate('/profile-detail')}
-                            className="font-bold text-sm text-slate-800 cursor-pointer hover:text-primary-600 transition-colors"
-                          >
-                            {comment.author}
-                          </span>
-                          <span className="text-[10px] font-medium text-slate-400">{comment.timeAgo}</span>
-                        </div>
-                        <p className="text-sm text-slate-600 leading-relaxed">{comment.content}</p>
+                    
+                    {/* 댓글 내용 */}
+                    <div className="flex-1 min-w-0">
+                      {/* 작성자 정보 */}
+                      <div className="flex items-center justify-between mb-2">
+                        <button
+                          onClick={() => navigate('/profile-detail', { state: { userId: comment.id } })}
+                          className="font-bold text-sm text-slate-800 cursor-pointer hover:text-primary-600 hover:underline transition-colors"
+                        >
+                          {comment.author}
+                        </button>
+                        <span className="text-xs font-medium text-slate-400">{comment.timeAgo}</span>
                       </div>
-                      <div className="flex items-center space-x-4 mt-2 ml-2">
+
+                      {/* 댓글 박스 */}
+                      <div className="bg-slate-50 rounded-2xl rounded-tl-none px-4 py-3 group-hover:bg-slate-100 transition-colors border border-slate-100 group-hover:border-primary-200">
+                        <p className="text-sm text-slate-700 leading-relaxed break-words">{comment.content}</p>
+                      </div>
+
+                      {/* 댓글 액션 버튼 */}
+                      <div className="flex items-center space-x-5 mt-2 ml-1">
                         <button
                           onClick={() => handleCommentLike(comment.id)}
-                          className={`flex items-center space-x-1 text-xs font-medium transition-colors cursor-pointer group/like ${comment.isLiked ? 'text-pink-500' : 'text-slate-400 hover:text-pink-500'
-                            }`}
+                          className={`flex items-center space-x-1.5 text-xs font-medium transition-all cursor-pointer group/like ${comment.isLiked 
+                            ? 'text-pink-500' 
+                            : 'text-slate-400 hover:text-pink-500'
+                          }`}
                         >
-                          <i className={`${comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'} group-hover/like:scale-110 transition-transform`}></i>
+                          <i className={`${comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'} group-hover/like:scale-125 transition-transform`}></i>
                           <span>{comment.likes > 0 ? comment.likes : '좋아요'}</span>
                         </button>
-                        <button className="text-xs font-medium text-slate-400 hover:text-primary-500 transition-colors cursor-pointer">
+                        <button className="text-xs font-medium text-slate-400 hover:text-primary-500 transition-colors cursor-pointer hover:font-semibold">
                           답글달기
                         </button>
                       </div>
@@ -330,11 +375,12 @@ export default function PostDetailPage({ post, onBack, onUpdatePost }: PostDetai
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <div className="w-16 h-16 flex items-center justify-center mx-auto mb-3 bg-white rounded-full shadow-sm">
-                  <i className="ri-chat-smile-2-line text-3xl text-primary-300"></i>
+              <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl border border-dashed border-slate-200">
+                <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-white rounded-full shadow-md">
+                  <i className="ri-chat-smile-2-line text-4xl text-primary-300"></i>
                 </div>
-                <p className="text-slate-500 font-medium">첫 번째 댓글의 주인공이 되어보세요!</p>
+                <p className="text-slate-600 font-semibold text-lg">아직 댓글이 없어요</p>
+                <p className="text-slate-500 text-sm mt-1">첫 번째 댓글의 주인공이 되어보세요!</p>
               </div>
             )}
           </div>

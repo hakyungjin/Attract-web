@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // 기본 프로필 이미지 헬퍼 함수
@@ -11,15 +11,61 @@ const getDefaultAvatar = (gender?: string) => {
 
 export default function ProfileTab() {
   const navigate = useNavigate();
-  const [profile] = useState({
-    name: '김민지',
-    age: 24,
+  const [profile, setProfile] = useState({
+    name: '사용자',
+    age: 0,
     gender: '여자',
-    location: '서울 강남구',
+    location: '위치 미설정',
     avatar: '',
-    bio: '음악과 여행을 좋아하는 긍정적인 사람입니다. 함께 즐거운 시간을 보낼 수 있는 분을 찾고 있어요!',
-    interests: ['음악', '여행', '카페', '영화', '운동']
+    bio: '',
+    interests: []
   });
+  const [matchingStats, setMatchingStats] = useState({
+    received: 0,
+    sent: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 현재 사용자 정보 로드
+  useEffect(() => {
+    const loadUserProfile = () => {
+      try {
+        // 로컬 스토리지에서 사용자 정보 가져오기
+        const localUser = localStorage.getItem('user');
+        if (localUser) {
+          const userData = JSON.parse(localUser);
+          setProfile({
+            name: userData.name || '사용자',
+            age: userData.age || 0,
+            gender: userData.gender || '여자',
+            location: userData.location || '위치 미설정',
+            avatar: userData.avatar_url || '',
+            bio: userData.bio || '',
+            interests: userData.interests || []
+          });
+          console.log('프로필 로드 완료:', userData);
+        }
+      } catch (error) {
+        console.error('프로필 로드 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 border-4 border-slate-200 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div className="text-sm font-medium text-slate-500">프로필 로드 중...</div>
+      </div>
+    );
+  }
 
   const handleEditProfile = () => {
     navigate('/profile-edit');
@@ -89,11 +135,11 @@ export default function ProfileTab() {
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center border border-white/10 hover:bg-white/20 transition-colors">
-                <div className="text-3xl font-bold mb-1 font-display">3</div>
+                <div className="text-3xl font-bold mb-1 font-display">{matchingStats.received}</div>
                 <div className="text-xs text-white/80 font-medium">받은 요청</div>
               </div>
               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center border border-white/10 hover:bg-white/20 transition-colors">
-                <div className="text-3xl font-bold mb-1 font-display">2</div>
+                <div className="text-3xl font-bold mb-1 font-display">{matchingStats.sent}</div>
                 <div className="text-xs text-white/80 font-medium">보낸 요청</div>
               </div>
             </div>
