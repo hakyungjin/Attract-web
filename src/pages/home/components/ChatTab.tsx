@@ -231,6 +231,8 @@ export default function ChatTab() {
               <img
                 src={currentUser?.avatar || getDefaultAvatar(currentUser?.gender)}
                 alt={currentUser?.name}
+                loading="lazy"
+                decoding="async"
                 className="w-10 h-10 rounded-full object-cover object-top shadow-sm"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -271,6 +273,8 @@ export default function ChatTab() {
                   <img
                     src={currentUser?.avatar || getDefaultAvatar(currentUser?.gender)}
                     alt={currentUser?.name}
+                    loading="lazy"
+                    decoding="async"
                     className="w-8 h-8 rounded-full object-cover object-top shadow-sm mb-1"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -366,6 +370,8 @@ export default function ChatTab() {
                   <img
                     src={user.avatar || getDefaultAvatar(user.gender)}
                     alt={user.name}
+                    loading="lazy"
+                    decoding="async"
                     className="w-14 h-14 rounded-2xl object-cover object-top shadow-sm group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;

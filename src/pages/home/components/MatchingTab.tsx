@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -27,6 +27,9 @@ export default function MatchingTab() {
   const [selectedLocation, setSelectedLocation] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PROFILES_PER_PAGE = 20;
 
   // 컴포넌트 마운트 시 로그인 사용자 성별에 따라 반대 성별로 초기화
   useEffect(() => {
@@ -60,13 +63,15 @@ export default function MatchingTab() {
     loadProfiles();
   }, [selectedGender]);
 
-  const loadProfiles = async () => {
+  const loadProfiles = async (loadMore = false) => {
     setIsLoading(true);
     try {
+      const currentPage = loadMore ? page + 1 : 0;
+
       // 성별 필터링
       let query = supabase
         .from('users')
-        .select('*');
+        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image', { count: 'exact' });
 
       // 로그인한 경우에만 내 프로필 제외
       if (authUser?.id) {
@@ -82,7 +87,12 @@ export default function MatchingTab() {
         return;
       }
 
-      const { data, error } = await query;
+      // Pagination 적용
+      query = query
+        .range(currentPage * PROFILES_PER_PAGE, (currentPage + 1) * PROFILES_PER_PAGE - 1)
+        .order('created_at', { ascending: false });
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
 
@@ -117,17 +127,30 @@ export default function MatchingTab() {
           });
 
         console.log('✅ 필터링된 프로필 수:', formattedProfiles.length);
-        setProfiles(formattedProfiles);
+
+        if (loadMore) {
+          setProfiles(prev => [...prev, ...formattedProfiles]);
+        } else {
+          setProfiles(formattedProfiles);
+        }
+
+        setPage(currentPage);
+        setHasMore(count ? (currentPage + 1) * PROFILES_PER_PAGE < count : false);
       }
     } catch (error) {
       console.error('프로필 로드 실패:', error);
-      setProfiles([]);
+      if (!loadMore) {
+        setProfiles([]);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredProfiles = profiles.filter(profile => profile.gender === selectedGender);
+  const filteredProfiles = useMemo(
+    () => profiles.filter(profile => profile.gender === selectedGender),
+    [profiles, selectedGender]
+  );
 
   const handleLocationClick = (location: string) => {
     setSelectedLocation(location);
@@ -209,6 +232,8 @@ export default function MatchingTab() {
               <img
                 src={profile.character}
                 alt={profile.name}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
 
@@ -242,12 +267,18 @@ export default function MatchingTab() {
       </div>
 
       {/* 더보기 버튼 */}
-      <div className="mt-10 text-center pb-8">
-        <button className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2">
-          <span>친구 더보기</span>
-          <i className="ri-arrow-down-s-line"></i>
-        </button>
-      </div>
+      {hasMore && (
+        <div className="mt-10 text-center pb-8">
+          <button
+            onClick={() => loadProfiles(true)}
+            disabled={isLoading}
+            className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span>{isLoading ? '로딩 중...' : '친구 더보기'}</span>
+            <i className={`${isLoading ? 'ri-loader-4-line animate-spin' : 'ri-arrow-down-s-line'}`}></i>
+          </button>
+        </div>
+      )}
 
       {/* 필터 팝업 */}
       {showFilter && (

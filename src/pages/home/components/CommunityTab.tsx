@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 
@@ -227,7 +227,10 @@ export default function CommunityTab() {
     return `${diffInDays}일 전`;
   };
 
-  const filteredPosts = posts.filter(post => post.category === selectedCategory);
+  const filteredPosts = useMemo(
+    () => posts.filter(post => post.category === selectedCategory),
+    [posts, selectedCategory]
+  );
 
   const handleLike = async (postId: number) => {
     if (!currentUser) {
