@@ -47,38 +47,53 @@ export default function MatchingRequestsPage() {
     setIsLoading(true);
 
     try {
-      // 받은 요청 - JOIN을 사용하여 한 번에 조회
+      // 1. 받은 요청 조회
       const { data: receivedData, error: receivedError } = await supabase
         .from('matching_requests')
-        .select(`
-          id,
-          from_user_id,
-          status,
-          created_at,
-          from_user:users!from_user_id(
-            id,
-            name,
-            age,
-            gender,
-            location,
-            school,
-            mbti,
-            bio,
-            profile_image
-          )
-        `)
+        .select('id, from_user_id, status, created_at')
         .eq('to_user_id', authUser.id)
         .order('created_at', { ascending: false });
 
-      if (receivedError) {
-        console.error('받은 요청 조회 실패:', receivedError);
+      // 2. 보낸 요청 조회
+      const { data: sentData, error: sentError } = await supabase
+        .from('matching_requests')
+        .select('id, to_user_id, status, created_at')
+        .eq('from_user_id', authUser.id)
+        .order('created_at', { ascending: false });
+
+      if (receivedError || sentError) {
+        console.error('매칭 요청 조회 실패:', receivedError || sentError);
+        return;
       }
 
+      // 3. 모든 관련 사용자 ID 수집
+      const fromUserIds = receivedData?.map(r => r.from_user_id) || [];
+      const toUserIds = sentData?.map(s => s.to_user_id) || [];
+      const allUserIds = [...new Set([...fromUserIds, ...toUserIds])];
+
+      // 4. 한 번의 쿼리로 모든 사용자 정보 조회
+      let usersMap: Record<string, any> = {};
+      if (allUserIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, name, age, gender, location, school, mbti, bio, profile_image')
+          .in('id', allUserIds);
+
+        if (usersError) {
+          console.error('사용자 정보 조회 실패:', usersError);
+        } else if (usersData) {
+          usersMap = Object.fromEntries(
+            usersData.map(user => [user.id, user])
+          );
+        }
+      }
+
+      // 5. 받은 요청 데이터 매핑
       if (receivedData) {
         const received: MatchRequest[] = receivedData
-          .filter(req => req.from_user) // 사용자 정보가 있는 경우만
+          .filter(req => usersMap[req.from_user_id]) // 사용자 정보가 있는 경우만
           .map(req => {
-            const user = req.from_user as any;
+            const user = usersMap[req.from_user_id];
             return {
               id: req.id.toString(),
               userId: req.from_user_id,
@@ -99,38 +114,12 @@ export default function MatchingRequestsPage() {
         setReceivedRequests(received);
       }
 
-      // 보낸 요청 - JOIN을 사용하여 한 번에 조회
-      const { data: sentData, error: sentError } = await supabase
-        .from('matching_requests')
-        .select(`
-          id,
-          to_user_id,
-          status,
-          created_at,
-          to_user:users!to_user_id(
-            id,
-            name,
-            age,
-            gender,
-            location,
-            school,
-            mbti,
-            bio,
-            profile_image
-          )
-        `)
-        .eq('from_user_id', authUser.id)
-        .order('created_at', { ascending: false });
-
-      if (sentError) {
-        console.error('보낸 요청 조회 실패:', sentError);
-      }
-
+      // 6. 보낸 요청 데이터 매핑
       if (sentData) {
         const sent: MatchRequest[] = sentData
-          .filter(req => req.to_user) // 사용자 정보가 있는 경우만
+          .filter(req => usersMap[req.to_user_id]) // 사용자 정보가 있는 경우만
           .map(req => {
-            const user = req.to_user as any;
+            const user = usersMap[req.to_user_id];
             return {
               id: req.id.toString(),
               userId: req.to_user_id,

@@ -98,39 +98,55 @@ export default function ChatTab() {
         }
       });
 
-      // 각 파트너의 정보와 마지막 메시지 로드
+      // 모든 파트너의 정보를 한 번에 조회
+      const partnerIds = Array.from(partners);
+      if (partnerIds.length === 0) {
+        setChatUsers([]);
+        return;
+      }
+
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, name, profile_image, gender')
+        .in('id', partnerIds);
+
+      if (!usersData) {
+        setChatUsers([]);
+        return;
+      }
+
+      // 사용자 맵 생성
+      const usersMap = Object.fromEntries(
+        usersData.map(user => [user.id, user])
+      );
+
+      // 각 파트너의 마지막 메시지 로드
       const chatList: ChatUser[] = [];
-      for (const partnerId of partners) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id, name, profile_image, gender')
-          .eq('id', partnerId)
-          .single();
+      for (const partnerId of partnerIds) {
+        const userData = usersMap[partnerId];
+        if (!userData) continue;
 
         const { data: lastMsg } = await supabase
           .from('messages')
-          .select('content, created_at, is_read')
-          .or(`sender_id.eq.${partnerId},recipient_id.eq.${partnerId}`)
-          .or(`sender_id.eq.${authUser.id},recipient_id.eq.${authUser.id}`)
+          .select('content, created_at, is_read, sender_id')
+          .or(`and(sender_id.eq.${authUser.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${authUser.id})`)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (userData) {
-          chatList.push({
-            id: userData.id,
-            name: userData.name || '사용자',
-            avatar: userData.profile_image || getDefaultAvatar(userData.gender),
-            lastMessage: lastMsg?.content || 'Conversation started',
-            lastMessageTime: lastMsg ? new Date(lastMsg.created_at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true }) : '방금 전',
-            unreadCount: lastMsg && !lastMsg.is_read ? 1 : 0,
-            isOnline: true,
-            gender: userData.gender
-          });
-        }
+        chatList.push({
+          id: userData.id,
+          name: userData.name || '사용자',
+          avatar: userData.profile_image || getDefaultAvatar(userData.gender),
+          lastMessage: lastMsg?.content || 'Conversation started',
+          lastMessageTime: lastMsg ? new Date(lastMsg.created_at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true }) : '방금 전',
+          unreadCount: lastMsg && !lastMsg.is_read && lastMsg.sender_id === partnerId ? 1 : 0,
+          isOnline: true,
+          gender: userData.gender
+        });
       }
 
-      setChatUsers(chatList.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()));
+      setChatUsers(chatList);
     } catch (error) {
       console.error('채팅 목록 로드 실패:', error);
     }
@@ -143,8 +159,7 @@ export default function ChatTab() {
       const { data } = await supabase
         .from('messages')
         .select('id, sender_id, content, created_at, is_read')
-        .or(`sender_id.eq.${authUser.id},recipient_id.eq.${authUser.id}`)
-        .or(`sender_id.eq.${partnerId},recipient_id.eq.${partnerId}`)
+        .or(`and(sender_id.eq.${authUser.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${authUser.id})`)
         .order('created_at', { ascending: true });
 
       if (data) {
