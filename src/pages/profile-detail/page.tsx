@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
 
 interface Profile {
-  id: number;
+  id: string;
   name: string;
   age: number;
   gender: string;
@@ -104,55 +105,128 @@ export default function ProfileDetailPage() {
         return;
       }
 
-      // 이미 매칭 요청이 있는지 확인 (양방향)
-      const { data: existingRequest1, error: checkError1 } = await supabase
+      const fromUserId = String(authUser.id);
+      const toUserId = String(profile.id);
+
+      console.log('📝 매칭 요청 정보:', { fromUserId, toUserId });
+
+      // 상대방이 나에게 보낸 요청이 있는지 확인 (상호 매칭 체크)
+      const { data: reverseRequest } = await supabase
         .from('matching_requests')
-        .select('*')
-        .eq('from_user_id', authUser.id)
-        .eq('to_user_id', profile.id);
+        .select('id')
+        .eq('from_user_id', toUserId)
+        .eq('to_user_id', fromUserId)
+        .eq('status', 'pending')
+        .limit(1);
 
-      if (checkError1) throw checkError1;
+      const isMutualMatch = reverseRequest && reverseRequest.length > 0;
+      console.log('상호 매칭 여부:', isMutualMatch);
 
-      const { data: existingRequest2, error: checkError2 } = await supabase
+      // 내가 이미 보낸 요청이 있는지 확인
+      const { data: myRequest } = await supabase
         .from('matching_requests')
-        .select('*')
-        .eq('from_user_id', profile.id)
-        .eq('to_user_id', authUser.id);
+        .select('id')
+        .eq('from_user_id', fromUserId)
+        .eq('to_user_id', toUserId)
+        .limit(1);
 
-      if (checkError2) throw checkError2;
-
-      const allRequests = [...(existingRequest1 || []), ...(existingRequest2 || [])];
-
-      if (allRequests.length > 0) {
-        alert('이미 매칭이 성사된 상대입니다');
+      if (myRequest && myRequest.length > 0) {
+        alert('이미 매칭 요청을 보낸 상대입니다');
         return;
       }
 
       // matching_requests 테이블에 매칭 요청 저장
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('matching_requests')
         .insert({
-          from_user_id: authUser.id,
-          to_user_id: profile.id,
-          status: 'pending'
-        });
+          from_user_id: fromUserId,
+          to_user_id: toUserId,
+          status: isMutualMatch ? 'accepted' : 'pending'
+        })
+        .select();
 
-      if (error) throw error;
+      console.log('매칭 요청 결과:', { data, error });
 
-      if (profile.hasLikedMe) {
-        // 상호 매칭인 경우
+      if (error) {
+        if (error.code === '23505') {
+          alert('이미 매칭 요청을 보낸 상대입니다');
+          return;
+        }
+        throw error;
+      }
+
+      if (isMutualMatch) {
+        // 상호 매칭 성사! 상대방 요청도 accepted로 업데이트
+        await supabase
+          .from('matching_requests')
+          .update({ status: 'accepted' })
+          .eq('from_user_id', toUserId)
+          .eq('to_user_id', fromUserId);
+
+        // 채팅방 생성
+        const { data: chatRoom, error: chatError } = await supabase
+          .from('chat_rooms')
+          .insert({
+            user1_id: fromUserId,
+            user2_id: toUserId,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (chatError) {
+          console.error('채팅방 생성 실패:', chatError);
+        } else {
+          console.log('✅ 채팅방 생성 완료:', chatRoom);
+        }
+
+        // 양쪽에 매칭 성사 알림 (DB)
+        await supabase.from('notifications').insert([
+          {
+            user_id: toUserId,
+            type: 'match_success',
+            title: '매칭 성사! 💕',
+            message: `${authUser.name || '누군가'}님과 매칭되었습니다! 대화를 시작해보세요.`,
+            data: { matched_user_id: fromUserId, chat_room_id: chatRoom?.id },
+            read: false
+          },
+          {
+            user_id: fromUserId,
+            type: 'match_success',
+            title: '매칭 성사! 💕',
+            message: `${profile.name}님과 매칭되었습니다! 대화를 시작해보세요.`,
+            data: { matched_user_id: toUserId, chat_room_id: chatRoom?.id },
+            read: false
+          }
+        ]);
+
+        // 🔔 푸시 알림 전송 (상대방에게)
+        await sendMatchSuccessPush(toUserId, authUser.name || '누군가', chatRoom?.id);
+
         setShowMatchModal(true);
       } else {
-        // 일반 매칭 요청인 경우
+        // 일반 매칭 요청 - 상대방에게 알림만
+        await supabase.from('notifications').insert({
+          user_id: toUserId,
+          type: 'match_request',
+          title: '새로운 매칭 요청',
+          message: `${authUser.name || '누군가'}님이 매칭을 요청했습니다`,
+          data: { from_user_id: fromUserId, from_user_name: authUser.name },
+          read: false
+        });
+
+        // 🔔 푸시 알림 전송
+        await sendMatchRequestPush(toUserId, authUser.name || '누군가', fromUserId);
+
         setShowLikeToast(true);
         setTimeout(() => {
           setShowLikeToast(false);
           navigate(-1);
         }, 2000);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('매칭 요청 실패:', error);
-      alert('매칭 요청에 실패했습니다');
+      alert('매칭 요청에 실패했습니다: ' + (error?.message || '알 수 없는 오류'));
     }
   };
 

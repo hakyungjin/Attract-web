@@ -53,7 +53,7 @@ export default function Header({ coins = 0 }: HeaderProps) {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 glass z-50 transition-all duration-300">
+      <header className="fixed top-0 left-0 right-0 glass z-50 transition-all duration-300" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between px-4 py-3 max-w-screen-xl mx-auto">
           {/* 로고 */}
           <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>

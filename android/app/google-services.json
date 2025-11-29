@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "557504244334",
+    "project_id": "attract--web",
+    "storage_bucket": "attract--web.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:557504244334:android:c1e177748dd4640898147f",
+        "android_client_info": {
+          "package_name": "com.attract.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-yszTPIfJ7QKkY3h7CjKVi3Ar9ksdO38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

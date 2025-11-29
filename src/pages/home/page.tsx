@@ -54,7 +54,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header coins={coins} />
-      <main className="pt-20 pb-28 px-4 max-w-screen-xl mx-auto">
+      <main 
+        className="pb-28 px-4 max-w-screen-xl mx-auto"
+        style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top))' }}
+      >
         {renderContent()}
       </main>
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />

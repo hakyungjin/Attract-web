@@ -5,9 +5,10 @@ import i18n from "./i18n";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { cleanupExpiredMatchingRequests } from "./services/matchingService";
+import { initPushNotifications } from "./services/pushNotification";
 
 function AppContent() {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     // 앱 시작 시 만료된 매칭 요청 정리
@@ -20,6 +21,13 @@ function AppContent() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // 로그인 시 푸시 알림 초기화
+  useEffect(() => {
+    if (user?.id) {
+      initPushNotifications(user.id);
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (

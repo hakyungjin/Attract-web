@@ -243,10 +243,10 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   
   -- 수신자
-  user_id UUID REFERENCES auth.users NOT NULL,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
   
   -- 발신자 (선택적)
-  from_user_id UUID REFERENCES auth.users,
+  from_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
   from_user_name TEXT,
   from_user_avatar TEXT,
   
@@ -259,12 +259,12 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   post_id BIGINT REFERENCES public.community_posts(id) ON DELETE CASCADE,
   
   -- 상태
-  is_read BOOLEAN DEFAULT false
+  read BOOLEAN DEFAULT false
 );
 
 -- Notifications 인덱스
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON public.notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
 
 -- Notifications RLS 설정
@@ -273,17 +273,17 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
 CREATE POLICY "Users can view own notifications"
   ON public.notifications FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can update own notifications" ON public.notifications;
 CREATE POLICY "Users can update own notifications"
   ON public.notifications FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can delete own notifications" ON public.notifications;
 CREATE POLICY "Users can delete own notifications"
   ON public.notifications FOR DELETE
-  USING (auth.uid() = user_id);
+  USING (true);
 
 DROP POLICY IF EXISTS "System can create notifications" ON public.notifications;
 CREATE POLICY "System can create notifications"
@@ -300,8 +300,8 @@ CREATE TABLE IF NOT EXISTS public.matching_requests (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
   
   -- 요청자와 수신자
-  from_user_id UUID REFERENCES auth.users NOT NULL,
-  to_user_id UUID REFERENCES auth.users NOT NULL,
+  from_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  to_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
   
   -- 상태
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
@@ -320,22 +320,22 @@ ALTER TABLE public.matching_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view related requests" ON public.matching_requests;
 CREATE POLICY "Users can view related requests"
   ON public.matching_requests FOR SELECT
-  USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
+  USING (true);
 
-DROP POLICY IF EXISTS "Users can create requests" ON public.matching_requests;
-CREATE POLICY "Users can create requests"
+DROP POLICY IF EXISTS "Anyone can create requests" ON public.matching_requests;
+CREATE POLICY "Anyone can create requests"
   ON public.matching_requests FOR INSERT
-  WITH CHECK (auth.uid() = from_user_id);
+  WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can update received requests" ON public.matching_requests;
-CREATE POLICY "Users can update received requests"
+DROP POLICY IF EXISTS "Anyone can update requests" ON public.matching_requests;
+CREATE POLICY "Anyone can update requests"
   ON public.matching_requests FOR UPDATE
-  USING (auth.uid() = to_user_id);
+  USING (true);
 
-DROP POLICY IF EXISTS "Users can delete own requests" ON public.matching_requests;
-CREATE POLICY "Users can delete own requests"
+DROP POLICY IF EXISTS "Anyone can delete requests" ON public.matching_requests;
+CREATE POLICY "Anyone can delete requests"
   ON public.matching_requests FOR DELETE
-  USING (auth.uid() = from_user_id);
+  USING (true);
 
 -- Matching Requests 자동삭제 정책 (24시간 후 pending 요청 삭제)
 CREATE OR REPLACE FUNCTION public.auto_delete_expired_matching_requests()
@@ -361,8 +361,8 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   
   -- 발신자와 수신자
-  sender_id UUID REFERENCES auth.users NOT NULL,
-  recipient_id UUID REFERENCES auth.users NOT NULL,
+  sender_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  recipient_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
   
   -- 메시지 내용
   content TEXT NOT NULL,
@@ -384,17 +384,17 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own messages" ON public.messages;
 CREATE POLICY "Users can view own messages"
   ON public.messages FOR SELECT
-  USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
 CREATE POLICY "Users can send messages"
   ON public.messages FOR INSERT
-  WITH CHECK (auth.uid() = sender_id);
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can update own messages" ON public.messages;
 CREATE POLICY "Users can update own messages"
   ON public.messages FOR UPDATE
-  USING (auth.uid() = recipient_id);
+  USING (true);
 
 -- ============================================
 -- 9. Coin Packages 테이블

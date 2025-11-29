@@ -17,6 +17,25 @@ export default function LoginPage() {
     gender: 'male'
   });
 
+  // 전화번호 포맷팅 (010-XXXX-XXXX)
+  const formatPhoneNumber = (value: string) => {
+    const numbers = value.replace(/[^\d]/g, '').slice(0, 11);
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setFormData({ ...formData, phoneNumber: formatted });
+  };
+
+  // 전화번호 유효성 검사 (010으로 시작, 11자리)
+  const isValidPhoneNumber = (phone: string) => {
+    const numbers = phone.replace(/[^\d]/g, '');
+    return numbers.length === 11 && numbers.startsWith('010');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -24,6 +43,12 @@ export default function LoginPage() {
     try {
       if (!formData.phoneNumber || !formData.password) {
         alert('전화번호와 비밀번호를 입력해주세요.');
+        setLoading(false);
+        return;
+      }
+
+      if (!isValidPhoneNumber(formData.phoneNumber)) {
+        alert('올바른 전화번호 형식이 아닙니다. (010-XXXX-XXXX)');
         setLoading(false);
         return;
       }
@@ -57,6 +82,11 @@ export default function LoginPage() {
     // 유효성 검사
     if (!formData.phoneNumber) {
       alert('전화번호를 입력해주세요.');
+      return;
+    }
+
+    if (!isValidPhoneNumber(formData.phoneNumber)) {
+      alert('올바른 전화번호 형식이 아닙니다. (010-XXXX-XXXX)');
       return;
     }
 
@@ -160,9 +190,10 @@ export default function LoginPage() {
                 <input
                   type="tel"
                   value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                  onChange={handlePhoneChange}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                   placeholder="010-1234-5678"
+                  maxLength={13}
                 />
               </div>
 
@@ -204,9 +235,10 @@ export default function LoginPage() {
                   type="tel"
                   required
                   value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                  onChange={handlePhoneChange}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                   placeholder="010-1234-5678"
+                  maxLength={13}
                 />
               </div>
 

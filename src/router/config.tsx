@@ -3,6 +3,7 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
 import SignupProfilePage from "../pages/signup-profile/page";
+import QuickSignupPage from "../pages/signup/QuickSignupPage";
 import ProfileEditPage from "../pages/profile-edit/page";
 import NotificationsPage from "../pages/notifications/page";
 import ProfileDetailPage from "../pages/profile-detail/page";
@@ -28,6 +29,10 @@ const routes: RouteObject[] = [
   {
     path: "/signup-profile",
     element: <SignupProfilePage />,
+  },
+  {
+    path: "/signup/quick",
+    element: <QuickSignupPage />,
   },
   {
     path: "/profile-edit",
