@@ -213,7 +213,7 @@ export default function LoginPage() {
                   <input type="checkbox" className="mr-2" />
                   <span className="text-gray-600">로그인 상태 유지</span>
                 </label>
-                <button type="button" className="text-cyan-500 hover:text-cyan-600 cursor-pointer whitespace-nowrap">
+                <button type="button" onClick={() => navigate('/support')} className="text-cyan-500 hover:text-cyan-600 cursor-pointer whitespace-nowrap">
                   비밀번호 찾기
                 </button>
               </div>
@@ -332,7 +332,7 @@ export default function LoginPage() {
         <div className="text-center mt-6 text-sm text-gray-600">
           <p>
             문제가 있으신가요?{' '}
-            <button className="text-cyan-500 hover:text-cyan-600 cursor-pointer whitespace-nowrap">
+            <button onClick={() => navigate('/support')} className="text-cyan-500 hover:text-cyan-600 cursor-pointer whitespace-nowrap">
               고객센터
             </button>
           </p>

@@ -270,7 +270,13 @@ export default function ProfileDetailPage() {
             />
             <span className="font-medium text-gray-800">{profile.name}</span>
           </div>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
+          <button onClick={() => {
+            const options = ['차단하기', '신고하기', '취소'];
+            const choice = window.confirm('이 사용자를 신고 또는 차단하시겠습니까?\n\n확인: 신고하기\n취소: 닫기');
+            if (choice) {
+              alert('신고 기능 준비중입니다. 고객센터로 문의해주세요.');
+            }
+          }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
             <i className="ri-more-2-fill text-xl"></i>
           </button>
         </div>
@@ -376,7 +382,7 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* MBTI 궁합 버튼 */}
-        <button className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+        <button onClick={() => alert('MBTI 궁합 분석 기능 준비중입니다.')} className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
               <i className="ri-heart-line text-white"></i>

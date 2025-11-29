@@ -243,7 +243,9 @@ export default function MatchingTab() {
 
       {/* 더보기 버튼 */}
       <div className="mt-10 text-center pb-8">
-        <button className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2">
+        <button onClick={() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }} className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2">
           <span>친구 더보기</span>
           <i className="ri-arrow-down-s-line"></i>
         </button>
