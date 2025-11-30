@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
+import { analyzeMBTICompatibility, getCompatibilityColor, getCompatibilityEmoji, type MBTICompatibility } from '../../services/mbtiCompatibility';
 
 interface Profile {
   id: string;
@@ -38,6 +39,9 @@ export default function ProfileDetailPage() {
   const [showLikeToast, setShowLikeToast] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showMBTIModal, setShowMBTIModal] = useState(false);
+  const [myMBTI, setMyMBTI] = useState<string | null>(null);
+  const [compatibility, setCompatibility] = useState<MBTICompatibility | null>(null);
 
   // 현재 로그인한 사용자 확인
   const getCurrentUserId = () => {
@@ -53,6 +57,25 @@ export default function ProfileDetailPage() {
 
   const currentUserId = getCurrentUserId();
   const isOwnProfile = currentUserId && profile?.id === currentUserId;
+
+  // 로그인한 사용자의 MBTI 가져오기
+  useEffect(() => {
+    const loadMyMBTI = async () => {
+      if (!authUser?.id) return;
+
+      const { data } = await supabase
+        .from('users')
+        .select('mbti')
+        .eq('id', authUser.id)
+        .single();
+
+      if (data?.mbti) {
+        setMyMBTI(data.mbti);
+      }
+    };
+
+    loadMyMBTI();
+  }, [authUser?.id]);
 
   // 기본 프로필 이미지
   const getDefaultAvatar = (gender: string) => {
@@ -251,6 +274,22 @@ export default function ProfileDetailPage() {
     navigate('/');
   };
 
+  const handleMBTICompatibility = () => {
+    if (!myMBTI) {
+      alert('내 MBTI 정보가 없습니다. 프로필을 업데이트해주세요.');
+      return;
+    }
+
+    if (!profile?.mbti) {
+      alert('상대방의 MBTI 정보가 없습니다.');
+      return;
+    }
+
+    const result = analyzeMBTICompatibility(myMBTI, profile.mbti);
+    setCompatibility(result);
+    setShowMBTIModal(true);
+  };
+
   return (
     <div className="min-h-screen bg-cyan-50 pb-24">
       {/* 헤더 */}
@@ -376,15 +415,23 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* MBTI 궁합 버튼 */}
-        <button className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
-              <i className="ri-heart-line text-white"></i>
+        {!isOwnProfile && myMBTI && profile?.mbti && (
+          <button
+            onClick={handleMBTICompatibility}
+            className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
+                <i className="ri-heart-line text-white"></i>
+              </div>
+              <div className="text-left">
+                <div className="font-semibold text-gray-800">MBTI 궁합 보기</div>
+                <div className="text-xs text-gray-500">{myMBTI} × {profile.mbti}</div>
+              </div>
             </div>
-            <span className="font-semibold text-gray-800">MBTI 궁합 보기</span>
-          </div>
-          <i className="ri-arrow-right-s-line text-xl text-gray-400"></i>
-        </button>
+            <i className="ri-arrow-right-s-line text-xl text-gray-400"></i>
+          </button>
+        )}
 
         {/* 관심사 */}
         <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -465,6 +512,118 @@ export default function ProfileDetailPage() {
                 나중에
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MBTI 궁합 모달 */}
+      {showMBTIModal && compatibility && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full my-8">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-gray-800">MBTI 궁합 분석</h3>
+              <button
+                onClick={() => setShowMBTIModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <i className="ri-close-line text-xl text-gray-600"></i>
+              </button>
+            </div>
+
+            {/* MBTI 표시 */}
+            <div className="flex items-center justify-center space-x-4 mb-6">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mb-2">
+                  <span className="text-white font-bold text-lg">{myMBTI}</span>
+                </div>
+                <p className="text-sm text-gray-600">나</p>
+              </div>
+              <div className="text-3xl">{getCompatibilityEmoji(compatibility.level)}</div>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl flex items-center justify-center mb-2">
+                  <span className="text-white font-bold text-lg">{profile.mbti}</span>
+                </div>
+                <p className="text-sm text-gray-600">{profile.name}</p>
+              </div>
+            </div>
+
+            {/* 궁합 점수 */}
+            <div className="text-center mb-6">
+              <div
+                className="text-6xl font-bold mb-2"
+                style={{ color: getCompatibilityColor(compatibility.level) }}
+              >
+                {compatibility.score}
+              </div>
+              <div
+                className="text-xl font-semibold mb-1"
+                style={{ color: getCompatibilityColor(compatibility.level) }}
+              >
+                {compatibility.title}
+              </div>
+              <p className="text-sm text-gray-600">{compatibility.description}</p>
+            </div>
+
+            {/* 진행 바 */}
+            <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${compatibility.score}%`,
+                  backgroundColor: getCompatibilityColor(compatibility.level)
+                }}
+              />
+            </div>
+
+            {/* 장점 */}
+            <div className="mb-6">
+              <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                <i className="ri-checkbox-circle-line text-green-500 mr-2"></i>
+                장점
+              </h4>
+              <ul className="space-y-2">
+                {compatibility.strengths.map((strength, index) => (
+                  <li key={index} className="flex items-start">
+                    <span className="text-green-500 mr-2">•</span>
+                    <span className="text-sm text-gray-700">{strength}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 주의사항 */}
+            <div className="mb-6">
+              <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                <i className="ri-error-warning-line text-orange-500 mr-2"></i>
+                주의사항
+              </h4>
+              <ul className="space-y-2">
+                {compatibility.challenges.map((challenge, index) => (
+                  <li key={index} className="flex items-start">
+                    <span className="text-orange-500 mr-2">•</span>
+                    <span className="text-sm text-gray-700">{challenge}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 조언 */}
+            <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-4 mb-6">
+              <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
+                <i className="ri-lightbulb-line text-purple-500 mr-2"></i>
+                조언
+              </h4>
+              <p className="text-sm text-gray-700 leading-relaxed">{compatibility.advice}</p>
+            </div>
+
+            {/* 닫기 버튼 */}
+            <button
+              onClick={() => setShowMBTIModal(false)}
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-full font-medium hover:from-pink-600 hover:to-purple-700 transition-all cursor-pointer"
+            >
+              확인
+            </button>
           </div>
         </div>
       )}
