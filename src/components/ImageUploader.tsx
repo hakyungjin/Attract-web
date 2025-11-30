@@ -54,6 +54,11 @@ export default function ImageUploader({
       onUploadError?.(errorMessage);
       alert(errorMessage);
 
+      // 실패 시 미리보기 URL 메모리 해제
+      if (preview && preview !== currentImageUrl) {
+        revokePreviewUrl(preview);
+      }
+
       // 실패 시 이전 이미지로 복구
       setPreviewUrl(currentImageUrl || null);
     } finally {

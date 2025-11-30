@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
+import { analyzeMBTICompatibility, getCompatibilityColor, getCompatibilityEmoji, type MBTICompatibility } from '../../services/mbtiCompatibility';
 
 interface Profile {
   id: string;
@@ -39,6 +40,9 @@ export default function ProfileDetailPage() {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showMBTIModal, setShowMBTIModal] = useState(false);
+  const [myMBTI, setMyMBTI] = useState<string | null>(null);
+  const [compatibility, setCompatibility] = useState<MBTICompatibility | null>(null);
 
   // 현재 로그인한 사용자 확인
   const getCurrentUserId = () => {
@@ -264,6 +268,22 @@ export default function ProfileDetailPage() {
     navigate('/');
   };
 
+  const handleMBTICompatibility = () => {
+    if (!myMBTI) {
+      alert('내 MBTI 정보가 없습니다. 프로필을 업데이트해주세요.');
+      return;
+    }
+
+    if (!profile?.mbti) {
+      alert('상대방의 MBTI 정보가 없습니다.');
+      return;
+    }
+
+    const result = analyzeMBTICompatibility(myMBTI, profile.mbti);
+    setCompatibility(result);
+    setShowMBTIModal(true);
+  };
+
   return (
     <div className={`min-h-screen bg-cyan-50 pb-24 ${showLoginModal ? 'overflow-hidden' : ''}`}>
       {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
@@ -402,10 +422,9 @@ export default function ProfileDetailPage() {
             <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
               <i className="ri-heart-line text-white"></i>
             </div>
-            <span className="font-semibold text-gray-800">MBTI 궁합 보기</span>
-          </div>
-          <i className="ri-arrow-right-s-line text-xl text-gray-400"></i>
-        </button>
+            <i className="ri-arrow-right-s-line text-xl text-gray-400"></i>
+          </button>
+        )}
 
         {/* 관심사 */}
         <div className="bg-white rounded-2xl p-6 shadow-sm">

@@ -47,91 +47,95 @@ export default function MatchingRequestsPage() {
     setIsLoading(true);
 
     try {
-      // 받은 요청
-      const { data: receivedData } = await supabase
+      // 1. 받은 요청 조회
+      const { data: receivedData, error: receivedError } = await supabase
         .from('matching_requests')
-        .select(`
-          id,
-          from_user_id,
-          status,
-          created_at
-        `)
+        .select('id, from_user_id, status, created_at')
         .eq('to_user_id', authUser.id)
         .order('created_at', { ascending: false });
 
-      if (receivedData) {
-        const received: MatchRequest[] = [];
-        
-        for (const req of receivedData) {
-          // 각 사용자 정보 따로 조회
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id, name, age, gender, location, school, mbti, bio, profile_image')
-            .eq('id', req.from_user_id)
-            .single();
-
-          if (userData) {
-            received.push({
-              id: req.id.toString(),
-              userId: req.from_user_id,
-              name: userData.name || '사용자',
-              age: userData.age || 20,
-              gender: userData.gender || 'unknown',
-              location: userData.location || '위치 미설정',
-              school: userData.school || '학교 미설정',
-              mbti: userData.mbti,
-              bio: userData.bio || '자기소개가 없습니다.',
-              avatar: userData.profile_image || getDefaultAvatar(userData.gender),
-              timestamp: new Date(req.created_at).toLocaleString('ko-KR'),
-              status: req.status as 'pending' | 'accepted' | 'rejected'
-            });
-          }
-        }
-        
-        setReceivedRequests(received.filter(r => r.status === 'pending'));
-      }
-
-      // 보낸 요청
-      const { data: sentData } = await supabase
+      // 2. 보낸 요청 조회
+      const { data: sentData, error: sentError } = await supabase
         .from('matching_requests')
-        .select(`
-          id,
-          to_user_id,
-          status,
-          created_at
-        `)
+        .select('id, to_user_id, status, created_at')
         .eq('from_user_id', authUser.id)
         .order('created_at', { ascending: false });
 
-      if (sentData) {
-        const sent: MatchRequest[] = [];
-        
-        for (const req of sentData) {
-          // 각 사용자 정보 따로 조회
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id, name, age, gender, location, school, mbti, bio, profile_image')
-            .eq('id', req.to_user_id)
-            .single();
+      if (receivedError || sentError) {
+        console.error('매칭 요청 조회 실패:', receivedError || sentError);
+        return;
+      }
 
-          if (userData) {
-            sent.push({
+      // 3. 모든 관련 사용자 ID 수집
+      const fromUserIds = receivedData?.map(r => r.from_user_id) || [];
+      const toUserIds = sentData?.map(s => s.to_user_id) || [];
+      const allUserIds = [...new Set([...fromUserIds, ...toUserIds])];
+
+      // 4. 한 번의 쿼리로 모든 사용자 정보 조회
+      let usersMap: Record<string, any> = {};
+      if (allUserIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, name, age, gender, location, school, mbti, bio, profile_image')
+          .in('id', allUserIds);
+
+        if (usersError) {
+          console.error('사용자 정보 조회 실패:', usersError);
+        } else if (usersData) {
+          usersMap = Object.fromEntries(
+            usersData.map(user => [user.id, user])
+          );
+        }
+      }
+
+      // 5. 받은 요청 데이터 매핑
+      if (receivedData) {
+        const received: MatchRequest[] = receivedData
+          .filter(req => usersMap[req.from_user_id]) // 사용자 정보가 있는 경우만
+          .map(req => {
+            const user = usersMap[req.from_user_id];
+            return {
               id: req.id.toString(),
-              userId: req.to_user_id,
-              name: userData.name || '사용자',
-              age: userData.age || 20,
-              gender: userData.gender || 'unknown',
-              location: userData.location || '위치 미설정',
-              school: userData.school || '학교 미설정',
-              mbti: userData.mbti,
-              bio: userData.bio || '자기소개가 없습니다.',
-              avatar: userData.profile_image || getDefaultAvatar(userData.gender),
+              userId: req.from_user_id,
+              name: user.name || '사용자',
+              age: user.age || 20,
+              gender: user.gender || 'unknown',
+              location: user.location || '위치 미설정',
+              school: user.school || '학교 미설정',
+              mbti: user.mbti,
+              bio: user.bio || '자기소개가 없습니다.',
+              avatar: user.profile_image || getDefaultAvatar(user.gender),
               timestamp: new Date(req.created_at).toLocaleString('ko-KR'),
               status: req.status as 'pending' | 'accepted' | 'rejected'
-            });
-          }
-        }
-        
+            };
+          })
+          .filter(r => r.status === 'pending');
+
+        setReceivedRequests(received);
+      }
+
+      // 6. 보낸 요청 데이터 매핑
+      if (sentData) {
+        const sent: MatchRequest[] = sentData
+          .filter(req => usersMap[req.to_user_id]) // 사용자 정보가 있는 경우만
+          .map(req => {
+            const user = usersMap[req.to_user_id];
+            return {
+              id: req.id.toString(),
+              userId: req.to_user_id,
+              name: user.name || '사용자',
+              age: user.age || 20,
+              gender: user.gender || 'unknown',
+              location: user.location || '위치 미설정',
+              school: user.school || '학교 미설정',
+              mbti: user.mbti,
+              bio: user.bio || '자기소개가 없습니다.',
+              avatar: user.profile_image || getDefaultAvatar(user.gender),
+              timestamp: new Date(req.created_at).toLocaleString('ko-KR'),
+              status: req.status as 'pending' | 'accepted' | 'rejected'
+            };
+          });
+
         setSentRequests(sent);
       }
     } catch (error) {
@@ -310,6 +314,8 @@ export default function MatchingRequestsPage() {
                     <img
                       src={request.avatar || getDefaultAvatar(request.gender)}
                       alt={request.name}
+                      loading="lazy"
+                      decoding="async"
                       className="w-16 h-16 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => handleProfileClick(request)}
                     />
@@ -359,6 +365,8 @@ export default function MatchingRequestsPage() {
                   <img
                     src={request.avatar || getDefaultAvatar(request.gender)}
                     alt={request.name}
+                    loading="lazy"
+                    decoding="async"
                     className="w-16 h-16 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => handleProfileClick(request)}
                   />
