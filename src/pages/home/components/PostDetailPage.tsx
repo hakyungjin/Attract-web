@@ -399,7 +399,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
                           <i className={`${comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'} group-hover/like:scale-125 transition-transform`}></i>
                           <span>{comment.likes > 0 ? comment.likes : '좋아요'}</span>
                         </button>
-                        <button className="text-xs font-medium text-slate-400 hover:text-primary-500 transition-colors cursor-pointer hover:font-semibold">
+                        <button onClick={() => alert('답글 기능 준비중입니다.')} className="text-xs font-medium text-slate-400 hover:text-primary-500 transition-colors cursor-pointer hover:font-semibold">
                           답글달기
                         </button>
                       </div>

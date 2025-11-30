@@ -267,18 +267,14 @@ export default function MatchingTab() {
       </div>
 
       {/* 더보기 버튼 */}
-      {hasMore && (
-        <div className="mt-10 text-center pb-8">
-          <button
-            onClick={() => loadProfiles(true)}
-            disabled={isLoading}
-            className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span>{isLoading ? '로딩 중...' : '친구 더보기'}</span>
-            <i className={`${isLoading ? 'ri-loader-4-line animate-spin' : 'ri-arrow-down-s-line'}`}></i>
-          </button>
-        </div>
-      )}
+      <div className="mt-10 text-center pb-8">
+        <button onClick={() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }} className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2">
+          <span>친구 더보기</span>
+          <i className="ri-arrow-down-s-line"></i>
+        </button>
+      </div>
 
       {/* 필터 팝업 */}
       {showFilter && (
