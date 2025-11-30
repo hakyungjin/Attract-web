@@ -49,7 +49,7 @@ export default function LandingPage() {
         <div className="text-center mt-6 text-sm text-gray-600">
           <p>
             문제가 있으신가요?{' '}
-            <button className="text-cyan-500 hover:text-cyan-600 font-medium">
+            <button onClick={() => navigate('/support')} className="text-cyan-500 hover:text-cyan-600 font-medium">
               고객센터
             </button>
           </p>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -37,6 +37,7 @@ export default function ProfileDetailPage() {
   const [userRating, setUserRating] = useState(0);
   const [showLikeToast, setShowLikeToast] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   // 현재 로그인한 사용자 확인
@@ -53,6 +54,14 @@ export default function ProfileDetailPage() {
 
   const currentUserId = getCurrentUserId();
   const isOwnProfile = currentUserId && profile?.id === currentUserId;
+
+  // 로그인 상태 확인 - 페이지 로드 시
+  useEffect(() => {
+    // authUser가 없고, localStorage에도 사용자 정보가 없으면 로그인 모달 표시
+    if (!authUser && !currentUserId) {
+      setShowLoginModal(true);
+    }
+  }, [authUser, currentUserId]);
 
   // 기본 프로필 이미지
   const getDefaultAvatar = (gender: string) => {
@@ -101,7 +110,7 @@ export default function ProfileDetailPage() {
   const handleLike = async () => {
     try {
       if (!authUser?.id || !profile?.id) {
-        alert('로그인 후 이용해주세요');
+        setShowLoginModal(true);
         return;
       }
 
@@ -235,6 +244,10 @@ export default function ProfileDetailPage() {
   };
 
   const handleRating = (rating: number) => {
+    if (!authUser?.id && !currentUserId) {
+      setShowLoginModal(true);
+      return;
+    }
     setUserRating(rating);
   };
 
@@ -252,7 +265,9 @@ export default function ProfileDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cyan-50 pb-24">
+    <div className={`min-h-screen bg-cyan-50 pb-24 ${showLoginModal ? 'overflow-hidden' : ''}`}>
+      {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
+      <div className={`${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
       {/* 헤더 */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-3">
@@ -270,7 +285,13 @@ export default function ProfileDetailPage() {
             />
             <span className="font-medium text-gray-800">{profile.name}</span>
           </div>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
+          <button onClick={() => {
+            const options = ['차단하기', '신고하기', '취소'];
+            const choice = window.confirm('이 사용자를 신고 또는 차단하시겠습니까?\n\n확인: 신고하기\n취소: 닫기');
+            if (choice) {
+              alert('신고 기능 준비중입니다. 고객센터로 문의해주세요.');
+            }
+          }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
             <i className="ri-more-2-fill text-xl"></i>
           </button>
         </div>
@@ -376,7 +397,7 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* MBTI 궁합 버튼 */}
-        <button className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+        <button onClick={() => alert('MBTI 궁합 분석 기능 준비중입니다.')} className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
               <i className="ri-heart-line text-white"></i>
@@ -428,6 +449,8 @@ export default function ProfileDetailPage() {
           </button>
         </div>
       )}
+      </div>
+      {/* blur 처리 영역 끝 */}
 
       {/* 좋아요 토스트 */}
       {showLikeToast && (
@@ -465,6 +488,28 @@ export default function ProfileDetailPage() {
                 나중에
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 로그인 요청 모달 */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center">
+            <div className="w-20 h-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="ri-lock-line text-white text-3xl"></i>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">로그인해주세요</h3>
+            <p className="text-gray-600 mb-6">
+              프로필 상세 정보는<br />
+              로그인 후 이용할 수 있습니다
+            </p>
+            <button
+              onClick={() => navigate('/login/signin')}
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-4 rounded-full font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg cursor-pointer whitespace-nowrap"
+            >
+              확인
+            </button>
           </div>
         </div>
       )}

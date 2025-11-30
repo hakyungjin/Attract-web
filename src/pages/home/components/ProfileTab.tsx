@@ -141,7 +141,7 @@ export default function ProfileTab() {
                   }}
                 />
               </div>
-              <button className="absolute bottom-2 right-2 w-9 h-9 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-black transition-colors cursor-pointer hover:scale-110 transform duration-300 border-2 border-white">
+              <button onClick={handleEditProfile} className="absolute bottom-2 right-2 w-9 h-9 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-black transition-colors cursor-pointer hover:scale-110 transform duration-300 border-2 border-white">
                 <i className="ri-camera-line text-lg"></i>
               </button>
             </div>
@@ -234,7 +234,7 @@ export default function ProfileTab() {
         {/* 메뉴 */}
         <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
           <div className="space-y-1">
-            <button className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+            <button onClick={() => navigate('/settings')} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
               <div className="flex items-center space-x-4">
                 <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                   <i className="ri-settings-3-line text-blue-500 text-xl"></i>
@@ -244,7 +244,7 @@ export default function ProfileTab() {
               <i className="ri-arrow-right-s-line text-slate-300 group-hover:text-slate-500 text-xl transition-colors"></i>
             </button>
 
-            <button className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+            <button onClick={() => alert('개인정보 보호 정책 페이지 준비중입니다.')} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
               <div className="flex items-center space-x-4">
                 <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center group-hover:bg-green-100 transition-colors">
                   <i className="ri-shield-check-line text-green-500 text-xl"></i>
@@ -254,7 +254,7 @@ export default function ProfileTab() {
               <i className="ri-arrow-right-s-line text-slate-300 group-hover:text-slate-500 text-xl transition-colors"></i>
             </button>
 
-            <button className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+            <button onClick={() => navigate('/support')} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
               <div className="flex items-center space-x-4">
                 <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                   <i className="ri-question-line text-purple-500 text-xl"></i>
