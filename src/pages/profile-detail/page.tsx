@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -37,6 +37,7 @@ export default function ProfileDetailPage() {
   const [userRating, setUserRating] = useState(0);
   const [showLikeToast, setShowLikeToast] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   // 현재 로그인한 사용자 확인
@@ -53,6 +54,14 @@ export default function ProfileDetailPage() {
 
   const currentUserId = getCurrentUserId();
   const isOwnProfile = currentUserId && profile?.id === currentUserId;
+
+  // 로그인 상태 확인 - 페이지 로드 시
+  useEffect(() => {
+    // authUser가 없고, localStorage에도 사용자 정보가 없으면 로그인 모달 표시
+    if (!authUser && !currentUserId) {
+      setShowLoginModal(true);
+    }
+  }, [authUser, currentUserId]);
 
   // 기본 프로필 이미지
   const getDefaultAvatar = (gender: string) => {
@@ -101,7 +110,7 @@ export default function ProfileDetailPage() {
   const handleLike = async () => {
     try {
       if (!authUser?.id || !profile?.id) {
-        alert('로그인 후 이용해주세요');
+        setShowLoginModal(true);
         return;
       }
 
@@ -235,6 +244,10 @@ export default function ProfileDetailPage() {
   };
 
   const handleRating = (rating: number) => {
+    if (!authUser?.id && !currentUserId) {
+      setShowLoginModal(true);
+      return;
+    }
     setUserRating(rating);
   };
 
@@ -469,6 +482,42 @@ export default function ProfileDetailPage() {
                 className="w-full bg-gray-100 text-gray-600 py-3 rounded-full font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
               >
                 나중에
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 로그인 요청 모달 */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center">
+            <div className="w-20 h-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="ri-lock-line text-white text-3xl"></i>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">로그인이 필요해요</h3>
+            <p className="text-gray-600 mb-6">
+              프로필과의 매칭 및 소통은<br />
+              로그인 후 이용할 수 있습니다
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/login/signin')}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-4 rounded-full font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg cursor-pointer whitespace-nowrap"
+              >
+                로그인하기
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full bg-white text-cyan-600 py-4 rounded-full font-bold border-2 border-cyan-500 hover:bg-cyan-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                회원가입
+              </button>
+              <button
+                onClick={() => setShowLoginModal(false)}
+                className="w-full text-gray-500 py-3 rounded-full font-medium hover:text-gray-700 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                둘러보기
               </button>
             </div>
           </div>
