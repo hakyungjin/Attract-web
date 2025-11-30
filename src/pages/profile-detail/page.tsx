@@ -265,7 +265,9 @@ export default function ProfileDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cyan-50 pb-24">
+    <div className={`min-h-screen bg-cyan-50 pb-24 ${showLoginModal ? 'overflow-hidden' : ''}`}>
+      {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
+      <div className={`${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
       {/* 헤더 */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-3">
@@ -447,6 +449,8 @@ export default function ProfileDetailPage() {
           </button>
         </div>
       )}
+      </div>
+      {/* blur 처리 영역 끝 */}
 
       {/* 좋아요 토스트 */}
       {showLikeToast && (
@@ -490,36 +494,22 @@ export default function ProfileDetailPage() {
 
       {/* 로그인 요청 모달 */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center">
             <div className="w-20 h-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="ri-lock-line text-white text-3xl"></i>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-3">로그인이 필요해요</h3>
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">로그인해주세요</h3>
             <p className="text-gray-600 mb-6">
-              프로필과의 매칭 및 소통은<br />
+              프로필 상세 정보는<br />
               로그인 후 이용할 수 있습니다
             </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => navigate('/login/signin')}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-4 rounded-full font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg cursor-pointer whitespace-nowrap"
-              >
-                로그인하기
-              </button>
-              <button
-                onClick={() => navigate('/login')}
-                className="w-full bg-white text-cyan-600 py-4 rounded-full font-bold border-2 border-cyan-500 hover:bg-cyan-50 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                회원가입
-              </button>
-              <button
-                onClick={() => setShowLoginModal(false)}
-                className="w-full text-gray-500 py-3 rounded-full font-medium hover:text-gray-700 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                둘러보기
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/login/signin')}
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-4 rounded-full font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg cursor-pointer whitespace-nowrap"
+            >
+              확인
+            </button>
           </div>
         </div>
       )}
