@@ -46,41 +46,49 @@ export default function Header({ coins = 0 }: HeaderProps) {
   };
 
   const handleLogout = () => {
+    // 모든 관련 localStorage 데이터 삭제
+    localStorage.removeItem('auth_user');
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userEmail');
-    navigate('/login');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_data');
+    // 페이지 새로고침으로 상태 초기화
+    window.location.href = '/login';
   };
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 glass z-50 transition-all duration-300" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="flex items-center justify-between px-4 py-3 max-w-screen-xl mx-auto">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[400px] glass z-50 transition-all duration-300" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex items-center justify-between px-4 py-1 h-14">
           {/* 로고 */}
           <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
-            <h1 className="flex items-center space-x-2 group">
-              <div className="relative transform transition-transform group-hover:scale-110 duration-300">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/30">
-                  <div className="w-7 h-7 flex items-center justify-center">
-                    <i className="ri-heart-fill text-white text-xl animate-pulse-soft"></i>
-                  </div>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-secondary-400 rounded-full border-2 border-white animate-bounce"></div>
+            <h1 className="flex items-center space-x-1 group">
+              <div className="relative transform transition-transform group-hover:scale-110 duration-300 -my-2">
+                <img 
+                  src="/image/icon.png" 
+                  alt="Attract 마스코트" 
+                  className="w-14 h-14 object-contain drop-shadow-md"
+                />
               </div>
-              <span className="text-2xl font-bold font-display bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent tracking-tight">
+              <span className="text-xl font-bold font-display bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent tracking-tight">
                 Attract
               </span>
             </h1>
           </div>
 
           {/* 우측 메뉴 */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
             {/* 자석 */}
             <button
               onClick={() => navigate('/coin-shop')}
-              className="group flex items-center space-x-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white px-4 py-2 rounded-full hover:from-primary-600 hover:to-primary-700 transition-all duration-300 shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transform hover:-translate-y-0.5"
+              className="group flex items-center gap-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-2 py-1 rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transform hover:-translate-y-0.5"
             >
-              <i className="ri-copper-coin-fill text-lg group-hover:rotate-12 transition-transform"></i>
-              <span className="text-sm font-bold font-display">{coins.toLocaleString()}</span>
+              <img 
+                src="/image/magnet.png" 
+                alt="자석" 
+                className="w-8 h-8 object-contain group-hover:rotate-12 transition-transform"
+              />
+              <span className="text-sm font-bold font-display pr-1">{coins.toLocaleString()}</span>
             </button>
 
             {/* 알림 */}
@@ -90,8 +98,8 @@ export default function Header({ coins = 0 }: HeaderProps) {
             >
               <i className="ri-notification-line text-slate-600 text-xl group-hover:text-primary-600 transition-colors"></i>
               {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border-2 border-white shadow-sm">
-                  {unreadCount}
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white shadow-sm animate-pulse">
+                  {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
@@ -114,7 +122,7 @@ export default function Header({ coins = 0 }: HeaderProps) {
           <div className="fixed top-20 right-4 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl py-2 w-56 z-50 animate-slide-up border border-white/20">
             <div className="px-4 py-3 border-b border-slate-100">
               <p className="text-sm text-slate-500">환영합니다!</p>
-              <p className="font-bold text-slate-800">사용자님</p>
+              <p className="font-bold text-slate-800">{authUser?.name || '사용자'}님</p>
             </div>
 
             <div className="py-2">

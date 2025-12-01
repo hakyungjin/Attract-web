@@ -39,10 +39,14 @@ export default function ProfileDetailPage() {
   const [showLikeToast, setShowLikeToast] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showCoinConfirmModal, setShowCoinConfirmModal] = useState(false);
+  const [userCoins, setUserCoins] = useState(0);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showMBTIModal, setShowMBTIModal] = useState(false);
   const [myMBTI, setMyMBTI] = useState<string | null>(null);
   const [compatibility, setCompatibility] = useState<MBTICompatibility | null>(null);
+
+  const MATCH_COST = 50; // 매칭 요청 비용
 
   // 현재 로그인한 사용자 확인
   const getCurrentUserId = () => {
@@ -66,6 +70,23 @@ export default function ProfileDetailPage() {
       setShowLoginModal(true);
     }
   }, [authUser, currentUserId]);
+
+  // 사용자 코인 정보 로드
+  useEffect(() => {
+    const loadUserCoins = async () => {
+      if (!authUser?.id) return;
+      const { data } = await supabase
+        .from('users')
+        .select('coins, mbti')
+        .eq('id', authUser.id)
+        .single();
+      if (data) {
+        setUserCoins(data.coins || 0);
+        setMyMBTI(data.mbti || null);
+      }
+    };
+    loadUserCoins();
+  }, [authUser?.id]);
 
   // 기본 프로필 이미지
   const getDefaultAvatar = (gender: string) => {
@@ -111,10 +132,29 @@ export default function ProfileDetailPage() {
 
   const interests = profile?.interests || ['관심사'];
 
+  // 하트 버튼 클릭 시 - 코인 확인 모달 표시
+  const handleLikeClick = () => {
+    if (!authUser?.id || !profile?.id) {
+      setShowLoginModal(true);
+      return;
+    }
+    setShowCoinConfirmModal(true);
+  };
+
+  // 코인 차감 후 실제 매칭 요청
   const handleLike = async () => {
+    setShowCoinConfirmModal(false);
+    
     try {
       if (!authUser?.id || !profile?.id) {
         setShowLoginModal(true);
+        return;
+      }
+
+      // 코인 잔액 확인
+      if (userCoins < MATCH_COST) {
+        alert(`자석이 부족합니다. 현재 ${userCoins}개 보유 중`);
+        navigate('/coin-shop');
         return;
       }
 
@@ -147,6 +187,20 @@ export default function ProfileDetailPage() {
         alert('이미 매칭 요청을 보낸 상대입니다');
         return;
       }
+
+      // 🪙 코인 차감
+      const { error: coinError } = await supabase
+        .from('users')
+        .update({ coins: userCoins - MATCH_COST })
+        .eq('id', authUser.id);
+
+      if (coinError) {
+        console.error('코인 차감 실패:', coinError);
+        alert('자석 차감에 실패했습니다.');
+        return;
+      }
+
+      setUserCoins(prev => prev - MATCH_COST);
 
       // matching_requests 테이블에 매칭 요청 저장
       const { data, error } = await supabase
@@ -417,14 +471,21 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* MBTI 궁합 버튼 */}
-        <button onClick={() => alert('MBTI 궁합 분석 기능 준비중입니다.')} className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+        <button 
+          onClick={handleMBTICompatibility} 
+          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg flex items-center justify-between hover:shadow-xl transition-all cursor-pointer group"
+        >
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
-              <i className="ri-heart-line text-white"></i>
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-2xl">💕</span>
             </div>
-            <i className="ri-arrow-right-s-line text-xl text-gray-400"></i>
-          </button>
-        )}
+            <div className="text-left">
+              <span className="font-bold text-white block">MBTI 궁합 보기</span>
+              <span className="text-white/80 text-sm">{myMBTI || '?'} & {profile?.mbti || '?'}</span>
+            </div>
+          </div>
+          <i className="ri-arrow-right-s-line text-2xl text-white/80 group-hover:translate-x-1 transition-transform"></i>
+        </button>
 
         {/* 관심사 */}
         <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -455,7 +516,7 @@ export default function ProfileDetailPage() {
       {!isOwnProfile && (
         <div className="fixed bottom-0 left-0 right-0 bg-cyan-50 px-8 py-6 flex justify-center space-x-8">
           <button
-            onClick={handleLike}
+            onClick={handleLikeClick}
             className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-cyan-200"
           >
             <i className="ri-heart-fill text-cyan-400 text-2xl"></i>
@@ -477,6 +538,46 @@ export default function ProfileDetailPage() {
           <div className="flex items-center space-x-2">
             <i className="ri-heart-fill text-pink-400"></i>
             <span>{profile.name}님에게 좋아요를 보냈어요!</span>
+          </div>
+        </div>
+      )}
+
+      {/* 자석 소모 확인 모달 */}
+      {showCoinConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="ri-magnet-line text-white text-2xl"></i>
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">하트를 보내시겠어요?</h3>
+            <p className="text-gray-600 mb-2">
+              <span className="font-bold text-cyan-600">{profile.name}</span>님에게<br />
+              하트를 보내려면 자석 <span className="font-bold text-cyan-600">{MATCH_COST}개</span>가 소모됩니다.
+            </p>
+            <div className="bg-cyan-50 rounded-xl p-3 mb-4">
+              <p className="text-sm text-cyan-700">
+                <i className="ri-information-line mr-1"></i>
+                상대가 거절하면 자석이 환불됩니다
+              </p>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              보유 자석: <span className="font-bold">{userCoins}개</span>
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={handleLike}
+                disabled={userCoins < MATCH_COST}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-full font-medium hover:from-cyan-600 hover:to-blue-700 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {userCoins < MATCH_COST ? '자석 부족' : '확인'}
+              </button>
+              <button
+                onClick={() => setShowCoinConfirmModal(false)}
+                className="w-full bg-gray-100 text-gray-600 py-3 rounded-full font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                취소
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -511,21 +612,112 @@ export default function ProfileDetailPage() {
         </div>
       )}
 
-      {/* 로그인 요청 모달 */}
+      {/* 로그인 요청 모달 - 프로필 위에 오버레이 */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* 반투명 블러 오버레이 */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-md"></div>
+          
+          {/* 모달 */}
+          <div className="relative bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl">
             <div className="w-20 h-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="ri-lock-line text-white text-3xl"></i>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-3">로그인해주세요</h3>
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">로그인 후 이용 가능합니다</h3>
             <p className="text-gray-600 mb-6">
-              프로필 상세 정보는<br />
-              로그인 후 이용할 수 있습니다
+              프로필 상세 정보를 보려면<br />
+              로그인이 필요해요
             </p>
             <button
-              onClick={() => navigate('/login/signin')}
+              onClick={() => navigate('/login')}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-4 rounded-full font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg cursor-pointer whitespace-nowrap"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MBTI 궁합 모달 */}
+      {showMBTIModal && compatibility && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full max-h-[80vh] overflow-y-auto">
+            {/* 헤더 */}
+            <div className="text-center mb-6">
+              <div className="text-5xl mb-3">{getCompatibilityEmoji(compatibility.level)}</div>
+              <h3 className="text-xl font-bold text-gray-800 mb-1">{compatibility.title}</h3>
+              <div className="flex items-center justify-center gap-2 text-lg">
+                <span className="bg-purple-100 text-purple-600 px-3 py-1 rounded-full font-bold">{myMBTI}</span>
+                <span className="text-gray-400">×</span>
+                <span className="bg-pink-100 text-pink-600 px-3 py-1 rounded-full font-bold">{profile?.mbti}</span>
+              </div>
+            </div>
+
+            {/* 궁합 점수 */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-600 font-medium">궁합 점수</span>
+                <span className="text-2xl font-bold" style={{ color: getCompatibilityColor(compatibility.level) }}>
+                  {compatibility.score}점
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className="h-3 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${compatibility.score}%`,
+                    backgroundColor: getCompatibilityColor(compatibility.level)
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* 설명 */}
+            <p className="text-gray-600 text-sm mb-4 bg-gray-50 p-3 rounded-xl">
+              {compatibility.description}
+            </p>
+
+            {/* 장점 */}
+            <div className="mb-4">
+              <h4 className="font-bold text-gray-800 mb-2 flex items-center">
+                <span className="text-green-500 mr-2">💚</span> 이런 점이 좋아요
+              </h4>
+              <ul className="space-y-1">
+                {compatibility.strengths.slice(0, 3).map((strength, index) => (
+                  <li key={index} className="text-sm text-gray-600 flex items-start">
+                    <i className="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                    {strength}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 주의점 */}
+            <div className="mb-4">
+              <h4 className="font-bold text-gray-800 mb-2 flex items-center">
+                <span className="text-amber-500 mr-2">💛</span> 이런 점은 조심해요
+              </h4>
+              <ul className="space-y-1">
+                {compatibility.challenges.slice(0, 2).map((challenge, index) => (
+                  <li key={index} className="text-sm text-gray-600 flex items-start">
+                    <i className="ri-alert-line text-amber-500 mr-2 mt-0.5"></i>
+                    {challenge}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 조언 */}
+            <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-4 mb-4">
+              <h4 className="font-bold text-gray-800 mb-1 flex items-center">
+                <span className="mr-2">💡</span> 연애 꿀팁
+              </h4>
+              <p className="text-sm text-gray-700">{compatibility.advice}</p>
+            </div>
+
+            <button
+              onClick={() => setShowMBTIModal(false)}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-full font-bold hover:from-purple-600 hover:to-pink-600 transition-all cursor-pointer"
             >
               확인
             </button>
