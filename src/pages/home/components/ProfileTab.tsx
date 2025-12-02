@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
+import KakaoAdFit, { DummyAdBanner } from '../../../components/ads/KakaoAdFit';
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
@@ -159,16 +160,7 @@ export default function ProfileTab() {
                 프로필 수정하기
               </button>
               <button
-                onClick={() => navigate('/profile-detail', { state: { profile: { 
-                  id: authUser?.id,
-                  name: profile.name,
-                  age: profile.age,
-                  gender: profile.gender === '남자' ? 'male' : 'female',
-                  location: profile.location,
-                  bio: profile.bio,
-                  interests: profile.interests,
-                  photos: profile.avatar ? [profile.avatar] : []
-                }}})}
+                onClick={() => navigate('/my-profile')}
                 className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-3 rounded-2xl font-bold hover:from-primary-600 hover:to-secondary-600 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
               >
                 <i className="ri-eye-line"></i>
@@ -223,36 +215,22 @@ export default function ProfileTab() {
           </div>
         </div>
 
-        {/* 광고 배너 1 */}
-        <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl p-4 animate-slide-up cursor-pointer hover:shadow-md transition-all" style={{ animationDelay: '0.2s' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <i className="ri-advertisement-line text-2xl text-amber-500"></i>
-              </div>
-              <div>
-                <p className="font-bold text-amber-800">광고 영역 1</p>
-                <p className="text-xs text-amber-600">여기에 광고가 표시됩니다</p>
-              </div>
-            </div>
-            <i className="ri-arrow-right-s-line text-amber-400 text-xl"></i>
-          </div>
+        {/* 광고 배너 1 - 카카오 애드핏 */}
+        <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          {/* 실제 광고 (unit ID 발급 후 주석 해제)
+          <KakaoAdFit unit="DAN-XXXXXXXXXX" width={320} height={100} />
+          */}
+          {/* 테스트용 더미 배너 (광고 승인 전까지 표시) */}
+          <DummyAdBanner width={320} height={100} text="광고 영역 1" className="mx-auto" />
         </div>
 
-        {/* 광고 배너 2 */}
-        <div className="bg-gradient-to-r from-violet-100 to-purple-100 rounded-2xl p-4 animate-slide-up cursor-pointer hover:shadow-md transition-all" style={{ animationDelay: '0.25s' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <i className="ri-gift-line text-2xl text-violet-500"></i>
-              </div>
-              <div>
-                <p className="font-bold text-violet-800">광고 영역 2</p>
-                <p className="text-xs text-violet-600">여기에 광고가 표시됩니다</p>
-              </div>
-            </div>
-            <i className="ri-arrow-right-s-line text-violet-400 text-xl"></i>
-          </div>
+        {/* 광고 배너 2 - 카카오 애드핏 */}
+        <div className="animate-slide-up" style={{ animationDelay: '0.25s' }}>
+          {/* 실제 광고 (unit ID 발급 후 주석 해제)
+          <KakaoAdFit unit="DAN-YYYYYYYYYY" width={320} height={100} />
+          */}
+          {/* 테스트용 더미 배너 (광고 승인 전까지 표시) */}
+          <DummyAdBanner width={320} height={100} text="광고 영역 2" className="mx-auto" />
         </div>
 
         {/* 메뉴 */}

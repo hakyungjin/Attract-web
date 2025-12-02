@@ -144,7 +144,7 @@ export default function ProfileDetailPage() {
   // 코인 차감 후 실제 매칭 요청
   const handleLike = async () => {
     setShowCoinConfirmModal(false);
-    
+
     try {
       if (!authUser?.id || !profile?.id) {
         setShowLoginModal(true);
@@ -342,193 +342,213 @@ export default function ProfileDetailPage() {
     <div className={`min-h-screen bg-cyan-50 pb-24 ${showLoginModal ? 'overflow-hidden' : ''}`}>
       {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
       <div className={`${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
-      {/* 헤더 */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={handleBack}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
-          >
-            <i className="ri-arrow-left-s-line text-2xl"></i>
-          </button>
-          <div className="flex items-center space-x-2">
-            <img
-              src={profilePhotos[0]}
-              alt={profile.name}
-              className="w-8 h-8 rounded-full object-cover"
-            />
-            <span className="font-medium text-gray-800">{profile.name}</span>
-          </div>
-          <button onClick={() => {
-            const options = ['차단하기', '신고하기', '취소'];
-            const choice = window.confirm('이 사용자를 신고 또는 차단하시겠습니까?\n\n확인: 신고하기\n취소: 닫기');
-            if (choice) {
-              alert('신고 기능 준비중입니다. 고객센터로 문의해주세요.');
-            }
-          }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
-            <i className="ri-more-2-fill text-xl"></i>
-          </button>
-        </div>
-      </div>
-
-      {/* 프로필 사진 갤러리 */}
-      <div className="relative bg-white">
-        <div className="relative h-96 overflow-hidden">
-          <img
-            src={profilePhotos[currentPhotoIndex]}
-            alt={`${profile.name} 사진 ${currentPhotoIndex + 1}`}
-            className="w-full h-full object-cover"
-          />
-
-          {/* 좌우 네비게이션 버튼 */}
-          {profilePhotos.length > 1 && (
-            <>
-              <button
-                onClick={handlePrevPhoto}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <i className="ri-arrow-left-s-line text-white text-xl"></i>
-              </button>
-              <button
-                onClick={handleNextPhoto}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <i className="ri-arrow-right-s-line text-white text-xl"></i>
-              </button>
-            </>
-          )}
-
-          {/* 사진 인디케이터 */}
-          {profilePhotos.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
-              {profilePhotos.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentPhotoIndex(index)}
-                  className={`w-2 h-2 rounded-full transition-colors cursor-pointer ${index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
-                    }`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 별점 평가 */}
-      <div className="bg-white px-4 py-4 border-b">
-        <div className="flex items-center justify-center space-x-2">
-          {[1, 2, 3, 4, 5].map((star) => (
+        {/* 헤더 */}
+        <div className="bg-white border-b sticky top-0 z-10">
+          <div className="flex items-center justify-between px-4 py-3">
             <button
-              key={star}
-              onClick={() => handleRating(star)}
-              className="cursor-pointer"
+              onClick={handleBack}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
             >
-              <i className={`text-3xl ${star <= userRating ? 'ri-star-fill text-yellow-400' : 'ri-star-line text-gray-300'}`}></i>
+              <i className="ri-arrow-left-s-line text-2xl"></i>
             </button>
-          ))}
-        </div>
-        <p className="text-center text-sm text-gray-500 mt-2">호감도를 체크해주세요</p>
-      </div>
-
-      {/* 프로필 정보 */}
-      <div className="px-4 py-6 space-y-4">
-        {/* 기본 정보 테이블 */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="grid grid-cols-2">
-            <div className="border-b border-r border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">학교</div>
-              <div className="font-medium text-gray-800">{profileInfo.school}</div>
+            <div className="flex items-center space-x-2">
+              <img
+                src={profilePhotos[0]}
+                alt={profile.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+              <span className="font-medium text-gray-800">{profile.name}</span>
             </div>
-            <div className="border-b border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">키</div>
-              <div className="font-medium text-gray-800">{profileInfo.height}</div>
-            </div>
-            <div className="border-b border-r border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">체형</div>
-              <div className="font-medium text-gray-800">{profileInfo.bodyType}</div>
-            </div>
-            <div className="border-b border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">스타일</div>
-              <div className="font-medium text-gray-800">{profileInfo.style}</div>
-            </div>
-            <div className="border-b border-r border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">종교</div>
-              <div className="font-medium text-gray-800">{profileInfo.religion}</div>
-            </div>
-            <div className="border-b border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">MBTI</div>
-              <div className="font-medium text-gray-800">{profileInfo.mbti}</div>
-            </div>
-            <div className="border-r border-gray-100 p-4">
-              <div className="text-xs text-gray-500 mb-1">흡연</div>
-              <div className="font-medium text-gray-800">{profileInfo.smoking}</div>
-            </div>
-            <div className="p-4">
-              <div className="text-xs text-gray-500 mb-1">음주</div>
-              <div className="font-medium text-gray-800">{profileInfo.drinking}</div>
-            </div>
+            <button onClick={() => {
+              const options = ['차단하기', '신고하기', '취소'];
+              const choice = window.confirm('이 사용자를 신고 또는 차단하시겠습니까?\n\n확인: 신고하기\n취소: 닫기');
+              if (choice) {
+                alert('신고 기능 준비중입니다. 고객센터로 문의해주세요.');
+              }
+            }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
+              <i className="ri-more-2-fill text-xl"></i>
+            </button>
           </div>
         </div>
 
-        {/* MBTI 궁합 버튼 */}
-        <button 
-          onClick={handleMBTICompatibility} 
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg flex items-center justify-between hover:shadow-xl transition-all cursor-pointer group"
-        >
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <span className="text-2xl">💕</span>
-            </div>
-            <div className="text-left">
-              <span className="font-bold text-white block">MBTI 궁합 보기</span>
-              <span className="text-white/80 text-sm">{myMBTI || '?'} & {profile?.mbti || '?'}</span>
-            </div>
-          </div>
-          <i className="ri-arrow-right-s-line text-2xl text-white/80 group-hover:translate-x-1 transition-transform"></i>
-        </button>
+        {/* 프로필 사진 갤러리 */}
+        <div className="relative bg-white">
+          <div
+            className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden"
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              e.currentTarget.dataset.touchStartX = String(touch.clientX);
+            }}
+            onTouchEnd={(e) => {
+              const touchStartX = Number(e.currentTarget.dataset.touchStartX);
+              const touchEndX = e.changedTouches[0].clientX;
+              const diff = touchStartX - touchEndX;
 
-        {/* 관심사 */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-            <i className="ri-heart-3-line mr-2 text-cyan-500"></i>
-            관심사
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {interests.map((interest, index) => (
-              <span key={index} className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">
-                {interest}
-              </span>
+              if (Math.abs(diff) > 50) { // 50px 이상 스와이프 시 동작
+                if (diff > 0) {
+                  handleNextPhoto();
+                } else {
+                  handlePrevPhoto();
+                }
+              }
+              e.currentTarget.dataset.touchStartX = '';
+            }}
+          >
+            <img
+              src={profilePhotos[currentPhotoIndex]}
+              alt={`${profile.name} 사진 ${currentPhotoIndex + 1}`}
+              className="w-full h-full object-cover"
+            />
+
+            {/* 좌우 네비게이션 버튼 - PC/태블릿용 (모바일에서도 보임) */}
+            {profilePhotos.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePrevPhoto(); }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                >
+                  <i className="ri-arrow-left-s-line text-white text-2xl"></i>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleNextPhoto(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                >
+                  <i className="ri-arrow-right-s-line text-white text-2xl"></i>
+                </button>
+              </>
+            )}
+
+            {/* 사진 인디케이터 */}
+            {profilePhotos.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
+                {profilePhotos.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(index); }}
+                    className={`w-2 h-2 rounded-full transition-all cursor-pointer shadow-sm ${index === currentPhotoIndex ? 'bg-white w-4' : 'bg-white/50 hover:bg-white/80'
+                      }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 별점 평가 */}
+        <div className="bg-white px-4 py-4 border-b">
+          <div className="flex items-center justify-center space-x-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => handleRating(star)}
+                className="cursor-pointer"
+              >
+                <i className={`text-3xl ${star <= userRating ? 'ri-star-fill text-yellow-400' : 'ri-star-line text-gray-300'}`}></i>
+              </button>
             ))}
           </div>
+          <p className="text-center text-sm text-gray-500 mt-2">호감도를 체크해주세요</p>
         </div>
 
-        {/* 자기소개 */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-            <i className="ri-chat-quote-line mr-2 text-cyan-500"></i>
-            자기소개
-          </h3>
-          <p className="text-gray-700 leading-relaxed">{profile?.bio || '자기소개가 없습니다.'}</p>
-        </div>
-      </div>
+        {/* 프로필 정보 */}
+        <div className="px-4 py-6 space-y-4">
+          {/* 기본 정보 테이블 */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="grid grid-cols-2">
+              <div className="border-b border-r border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">학교</div>
+                <div className="font-medium text-gray-800">{profileInfo.school}</div>
+              </div>
+              <div className="border-b border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">키</div>
+                <div className="font-medium text-gray-800">{profileInfo.height}</div>
+              </div>
+              <div className="border-b border-r border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">체형</div>
+                <div className="font-medium text-gray-800">{profileInfo.bodyType}</div>
+              </div>
+              <div className="border-b border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">스타일</div>
+                <div className="font-medium text-gray-800">{profileInfo.style}</div>
+              </div>
+              <div className="border-b border-r border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">종교</div>
+                <div className="font-medium text-gray-800">{profileInfo.religion}</div>
+              </div>
+              <div className="border-b border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">MBTI</div>
+                <div className="font-medium text-gray-800">{profileInfo.mbti}</div>
+              </div>
+              <div className="border-r border-gray-100 p-4">
+                <div className="text-xs text-gray-500 mb-1">흡연</div>
+                <div className="font-medium text-gray-800">{profileInfo.smoking}</div>
+              </div>
+              <div className="p-4">
+                <div className="text-xs text-gray-500 mb-1">음주</div>
+                <div className="font-medium text-gray-800">{profileInfo.drinking}</div>
+              </div>
+            </div>
+          </div>
 
-      {/* 하단 액션 버튼 - 자기 자신의 프로필이 아닐 때만 표시 */}
-      {!isOwnProfile && (
-        <div className="fixed bottom-0 left-0 right-0 bg-cyan-50 px-8 py-6 flex justify-center space-x-8">
+          {/* MBTI 궁합 버튼 */}
           <button
-            onClick={handleLikeClick}
-            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-cyan-200"
+            onClick={handleMBTICompatibility}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg flex items-center justify-between hover:shadow-xl transition-all cursor-pointer group"
           >
-            <i className="ri-heart-fill text-cyan-400 text-2xl"></i>
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-2xl">💕</span>
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-white block">MBTI 궁합 보기</span>
+                <span className="text-white/80 text-sm">{myMBTI || '?'} & {profile?.mbti || '?'}</span>
+              </div>
+            </div>
+            <i className="ri-arrow-right-s-line text-2xl text-white/80 group-hover:translate-x-1 transition-transform"></i>
           </button>
-          <button
-            onClick={handlePass}
-            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-gray-200"
-          >
-            <i className="ri-close-line text-gray-400 text-2xl"></i>
-          </button>
+
+          {/* 관심사 */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+              <i className="ri-heart-3-line mr-2 text-cyan-500"></i>
+              관심사
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {interests.map((interest, index) => (
+                <span key={index} className="bg-cyan-50 text-cyan-600 px-4 py-2 rounded-full text-sm font-medium">
+                  {interest}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 자기소개 */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
+              <i className="ri-chat-quote-line mr-2 text-cyan-500"></i>
+              자기소개
+            </h3>
+            <p className="text-gray-700 leading-relaxed">{profile?.bio || '자기소개가 없습니다.'}</p>
+          </div>
         </div>
-      )}
+
+        {/* 하단 액션 버튼 - 자기 자신의 프로필이 아닐 때만 표시 */}
+        {!isOwnProfile && (
+          <div className="fixed bottom-0 left-0 right-0 bg-cyan-50 px-8 py-6 flex justify-center space-x-8">
+            <button
+              onClick={handleLikeClick}
+              className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-cyan-200"
+            >
+              <i className="ri-heart-fill text-cyan-400 text-2xl"></i>
+            </button>
+            <button
+              onClick={handlePass}
+              className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-gray-200"
+            >
+              <i className="ri-close-line text-gray-400 text-2xl"></i>
+            </button>
+          </div>
+        )}
       </div>
       {/* blur 처리 영역 끝 */}
 
@@ -617,7 +637,7 @@ export default function ProfileDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* 반투명 블러 오버레이 */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-md"></div>
-          
+
           {/* 모달 */}
           <div className="relative bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl">
             <div className="w-20 h-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -662,9 +682,9 @@ export default function ProfileDetailPage() {
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
-                <div 
+                <div
                   className="h-3 rounded-full transition-all duration-500"
-                  style={{ 
+                  style={{
                     width: `${compatibility.score}%`,
                     backgroundColor: getCompatibilityColor(compatibility.level)
                   }}

@@ -79,7 +79,6 @@ export default function LoginPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 유효성 검사
     if (!formData.phoneNumber) {
       alert('전화번호를 입력해주세요.');
       return;
@@ -118,7 +117,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 전화번호에서 '-' 제거
       const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
       const { error } = await signUpPhone(cleanPhoneNumber, formData.password, {
         name: formData.name,
@@ -131,7 +129,6 @@ export default function LoginPage() {
         return;
       }
 
-      // 회원가입 성공 - 프로필 완성 페이지로 이동
       alert('회원가입이 완료되었습니다! 프로필을 완성해주세요.');
       navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
     } catch (error: any) {
@@ -312,7 +309,7 @@ export default function LoginPage() {
               <label className="flex items-start cursor-pointer text-sm">
                 <input type="checkbox" className="mt-1 mr-2" />
                 <span className="text-gray-600">
-                  <span className="text-cyan-500">이용약관</span> 및 <span className="text-cyan-500">개인정보처리방침</span>에 동의합니다
+                  <button type="button" onClick={() => navigate('/policy/terms')} className="text-cyan-500 hover:underline">이용약관</button> 및 <button type="button" onClick={() => navigate('/policy/privacy')} className="text-cyan-500 hover:underline">개인정보처리방침</button>에 동의합니다
                 </span>
               </label>
 
