@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
+import { MatchingGridSkeleton } from '../../../components/base/Skeleton';
+import LazyImage from '../../../components/base/LazyImage';
 
 interface Profile {
   id: string;
@@ -18,6 +20,11 @@ interface Profile {
   isMatched?: boolean;
 }
 
+// 전역 캐시 - 컴포넌트 외부에 선언하여 리렌더링에도 유지
+let cachedProfiles: { male: Profile[], female: Profile[] } = { male: [], female: [] };
+let lastLoadTime: { male: number, female: number } = { male: 0, female: 0 };
+const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
+
 export default function MatchingTab() {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
@@ -27,6 +34,10 @@ export default function MatchingTab() {
   const [selectedLocation, setSelectedLocation] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PROFILES_PER_PAGE = 20;
+  const isLoadingRef = useRef(false); // 중복 로드 방지
 
   // 컴포넌트 마운트 시 로그인 사용자 성별에 따라 반대 성별로 초기화
   useEffect(() => {
@@ -55,18 +66,38 @@ export default function MatchingTab() {
     loadCurrentUserInfo();
   }, [authUser?.id]);
 
-  // 마운트 시 데이터 로드
+  // 마운트 시 데이터 로드 (캐시 확인)
   useEffect(() => {
-    loadProfiles();
+    if (!selectedGender) return;
+    
+    const genderKey = selectedGender as 'male' | 'female';
+    const now = Date.now();
+    const cacheValid = cachedProfiles[genderKey].length > 0 && 
+                       (now - lastLoadTime[genderKey] < CACHE_DURATION);
+    
+    if (cacheValid) {
+      // 캐시된 데이터 사용
+      setProfiles(cachedProfiles[genderKey]);
+      setIsLoading(false);
+    } else if (!isLoadingRef.current) {
+      // 캐시가 없거나 만료됨 - 새로 로드
+      loadProfiles();
+    }
   }, [selectedGender]);
 
-  const loadProfiles = async () => {
+  const loadProfiles = async (loadMore = false) => {
+    if (!selectedGender) return;
+    if (isLoadingRef.current && !loadMore) return; // 이미 로딩 중이면 중복 호출 방지
+    
+    isLoadingRef.current = true;
     setIsLoading(true);
     try {
+      const currentPage = loadMore ? page + 1 : 0;
+
       // 성별 필터링
       let query = supabase
         .from('users')
-        .select('*');
+        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image', { count: 'exact' });
 
       // 로그인한 경우에만 내 프로필 제외
       if (authUser?.id) {
@@ -82,7 +113,12 @@ export default function MatchingTab() {
         return;
       }
 
-      const { data, error } = await query;
+      // Pagination 적용
+      query = query
+        .range(currentPage * PROFILES_PER_PAGE, (currentPage + 1) * PROFILES_PER_PAGE - 1)
+        .order('created_at', { ascending: false });
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
 
@@ -117,17 +153,36 @@ export default function MatchingTab() {
           });
 
         console.log('✅ 필터링된 프로필 수:', formattedProfiles.length);
-        setProfiles(formattedProfiles);
+
+        if (loadMore) {
+          setProfiles(prev => [...prev, ...formattedProfiles]);
+        } else {
+          setProfiles(formattedProfiles);
+          // 캐시에 저장
+          if (selectedGender === 'male' || selectedGender === 'female') {
+            cachedProfiles[selectedGender] = formattedProfiles;
+            lastLoadTime[selectedGender] = Date.now();
+          }
+        }
+
+        setPage(currentPage);
+        setHasMore(count ? (currentPage + 1) * PROFILES_PER_PAGE < count : false);
       }
     } catch (error) {
       console.error('프로필 로드 실패:', error);
-      setProfiles([]);
+      if (!loadMore) {
+        setProfiles([]);
+      }
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
-  const filteredProfiles = profiles.filter(profile => profile.gender === selectedGender);
+  const filteredProfiles = useMemo(
+    () => profiles.filter(profile => profile.gender === selectedGender),
+    [profiles, selectedGender]
+  );
 
   const handleLocationClick = (location: string) => {
     setSelectedLocation(location);
@@ -138,15 +193,15 @@ export default function MatchingTab() {
     navigate('/profile-detail', { state: { profile } });
   };
 
-  // 로딩 상태
+  // 로딩 상태 - 스켈레톤 UI
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4">
-        <div className="relative w-16 h-16">
-          <div className="absolute inset-0 border-4 border-slate-200 rounded-full"></div>
-          <div className="absolute inset-0 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-slate-50 pt-4">
+        <div className="flex items-center justify-between mb-4 px-3">
+          <div className="h-7 w-16 bg-slate-200 rounded animate-pulse"></div>
+          <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
         </div>
-        <div className="text-sm font-medium text-slate-500">프로필 로드 중...</div>
+        <MatchingGridSkeleton />
       </div>
     );
   }
@@ -162,78 +217,70 @@ export default function MatchingTab() {
   }
 
   return (
-    <div className="px-4 py-6 min-h-screen">
+    <div className="px-3 py-4 min-h-screen">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">매칭</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-slate-800">매칭</h2>
 
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowFilter(!showFilter)}
-            className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:shadow-lg transition-all hover:scale-105 group"
+            className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:shadow-lg transition-all hover:scale-105 group"
           >
-            <i className="ri-filter-line text-slate-400 group-hover:text-primary-500 text-xl transition-colors"></i>
+            <i className="ri-filter-line text-slate-400 group-hover:text-primary-500 text-lg transition-colors"></i>
           </button>
         </div>
       </div>
 
       {/* 포스트잇 그리드 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         {filteredProfiles.map((profile) => (
           <div
             key={profile.id}
             onClick={() => handleProfileClick(profile)}
-            className="bg-white rounded-3xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl hover:shadow-primary-500/10 transition-all duration-300 relative group transform hover:-translate-y-1"
+            className="bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl hover:shadow-primary-500/10 transition-all duration-300 relative group transform hover:-translate-y-1"
           >
             {/* 상호 좋아요 표시 */}
             {profile.hasLikedMe && (
-              <div className="absolute top-3 right-3 w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center z-10 shadow-lg shadow-pink-500/30 animate-pulse-soft">
-                <i className="ri-heart-fill text-white text-sm"></i>
+              <div className="absolute top-2 right-2 w-7 h-7 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center z-10 shadow-lg shadow-pink-500/30 animate-pulse-soft">
+                <i className="ri-heart-fill text-white text-xs"></i>
               </div>
             )}
 
             {/* 성별 아이콘 */}
-            <div className="absolute top-3 left-3 w-8 h-8 glass rounded-full flex items-center justify-center z-10">
-              <i className={`${profile.gender === 'female' ? 'ri-women-line text-pink-500' : 'ri-men-line text-blue-500'} font-bold`}></i>
+            <div className="absolute top-2 left-2 w-7 h-7 glass rounded-full flex items-center justify-center z-10">
+              <i className={`text-sm ${profile.gender === 'female' ? 'ri-women-line text-pink-500' : 'ri-men-line text-blue-500'} font-bold`}></i>
             </div>
 
             {/* MBTI 태그 */}
-            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
-              <span className="glass text-primary-700 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
-                {profile.mbti}
+            <div className="absolute top-2 left-10 z-10">
+              <span className="glass text-primary-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                {profile.mbti || 'MBTI'}
               </span>
             </div>
 
-            {/* 캐릭터 이미지 */}
-            <div className="relative h-72 overflow-hidden bg-slate-100">
-              <img
+            {/* 캐릭터 이미지 - LazyImage 사용 */}
+            <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
+              <LazyImage
                 src={profile.character}
                 alt={profile.name}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                className="w-full h-full"
               />
 
               {/* 그라데이션 오버레이 */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent opacity-80"></div>
 
               {/* 프로필 정보 */}
-              <div className="absolute bottom-0 left-0 right-0 p-5 text-white transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <h3 className="font-bold text-xl mb-1 font-display tracking-tight">{profile.name}</h3>
-                <div className="flex items-center justify-between text-sm text-slate-200">
-                  <span className="font-medium">{profile.age}세</span>
-                  <div
-                    className="flex items-center hover:text-primary-300 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLocationClick(profile.location);
-                    }}
-                  >
-                    <i className="ri-map-pin-line mr-1"></i>
-                    <span className="text-xs">{profile.location}</span>
-                  </div>
+              <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                <h3 className="font-bold text-base mb-0.5 truncate">{profile.name}</h3>
+                <div className="flex items-center text-xs text-slate-200 space-x-1">
+                  <span>{profile.age}세</span>
+                  <span>·</span>
+                  <span className="truncate">{profile.location}</span>
                 </div>
-                <div className="flex items-center text-xs mt-2 text-slate-300 bg-white/10 rounded-lg px-2 py-1 w-fit backdrop-blur-sm">
+                <div className="flex items-center text-[10px] mt-1.5 text-slate-300 bg-white/10 rounded px-1.5 py-0.5 w-fit backdrop-blur-sm">
                   <i className="ri-school-line mr-1"></i>
-                  <span className="truncate max-w-[100px]">{profile.school}</span>
+                  <span className="truncate max-w-[80px]">{profile.school}</span>
                 </div>
               </div>
             </div>

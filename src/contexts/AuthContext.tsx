@@ -158,7 +158,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     setUser(null);
+    // 모든 관련 로컬 스토리지 데이터 삭제
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_data');
   };
 
   const value: AuthContextType = {

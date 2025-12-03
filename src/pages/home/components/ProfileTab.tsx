@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
+import KakaoAdFit, { DummyAdBanner } from '../../../components/ads/KakaoAdFit';
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
@@ -148,91 +149,92 @@ export default function ProfileTab() {
 
             {/* 기본 정보 */}
             <h2 className="text-2xl font-bold text-slate-800 mb-1 font-display">{profile.name}</h2>
-            <p className="text-slate-500 mb-6 font-medium">{profile.age}세 · {profile.location}</p>
+            <p className="text-slate-500 mb-4 font-medium">{profile.age}세 · {profile.location}</p>
 
-            {/* 프로필 수정 버튼 */}
-            <button
-              onClick={handleEditProfile}
-              className="w-full bg-slate-800 text-white py-3.5 rounded-2xl font-bold hover:bg-black transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-slate-200 hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              프로필 수정하기
-            </button>
-          </div>
-        </div>
-
-        {/* 매칭 관리 카드 */}
-        <div className="bg-gradient-to-br from-primary-500 to-secondary-600 rounded-[2rem] shadow-xl shadow-primary-500/20 p-6 animate-slide-up text-white relative overflow-hidden" style={{ animationDelay: '0.1s' }}>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -ml-10 -mb-10"></div>
-
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold text-lg flex items-center font-display">
-                <i className="ri-heart-fill text-pink-300 mr-2 text-xl animate-pulse-soft"></i>
-                매칭 현황
-              </h3>
+            {/* 버튼 그룹 */}
+            <div className="space-y-2">
               <button
-                onClick={handleMatchingRequests}
-                className="text-white/80 text-sm font-medium hover:text-white cursor-pointer whitespace-nowrap bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm hover:bg-white/20 transition-colors"
+                onClick={handleEditProfile}
+                className="w-full bg-slate-800 text-white py-3 rounded-2xl font-bold hover:bg-black transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-slate-200 hover:shadow-xl transform hover:-translate-y-0.5"
               >
-                전체보기
+                프로필 수정하기
+              </button>
+              <button
+                onClick={() => navigate('/my-profile')}
+                className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-3 rounded-2xl font-bold hover:from-primary-600 hover:to-secondary-600 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
+              >
+                <i className="ri-eye-line"></i>
+                내 프로필 미리보기
               </button>
             </div>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center border border-white/10 hover:bg-white/20 transition-colors">
-                <div className="text-3xl font-bold mb-1 font-display">{matchingStats.received}</div>
-                <div className="text-xs text-white/80 font-medium">받은 요청</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center border border-white/10 hover:bg-white/20 transition-colors">
-                <div className="text-3xl font-bold mb-1 font-display">{matchingStats.sent}</div>
-                <div className="text-xs text-white/80 font-medium">보낸 요청</div>
-              </div>
-            </div>
-
+        {/* 매칭 현황 카드 - 새로운 UI */}
+        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-bold text-lg text-slate-800 font-display">매칭 현황</h3>
             <button
               onClick={handleMatchingRequests}
-              className="w-full bg-white text-primary-600 py-3.5 rounded-2xl font-bold hover:bg-slate-50 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center shadow-lg"
+              className="text-primary-500 text-sm font-medium hover:text-primary-600 cursor-pointer"
             >
-              <i className="ri-heart-line mr-2 text-lg"></i>
-              매칭 관리하기
+              전체보기
             </button>
           </div>
-        </div>
 
-        {/* 자기소개 */}
-        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center font-display">
-            <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center mr-3 text-primary-500">
-              <i className="ri-user-smile-line text-lg"></i>
+          <div className="grid grid-cols-2 gap-3">
+            {/* 받은 요청 */}
+            <div 
+              onClick={handleMatchingRequests}
+              className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                  <i className="ri-heart-fill text-pink-500 text-xl"></i>
+                </div>
+                <span className="text-2xl font-bold text-pink-600">{matchingStats.received}</span>
+              </div>
+              <div className="text-sm font-bold text-pink-700">받은 요청</div>
+              <div className="text-xs text-pink-500 mt-0.5">새로운 관심 표시</div>
             </div>
-            자기소개
-          </h3>
-          <p className="text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl text-sm">{profile.bio}</p>
-        </div>
 
-        {/* 관심사 */}
-        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center font-display">
-            <div className="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-pink-500">
-              <i className="ri-heart-line text-lg"></i>
+            {/* 보낸 요청 */}
+            <div 
+              onClick={handleMatchingRequests}
+              className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                  <i className="ri-send-plane-fill text-blue-500 text-xl"></i>
+                </div>
+                <span className="text-2xl font-bold text-blue-600">{matchingStats.sent}</span>
+              </div>
+              <div className="text-sm font-bold text-blue-700">보낸 요청</div>
+              <div className="text-xs text-blue-500 mt-0.5">대기 중인 요청</div>
             </div>
-            관심사
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {profile.interests.map((interest, index) => (
-              <span
-                key={index}
-                className="bg-white border border-slate-100 text-slate-600 px-4 py-2 rounded-full text-sm font-medium shadow-sm hover:shadow-md hover:border-primary-200 hover:text-primary-600 transition-all cursor-default"
-              >
-                {interest}
-              </span>
-            ))}
           </div>
+        </div>
+
+        {/* 광고 배너 1 - 카카오 애드핏 */}
+        <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          {/* 실제 광고 (unit ID 발급 후 주석 해제)
+          <KakaoAdFit unit="DAN-XXXXXXXXXX" width={320} height={100} />
+          */}
+          {/* 테스트용 더미 배너 (광고 승인 전까지 표시) */}
+          <DummyAdBanner width={320} height={100} text="광고 영역 1" className="mx-auto" />
+        </div>
+
+        {/* 광고 배너 2 - 카카오 애드핏 */}
+        <div className="animate-slide-up" style={{ animationDelay: '0.25s' }}>
+          {/* 실제 광고 (unit ID 발급 후 주석 해제)
+          <KakaoAdFit unit="DAN-YYYYYYYYYY" width={320} height={100} />
+          */}
+          {/* 테스트용 더미 배너 (광고 승인 전까지 표시) */}
+          <DummyAdBanner width={320} height={100} text="광고 영역 2" className="mx-auto" />
         </div>
 
         {/* 메뉴 */}
-        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+        <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
           <div className="space-y-1">
             <button onClick={() => navigate('/settings')} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
               <div className="flex items-center space-x-4">

@@ -14,30 +14,18 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-2 flex justify-center pointer-events-none" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-      <div className="glass rounded-full px-6 py-3 flex items-center justify-between shadow-2xl shadow-primary-500/20 pointer-events-auto max-w-md w-full">
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[400px] z-50 bg-white border-t border-gray-200" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex items-center justify-around py-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 group ${isActive ? 'text-primary-600' : 'text-slate-400 hover:text-slate-600'
-                }`}
+              className={`flex flex-col items-center justify-center flex-1 py-2 ${isActive ? 'text-primary-600' : 'text-gray-400'}`}
             >
-              {isActive && (
-                <span className="absolute -top-2 w-1 h-1 bg-primary-500 rounded-full animate-bounce" />
-              )}
-              <i className={`text-2xl transition-all duration-300 ${isActive ? `${tab.activeIcon} scale-110 drop-shadow-md` : `${tab.icon} group-hover:scale-110`
-                }`}></i>
-              <span className={`text-[10px] font-medium mt-1 transition-all duration-300 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 absolute'
-                }`}>
-                {tab.label}
-              </span>
-
-              {isActive && (
-                <div className="absolute inset-0 bg-primary-50 rounded-full -z-10 scale-0 animate-ping opacity-20" />
-              )}
+              <i className={`text-2xl ${isActive ? tab.activeIcon : tab.icon}`}></i>
+              <span className="text-[10px] font-medium mt-1">{tab.label}</span>
             </button>
           );
         })}

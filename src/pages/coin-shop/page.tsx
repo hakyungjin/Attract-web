@@ -129,7 +129,7 @@ export default function CoinShopPage() {
         <p className="text-sm text-gray-500 mb-2">보유 자석</p>
         <div className="flex items-center justify-center space-x-2">
           <img
-            src="/images/magnet.png"
+            src="/image/magnet.png"
             alt="자석"
             className="w-8 h-8"
           />
@@ -155,7 +155,7 @@ export default function CoinShopPage() {
                   pkg.popular ? 'bg-pink-50' : 'bg-gray-100'
                 }`}>
                   <img
-                    src="/images/magnet.png"
+                    src="/image/magnet.png"
                     alt="자석"
                     className="w-8 h-8"
                   />

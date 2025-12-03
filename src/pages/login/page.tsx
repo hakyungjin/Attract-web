@@ -211,6 +211,13 @@ export default function LoginPage() {
     // 전화번호 인증 확인
     if (!phoneVerified) {
       alert('전화번호 인증을 완료해주세요.');
+    if (!formData.phoneNumber) {
+      alert('전화번호를 입력해주세요.');
+      return;
+    }
+
+    if (!isValidPhoneNumber(formData.phoneNumber)) {
+      alert('올바른 전화번호 형식이 아닙니다. (010-XXXX-XXXX)');
       return;
     }
 
@@ -243,7 +250,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 전화번호에서 '-' 제거
       const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
       const { error } = await signUpPhone(cleanPhoneNumber, formData.password, {
         name: formData.name,
@@ -256,7 +262,6 @@ export default function LoginPage() {
         return;
       }
 
-      // 회원가입 성공 - 프로필 완성 페이지로 이동
       alert('회원가입이 완료되었습니다! 프로필을 완성해주세요.');
       navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
     } catch (error: any) {
@@ -520,6 +525,40 @@ export default function LoginPage() {
                   </button>
                 </form>
               )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">비밀번호 <span className="text-red-500">*</span></label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  placeholder="8자 이상 입력하세요"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">비밀번호 확인 <span className="text-red-500">*</span></label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  placeholder="비밀번호를 다시 입력하세요"
+                />
+              </div>
+
+              <label className="flex items-start cursor-pointer text-sm">
+                <input type="checkbox" className="mt-1 mr-2" />
+                <span className="text-gray-600">
+                  <button type="button" onClick={() => navigate('/policy/terms')} className="text-cyan-500 hover:underline">이용약관</button> 및 <button type="button" onClick={() => navigate('/policy/privacy')} className="text-cyan-500 hover:underline">개인정보처리방침</button>에 동의합니다
+                </span>
+              </label>
 
               {/* reCAPTCHA 컨테이너 (invisible) */}
               <div id="recaptcha-container"></div>

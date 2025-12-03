@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { CommunityListSkeleton } from '../../../components/base/Skeleton';
 
 interface Comment {
   id: number;
@@ -33,21 +34,41 @@ interface Post {
 
 import PostDetailPage from './PostDetailPage';
 
+// 전역 캐시 - 컴포넌트 외부에 선언하여 리렌더링에도 유지
+let cachedPosts: Post[] | null = null;
+let lastLoadTime: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
+
 export default function CommunityTab() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<'dating' | 'chat'>('dating');
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<Post[]>(cachedPosts || []);
   const [newPost, setNewPost] = useState('');
   const [showNewPost, setShowNewPost] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(!cachedPosts);
+  const [currentUser, setCurrentUser] = useState<any>(undefined); // undefined = 아직 확인 안됨, null = 로그인 안됨
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const isLoadingRef = useRef(false); // 중복 로드 방지
 
   // 현재 사용자 정보 가져오기
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        // 먼저 Supabase 인증 사용자 확인
+        // 먼저 로컬 스토리지의 auth_user 확인 (커스텀 인증 시스템)
+        const authUser = localStorage.getItem('auth_user');
+        if (authUser) {
+          try {
+            const parsedUser = JSON.parse(authUser);
+            setCurrentUser(parsedUser);
+            console.log('auth_user 사용자:', parsedUser);
+            return;
+          } catch (err) {
+            console.error('auth_user 파싱 실패:', err);
+          }
+        }
+
+        // Supabase 인증 사용자 확인 (폴백)
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
@@ -68,45 +89,35 @@ export default function CommunityTab() {
             // Profile fetch failed, continue with basic user info
           }
         } else {
-          // Supabase 사용자 없으면 로컬 스토리지 확인
-          const localUser = localStorage.getItem('user');
-          if (localUser) {
-            try {
-              const parsedUser = JSON.parse(localUser);
-              setCurrentUser(parsedUser);
-              console.log('로컬 스토리지 사용자:', parsedUser);
-            } catch (err) {
-              console.error('로컬 스토리지 파싱 실패:', err);
-              setCurrentUser(null);
-            }
-          } else {
-            setCurrentUser(null);
-          }
+          // 로그인 안됨
+          setCurrentUser(null);
         }
       } catch (err) {
         console.error('사용자 정보 조회 실패:', err);
-        // 최후의 수단: 로컬 스토리지 확인
-        const localUser = localStorage.getItem('user');
-        if (localUser) {
-          try {
-            setCurrentUser(JSON.parse(localUser));
-          } catch (err) {
-            setCurrentUser(null);
-          }
-        }
+        setCurrentUser(null);
       }
     };
     getCurrentUser();
   }, []);
 
-  // 게시글 불러오기
+  // 게시글 불러오기 - 캐시가 없거나 만료된 경우에만 실행
   useEffect(() => {
-    if (currentUser !== null) {
+    const now = Date.now();
+    const cacheValid = cachedPosts && (now - lastLoadTime < CACHE_DURATION);
+    
+    if (cacheValid) {
+      // 캐시된 데이터 사용
+      setPosts(cachedPosts!);
+      setIsLoading(false);
+    } else if (!isLoadingRef.current) {
+      // 캐시가 없거나 만료됨 - 새로 로드
       loadPosts();
     }
-  }, [currentUser]);
+  }, []);
 
   const loadPosts = async () => {
+    if (isLoadingRef.current) return; // 이미 로딩 중이면 중복 호출 방지
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -115,21 +126,11 @@ export default function CommunityTab() {
         setTimeout(() => reject(new Error('Timeout')), 5000)
       );
 
+      // 먼저 게시글만 가져오기
       const fetchPromise = supabase
         .from('community_posts')
         .select(`
           *,
-          users!user_id (
-            id,
-            name,
-            avatar_url,
-            age,
-            location,
-            gender,
-            bio,
-            school,
-            job
-          ),
           post_comments (
             id,
             author_name,
@@ -159,19 +160,41 @@ export default function CommunityTab() {
           userLikes = likesData?.map(like => like.post_id) || [];
         }
 
+        // 게시글 작성자 ID 목록 수집
+        const userIds = [...new Set(data.map((post: any) => post.user_id).filter(Boolean))];
+        
+        // 작성자 정보 일괄 조회
+        let usersMap: { [key: string]: any } = {};
+        if (userIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, name, avatar_url, profile_image, age, location, gender, bio, school, job')
+            .in('id', userIds);
+          
+          if (usersData) {
+            usersData.forEach((user: any) => {
+              usersMap[user.id] = user;
+            });
+          }
+        }
+
         const formattedPosts: Post[] = data.map((post: any) => {
-          const author = post.users;
+          // users 테이블에서 가져온 정보 또는 게시글에 저장된 정보 사용
+          const author = usersMap[post.user_id];
+          const authorName = author?.name || post.author_name || '익명';
+          const authorAvatar = author?.avatar_url || author?.profile_image || post.avatar_url || 'https://via.placeholder.com/100';
+          
           return {
             id: post.id,
-            author: author?.name || '익명',
-            avatar: author?.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=400&height=500&seq=default&orientation=portrait',
+            author: authorName,
+            avatar: authorAvatar,
             content: post.content,
             image: post.image_url,
             likes: post.likes,
             comments: post.post_comments?.map((comment: any) => ({
               id: comment.id,
               author: comment.author_name,
-              avatar: comment.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=default&orientation=squarish',
+              avatar: comment.avatar_url || 'https://via.placeholder.com/100',
               content: comment.content,
               timeAgo: getTimeAgo(comment.created_at),
               likes: comment.likes,
@@ -179,25 +202,40 @@ export default function CommunityTab() {
             })) || [],
             timeAgo: getTimeAgo(post.created_at),
             isLiked: userLikes.includes(post.id),
-            age: author?.age,
-            location: author?.location,
-            job: author?.job,
+            age: author?.age || post.age,
+            location: author?.location || post.location,
+            job: author?.job || post.job,
             views: post.views,
             category: post.category,
             userId: post.user_id,
-            authorData: {
-              id: author?.id,
-              name: author?.name || '익명',
-              avatar_url: author?.avatar_url,
-              age: author?.age,
-              location: author?.location,
-              gender: author?.gender,
-              bio: author?.bio,
-              school: author?.school,
-              job: author?.job
+            authorData: author ? {
+              id: author.id,
+              name: author.name || '익명',
+              avatar_url: author.avatar_url || author.profile_image,
+              age: author.age,
+              location: author.location,
+              gender: author.gender,
+              bio: author.bio,
+              school: author.school,
+              job: author.job
+            } : {
+              id: post.user_id,
+              name: post.author_name || '익명',
+              avatar_url: post.avatar_url,
+              age: post.age,
+              location: post.location,
+              gender: post.gender,
+              bio: post.bio,
+              school: post.school,
+              job: post.job
             }
           };
         });
+        
+        // 캐시에 저장
+        cachedPosts = formattedPosts;
+        lastLoadTime = Date.now();
+        
         setPosts(formattedPosts);
       } else {
         throw new Error('No data');
@@ -209,6 +247,7 @@ export default function CommunityTab() {
       setPosts([]);
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
@@ -227,7 +266,10 @@ export default function CommunityTab() {
     return `${diffInDays}일 전`;
   };
 
-  const filteredPosts = posts.filter(post => post.category === selectedCategory);
+  const filteredPosts = useMemo(
+    () => posts.filter(post => post.category === selectedCategory),
+    [posts, selectedCategory]
+  );
 
   const handleLike = async (postId: number) => {
     if (!currentUser) {
@@ -288,6 +330,13 @@ export default function CommunityTab() {
   };
 
   const handleCommentClick = async (post: Post) => {
+    // 로그인 체크
+    const authUser = localStorage.getItem('auth_user');
+    if (!authUser) {
+      setShowLoginModal(true);
+      return;
+    }
+
     // 조회수 증가
     try {
       await supabase
@@ -390,20 +439,20 @@ export default function CommunityTab() {
   return (
     <div className="px-4 py-4 pb-20 min-h-screen">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-2xl font-bold font-display text-slate-800">커뮤니티</h2>
-          <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-lg shadow-primary-500/30 animate-pulse-soft">
-            TODAY
-          </div>
-          <span className="text-primary-600 font-bold font-display text-lg">30,301</span>
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold font-display text-slate-800 whitespace-nowrap">커뮤니티</h2>
         <div className="flex items-center space-x-2">
-          <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
-            <i className="ri-equalizer-line text-xl text-slate-400 group-hover:text-primary-500 transition-colors"></i>
+          <div className="flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-full">
+            <span className="bg-gradient-to-r from-primary-500 to-primary-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+              TODAY
+            </span>
+            <span className="text-primary-600 font-bold text-sm">30,301</span>
+          </div>
+          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
+            <i className="ri-equalizer-line text-lg text-slate-400 group-hover:text-primary-500 transition-colors"></i>
           </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
-            <i className="ri-layout-grid-line text-xl text-slate-400 group-hover:text-primary-500 transition-colors"></i>
+          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
+            <i className="ri-layout-grid-line text-lg text-slate-400 group-hover:text-primary-500 transition-colors"></i>
           </button>
         </div>
       </div>
@@ -442,69 +491,74 @@ export default function CommunityTab() {
 
       {/* 게시글 목록 */}
       {isLoading ? (
-        <div className="flex flex-col justify-center items-center py-20 space-y-4">
-          <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
-          <p className="text-slate-400 text-sm font-medium animate-pulse">게시글을 불러오는 중...</p>
-        </div>
+        <CommunityListSkeleton />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredPosts.map((post) => (
             <div
               key={post.id}
-              className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-primary-500/5 transition-all duration-300 group transform hover:-translate-y-0.5"
+              className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary-100 transition-all duration-300"
               onClick={() => handleCommentClick(post)}
             >
-              <div className="flex p-3">
-                {/* 왼쪽 이미지 */}
-                <div className="w-28 h-36 flex-shrink-0 rounded-2xl overflow-hidden relative">
-                  <img
-                    src={post.image}
-                    alt={post.author}
-                    className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+              <div className="flex p-4">
+                {/* 왼쪽: 프로필 사진 (원형 + 핑크 테두리) */}
+                <div className="flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-br from-pink-400 to-pink-500">
+                    <img
+                      src={post.avatar}
+                      alt={post.author}
+                      className="w-full h-full rounded-full object-cover border-2 border-white"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://via.placeholder.com/100';
+                      }}
+                    />
+                  </div>
                 </div>
 
-                {/* 오른쪽 콘텐츠 */}
-                <div className="flex-1 ml-4 flex flex-col justify-between py-1">
-                  {/* 제목 */}
-                  <div>
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
-                        {post.category === 'dating' ? '소개팅' : '잡담'}
-                      </span>
-                      <span className="text-xs text-slate-400">{post.timeAgo}</span>
+                {/* 중간: 콘텐츠 */}
+                <div className="flex-1 ml-3 min-w-0">
+                  {/* 제목 (게시글 내용 첫 줄) */}
+                  <h3 className="text-[15px] font-bold text-slate-800 line-clamp-1 mb-1">
+                    {post.content.split('\n')[0]}
+                  </h3>
+                  
+                  {/* 작성자 정보 */}
+                  <p className="text-sm text-slate-500 mb-2">
+                    {post.author} ({post.location || '위치 미설정'} / {post.age || '?'}세 / {post.job || '직업 미설정'})
+                  </p>
+                  
+                  {/* 조회수, 댓글, 시간 */}
+                  <div className="flex items-center space-x-3 text-xs text-slate-400">
+                    <div className="flex items-center space-x-1">
+                      <i className="ri-eye-line"></i>
+                      <span>{post.views || 0}</span>
                     </div>
-                    <h3 className="text-base font-bold text-slate-800 line-clamp-1 mb-1 group-hover:text-primary-600 transition-colors">
-                      {post.author}
-                    </h3>
-                    <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">{post.content}</p>
+                    <div className="flex items-center space-x-1">
+                      <i className="ri-chat-3-line"></i>
+                      <span>{post.comments.length}</span>
+                    </div>
+                    <span>|</span>
+                    <span>{post.timeAgo}</span>
                   </div>
+                </div>
 
-                  {/* 하단 정보 */}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50">
-                    <div className="flex items-center space-x-4 text-xs font-medium text-slate-400">
-                      <div className="flex items-center space-x-1.5 group/icon">
-                        <i className="ri-eye-line group-hover/icon:text-primary-500 transition-colors"></i>
-                        <span>{post.views}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLike(post.id);
+                {/* 오른쪽: 게시물 이미지 (있을 때만 표시) */}
+                {post.image && (
+                  <div className="flex-shrink-0 ml-3">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden">
+                      <img
+                        src={post.image}
+                        alt="게시물 이미지"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
                         }}
-                        className="flex items-center space-x-1.5 group/icon cursor-pointer"
-                      >
-                        <i className={`ri-heart-3-line group-hover/icon:text-pink-500 transition-colors ${post.isLiked ? 'text-pink-500 ri-heart-3-fill' : ''}`}></i>
-                        <span>{post.likes}</span>
-                      </button>
-                      <div className="flex items-center space-x-1.5 group/icon">
-                        <i className="ri-chat-3-line group-hover/icon:text-blue-500 transition-colors"></i>
-                        <span>{post.comments.length}</span>
-                      </div>
+                      />
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           ))}
@@ -549,6 +603,26 @@ export default function CommunityTab() {
                 게시하기
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 로그인 필요 모달 */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowLoginModal(false)}></div>
+          <div className="relative bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="ri-lock-line text-3xl text-primary-500"></i>
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">로그인이 필요합니다</h3>
+            <p className="text-slate-500 text-sm mb-6">게시글을 보려면 로그인해주세요</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full bg-gradient-to-r from-primary-500 to-primary-600 text-white py-3 rounded-2xl font-bold hover:from-primary-600 hover:to-primary-700 transition-all"
+            >
+              로그인하기
+            </button>
           </div>
         </div>
       )}

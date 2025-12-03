@@ -229,194 +229,134 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* 헤더 */}
-      <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-20">
-        <div className="flex items-center px-4 py-3 max-w-md mx-auto">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group"
-          >
-            <i className="ri-arrow-left-line text-xl text-slate-600 group-hover:text-primary-600 transition-colors"></i>
+    <div className="min-h-screen bg-white pb-32">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-white flex items-center px-4 h-14 border-b border-gray-100">
+        <button onClick={onBack} className="mr-4">
+          <i className="ri-arrow-left-line text-2xl text-gray-800"></i>
+        </button>
+        <h1 className="text-lg font-bold text-gray-800 flex-1 text-center mr-8">게시글</h1>
+      </div>
+
+      {/* Post Content */}
+      <div className="bg-white">
+        {/* Author Info & Content */}
+        <div className="px-4 py-4">
+          <div className="flex items-center mb-3">
+            <img
+              src={currentPost.avatar}
+              alt={currentPost.author}
+              className="w-10 h-10 rounded-full object-cover mr-3 flex-shrink-0 border border-gray-100"
+              onClick={() => navigate('/profile-detail', { state: { authorData: currentPost.authorData || { id: currentPost.id, name: currentPost.author, avatar_url: currentPost.avatar } } })}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-gray-900 text-sm truncate">
+                {currentPost.author}
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">{currentPost.timeAgo}</div>
+            </div>
+
+            {(currentPost.userId === currentUser?.id || currentPost.userId === currentUser?.profile?.id) && (
+              <button
+                onClick={handleDeletePost}
+                disabled={isDeleting}
+                className="text-gray-400 p-2 -mr-2"
+              >
+                <i className={`ri-${isDeleting ? 'loader-4-line animate-spin' : 'more-fill'} text-xl`}></i>
+              </button>
+            )}
+          </div>
+
+          <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+            {currentPost.content}
+          </p>
+        </div>
+
+        {/* Main Image */}
+        {currentPost.image && (
+          <div className="w-full mb-2">
+            <img
+              src={currentPost.image}
+              alt="게시글 이미지"
+              className="w-full h-auto object-cover"
+            />
+          </div>
+        )}
+
+        {/* Stats Row */}
+        <div className="px-4 py-3 flex items-center gap-4 border-b border-gray-50">
+          <button onClick={handleLike} className="flex items-center gap-1.5 transition-colors">
+            <i className={`${currentPost.isLiked ? 'ri-heart-fill text-pink-500' : 'ri-heart-line text-gray-400'} text-xl`}></i>
+            <span className="text-sm text-gray-600">{currentPost.likes}</span>
           </button>
-          <h1 className="flex-1 text-center font-bold text-slate-800 font-display">게시글</h1>
-          <div className="w-10"></div>
+          <div className="flex items-center gap-1.5">
+            <i className="ri-chat-3-line text-xl text-gray-400"></i>
+            <span className="text-sm text-gray-600">댓글</span>
+          </div>
         </div>
       </div>
 
-      <div className="px-4 py-6 pb-20">
-        <div className="max-w-md mx-auto space-y-6">
-          {/* 게시글 상세 */}
-          <div className="bg-white rounded-3xl shadow-lg shadow-primary-500/5 p-6 animate-slide-up">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="relative group cursor-pointer" onClick={() => navigate('/profile-detail', { state: { authorData: currentPost.authorData || { id: currentPost.id, name: currentPost.author, avatar_url: currentPost.avatar } } })}>
-                <img
-                  src={currentPost.avatar}
-                  alt={currentPost.author}
-                  className="w-14 h-14 rounded-2xl object-cover object-top shadow-md group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-              </div>
-              <div className="flex-1">
-                <h4
-                  onClick={() => navigate('/profile-detail', { state: { authorData: currentPost.authorData || { id: currentPost.id, name: currentPost.author, avatar_url: currentPost.avatar } } })}
-                  className="font-bold text-lg text-slate-800 cursor-pointer hover:text-primary-600 transition-colors font-display"
-                >
-                  {currentPost.author}
-                </h4>
-                <p className="text-xs font-medium text-slate-400">{currentPost.timeAgo}</p>
-              </div>
-              <button 
-                onClick={() => {
-                  if (currentPost.userId === currentUser?.id || currentPost.userId === currentUser?.profile?.id) {
-                    handleDeletePost();
-                  }
-                }}
-                disabled={isDeleting || (currentPost.userId !== currentUser?.id && currentPost.userId !== currentUser?.profile?.id)}
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-slate-400 transition-all ${
-                  currentPost.userId === currentUser?.id || currentPost.userId === currentUser?.profile?.id
-                    ? 'hover:bg-red-50 hover:text-red-500 cursor-pointer'
-                    : 'cursor-default opacity-0'
-                }`}
-              >
-                <i className={`ri-${isDeleting ? 'loader-4-line animate-spin' : 'delete-bin-line'}`}></i>
-              </button>
-            </div>
+      {/* Comments Section */}
+      <div className="px-4 py-4">
+        <div className="font-bold text-sm mb-4">댓글 {currentPost.comments.length}</div>
 
-            <p className="text-slate-600 mb-6 text-base leading-relaxed whitespace-pre-wrap">{currentPost.content}</p>
-
-            {currentPost.image && (
-              <div className="rounded-2xl overflow-hidden mb-6 shadow-md">
-                <img
-                  src={currentPost.image}
-                  alt="게시글 이미지"
-                  className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
-                />
-              </div>
-            )}
-
-            {/* 좋아요/댓글 버튼 */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-              <div className="flex space-x-3 w-full">
-                <button
-                  onClick={handleLike}
-                  className={`flex-1 flex items-center justify-center space-x-2 py-3.5 rounded-xl transition-all cursor-pointer whitespace-nowrap group ${currentPost.isLiked
-                    ? 'bg-pink-50 text-pink-500 shadow-inner'
-                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                    }`}
-                >
-                  <i className={`text-xl transition-transform group-hover:scale-110 ${currentPost.isLiked ? 'ri-heart-fill animate-pulse-soft' : 'ri-heart-line'}`}></i>
-                  <span className="text-sm font-bold">좋아요 {currentPost.likes > 0 && currentPost.likes}</span>
-                </button>
-
-                <button className="flex-1 flex items-center justify-center space-x-2 py-3.5 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-all cursor-pointer whitespace-nowrap group">
-                  <i className="ri-chat-3-line text-xl group-hover:scale-110 transition-transform"></i>
-                  <span className="text-sm font-bold">댓글 {currentPost.comments.length > 0 && currentPost.comments.length}</span>
-                </button>
-              </div>
-            </div>
+        {currentPost.comments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-300">
+            <i className="ri-chat-3-line text-4xl mb-2 opacity-50"></i>
+            <p className="text-sm">첫 번째 댓글을 남겨보세요!</p>
           </div>
-
-          {/* 댓글 섹션 */}
-          <div className="bg-white rounded-3xl shadow-lg shadow-primary-500/5 p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <h3 className="font-bold text-slate-800 mb-6 flex items-center">
-              댓글 <span className="ml-2 text-primary-500">{currentPost.comments.length}</span>
-            </h3>
-
-            {/* 댓글 작성 */}
-            <div className="flex space-x-4 mb-8 pb-6 border-b border-slate-100">
-              <img
-                src={currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20profile%20avatar%2C%20friendly%20expression%2C%20professional%20portrait%20photography%2C%20soft%20natural%20lighting%2C%20clean%20white%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=myavatar&orientation=squarish'}
-                alt={currentUser?.name || '내 프로필'}
-                className="w-12 h-12 rounded-full object-cover object-top flex-shrink-0 shadow-sm border-2 border-primary-100"
-              />
-              <div className="flex-1">
-                <p className="text-xs font-bold text-slate-600 mb-2">{currentUser?.name || '사용자'}</p>
-                <div className="relative">
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="댓글을 남겨보세요..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm resize-none bg-white transition-all placeholder-slate-400 shadow-sm"
-                    rows={2}
-                    maxLength={500}
-                  />
+        ) : (
+          <div className="space-y-5">
+            {currentPost.comments.map((comment) => (
+              <div key={comment.id} className="flex items-start gap-3">
+                <img
+                  src={comment.avatar}
+                  alt={comment.author}
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
+                  onClick={() => navigate('/profile-detail', { state: { userId: comment.id } })}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-bold text-gray-900">{comment.author}</span>
+                    <span className="text-xs text-gray-400">{comment.timeAgo}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed break-words">{comment.content}</p>
                   <button
-                    onClick={handleSubmitComment}
-                    disabled={!newComment.trim()}
-                    className={`absolute bottom-3 right-3 p-2 rounded-full transition-all ${newComment.trim()
-                      ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-md transform hover:scale-105'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                      }`}
+                    onClick={() => handleCommentLike(comment.id)}
+                    className={`text-xs mt-1.5 flex items-center gap-1 ${comment.isLiked ? 'text-pink-500' : 'text-gray-400'}`}
                   >
-                    <i className="ri-send-plane-fill"></i>
+                    <i className={comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'}></i>
+                    <span>좋아요 {comment.likes > 0 && comment.likes}</span>
                   </button>
                 </div>
               </div>
-            </div>
-
-            {/* 댓글 목록 */}
-            {currentPost.comments.length > 0 ? (
-              <div className="space-y-5">
-                {currentPost.comments.map((comment) => (
-                  <div key={comment.id} className="flex space-x-3 group pb-5 border-b border-slate-50 last:border-b-0">
-                    {/* 프로필 이미지 */}
-                    <img
-                      src={comment.avatar}
-                      alt={comment.author}
-                      onClick={() => navigate('/profile-detail', { state: { userId: comment.id } })}
-                      className="w-11 h-11 rounded-full object-cover object-top flex-shrink-0 cursor-pointer hover:opacity-80 transition-all shadow-sm border-2 border-slate-100 group-hover:border-primary-300"
-                    />
-                    
-                    {/* 댓글 내용 */}
-                    <div className="flex-1 min-w-0">
-                      {/* 작성자 정보 */}
-                      <div className="flex items-center justify-between mb-2">
-                        <button
-                          onClick={() => navigate('/profile-detail', { state: { userId: comment.id } })}
-                          className="font-bold text-sm text-slate-800 cursor-pointer hover:text-primary-600 hover:underline transition-colors"
-                        >
-                          {comment.author}
-                        </button>
-                        <span className="text-xs font-medium text-slate-400">{comment.timeAgo}</span>
-                      </div>
-
-                      {/* 댓글 박스 */}
-                      <div className="bg-slate-50 rounded-2xl rounded-tl-none px-4 py-3 group-hover:bg-slate-100 transition-colors border border-slate-100 group-hover:border-primary-200">
-                        <p className="text-sm text-slate-700 leading-relaxed break-words">{comment.content}</p>
-                      </div>
-
-                      {/* 댓글 액션 버튼 */}
-                      <div className="flex items-center space-x-5 mt-2 ml-1">
-                        <button
-                          onClick={() => handleCommentLike(comment.id)}
-                          className={`flex items-center space-x-1.5 text-xs font-medium transition-all cursor-pointer group/like ${comment.isLiked 
-                            ? 'text-pink-500' 
-                            : 'text-slate-400 hover:text-pink-500'
-                          }`}
-                        >
-                          <i className={`${comment.isLiked ? 'ri-heart-fill' : 'ri-heart-line'} group-hover/like:scale-125 transition-transform`}></i>
-                          <span>{comment.likes > 0 ? comment.likes : '좋아요'}</span>
-                        </button>
-                        <button onClick={() => alert('답글 기능 준비중입니다.')} className="text-xs font-medium text-slate-400 hover:text-primary-500 transition-colors cursor-pointer hover:font-semibold">
-                          답글달기
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl border border-dashed border-slate-200">
-                <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-white rounded-full shadow-md">
-                  <i className="ri-chat-smile-2-line text-4xl text-primary-300"></i>
-                </div>
-                <p className="text-slate-600 font-semibold text-lg">아직 댓글이 없어요</p>
-                <p className="text-slate-500 text-sm mt-1">첫 번째 댓글의 주인공이 되어보세요!</p>
-              </div>
-            )}
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Input Bar */}
+      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-3 z-40" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <img
+          src={currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://via.placeholder.com/100'}
+          alt="내 프로필"
+          className="w-8 h-8 rounded-full object-cover border border-gray-100 flex-shrink-0"
+        />
+        <div className="flex-1 relative">
+          <input
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="댓글을 입력하세요..."
+            className="w-full bg-gray-100 rounded-full pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 transition-shadow"
+          />
+          <button
+            onClick={handleSubmitComment}
+            disabled={!newComment.trim()}
+            className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${newComment.trim() ? 'text-primary-500 hover:bg-gray-200' : 'text-gray-300'}`}
+          >
+            <i className="ri-send-plane-fill text-lg"></i>
+          </button>
         </div>
       </div>
     </div>

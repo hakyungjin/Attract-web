@@ -5,8 +5,8 @@
   "targets": {
     "attract--web": {
       "hosting": {
-        "demo": [
-          "attract-web-demo"
+        "production": [
+          "attract"
         ]
       }
     }

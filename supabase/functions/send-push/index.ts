@@ -1,5 +1,14 @@
+// @ts-ignore - Deno 모듈 (Supabase Edge Function 런타임에서 정상 작동)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore - Deno 모듈
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// Deno 타입 선언
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -111,7 +120,7 @@ async function sendFCMv1(
   return response.json()
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -172,10 +181,10 @@ serve(async (req) => {
       JSON.stringify({ success: true, result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('푸시 전송 에러:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error?.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

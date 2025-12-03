@@ -30,7 +30,8 @@ export default function ProfileEditPage() {
     smoking: '비흡연',
     drinking: '가끔',
     interests: [] as string[],
-    avatar: ''
+    avatar: '',
+    photos: [] as string[] // 여러 장 사진
   });
 
   const [newInterest, setNewInterest] = useState('');
@@ -38,6 +39,7 @@ export default function ProfileEditPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const MAX_PHOTOS = 6; // 최대 사진 수
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -81,7 +83,8 @@ export default function ProfileEditPage() {
             smoking: userData.smoking || '비흡연',
             drinking: userData.drinking || '가끔',
             interests: userData.interests || [],
-            avatar: profileImage
+            avatar: profileImage,
+            photos: userData.photos || (profileImage ? [profileImage] : [])
           });
         }
       } catch (error) {
@@ -149,7 +152,8 @@ export default function ProfileEditPage() {
         smoking: formData.smoking,
         drinking: formData.drinking,
         interests: formData.interests,
-        profile_image: uploadedImageUrl || formData.avatar,
+        profile_image: uploadedImageUrl || formData.avatar || formData.photos[0] || '',
+        photos: formData.photos,
         updated_at: new Date().toISOString()
       };
 
@@ -350,7 +354,84 @@ export default function ProfileEditPage() {
                 <i className="ri-camera-line"></i>
               </label>
             </div>
-            <p className="text-sm text-gray-500">프로필 사진 변경</p>
+            <p className="text-sm text-gray-500">대표 프로필 사진</p>
+          </div>
+        </div>
+
+        {/* 사진 갤러리 (최대 6장) */}
+        <div className="bg-white rounded-3xl shadow-sm p-6 mb-4">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+            <i className="ri-gallery-line mr-2 text-cyan-500"></i>
+            내 사진 ({formData.photos.length}/{MAX_PHOTOS})
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">최대 {MAX_PHOTOS}장까지 업로드 가능합니다. 첫 번째 사진이 대표 사진이 됩니다.</p>
+          
+          <div className="grid grid-cols-3 gap-2">
+            {/* 기존 사진들 */}
+            {formData.photos.map((photo, index) => (
+              <div key={index} className="relative aspect-square rounded-xl overflow-hidden group">
+                <img src={photo} alt={`사진 ${index + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <button
+                    onClick={() => {
+                      const newPhotos = formData.photos.filter((_, i) => i !== index);
+                      setFormData({ ...formData, photos: newPhotos });
+                    }}
+                    className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                  >
+                    <i className="ri-delete-bin-line"></i>
+                  </button>
+                </div>
+                {index === 0 && (
+                  <div className="absolute top-1 left-1 bg-cyan-500 text-white text-[10px] px-1.5 py-0.5 rounded">대표</div>
+                )}
+              </div>
+            ))}
+            
+            {/* 사진 추가 버튼 */}
+            {formData.photos.length < MAX_PHOTOS && (
+              <label className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-cyan-500 hover:bg-cyan-50 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    setIsUploading(true);
+                    try {
+                      const fileExt = file.name.split('.').pop();
+                      const fileName = `${authUser?.id}_${Date.now()}.${fileExt}`;
+                      const filePath = `profile-photos/${fileName}`;
+                      
+                      const { error: uploadError } = await supabase.storage
+                        .from('profiles')
+                        .upload(filePath, file);
+                      
+                      if (uploadError) throw uploadError;
+                      
+                      const { data: { publicUrl } } = supabase.storage
+                        .from('profiles')
+                        .getPublicUrl(filePath);
+                      
+                      setFormData(prev => ({
+                        ...prev,
+                        photos: [...prev.photos, publicUrl],
+                        avatar: prev.photos.length === 0 ? publicUrl : prev.avatar
+                      }));
+                    } catch (error) {
+                      console.error('사진 업로드 실패:', error);
+                      alert('사진 업로드에 실패했습니다.');
+                    } finally {
+                      setIsUploading(false);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <i className="ri-add-line text-2xl text-gray-400"></i>
+                <span className="text-xs text-gray-400 mt-1">추가</span>
+              </label>
+            )}
           </div>
         </div>
 
@@ -390,28 +471,30 @@ export default function ProfileEditPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                성별
+                성별 <span className="text-xs text-gray-400">(변경 불가)</span>
               </label>
               <div className="flex space-x-3">
-                <button
-                  onClick={() => setFormData({ ...formData, gender: '여자' })}
-                  className={`flex-1 py-3 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.gender === '여자'
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
+                <div
+                  className={`flex-1 py-3 rounded-xl font-medium text-center ${formData.gender === '여자'
+                    ? 'bg-gradient-to-r from-pink-400 to-pink-500 text-white'
+                    : 'bg-gray-100 text-gray-400'
                     }`}
                 >
                   여자
-                </button>
-                <button
-                  onClick={() => setFormData({ ...formData, gender: '남자' })}
-                  className={`flex-1 py-3 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${formData.gender === '남자'
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
+                </div>
+                <div
+                  className={`flex-1 py-3 rounded-xl font-medium text-center ${formData.gender === '남자'
+                    ? 'bg-gradient-to-r from-blue-400 to-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-400'
                     }`}
                 >
                   남자
-                </button>
+                </div>
               </div>
+              <p className="text-xs text-gray-400 mt-2">
+                <i className="ri-information-line mr-1"></i>
+                성별은 회원가입 시 설정한 후 변경할 수 없습니다
+              </p>
             </div>
 
             <div>

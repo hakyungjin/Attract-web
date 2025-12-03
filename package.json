@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vite build && firebase deploy --only hosting --project attract--web"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
@@ -42,6 +43,7 @@
     "postcss": "^8.5.6",
     "source-map": "^0.7.6",
     "tailwindcss": "^3.4.17",
+    "terser": "^5.44.1",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
     "unplugin-auto-import": "^19.3.0",
