@@ -2,14 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-
-// 기본 프로필 이미지 헬퍼 함수
-const getDefaultAvatar = (gender?: string) => {
-  if (gender === '남자') {
-    return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
-  }
-  return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
-};
+import { getDefaultAvatar } from '../../utils/avatarUtils';
+import { MBTI_TYPES } from '../../constants/mbti';
+import { logger } from '../../utils/logger';
 
 export default function ProfileEditPage() {
   const navigate = useNavigate();
@@ -44,7 +39,7 @@ export default function ProfileEditPage() {
   useEffect(() => {
     const loadUserProfile = async () => {
       if (!authUser?.id) {
-        console.log('사용자 정보 없음');
+        logger.info('사용자 정보 없음');
         setLoading(false);
         return;
       }
@@ -58,7 +53,7 @@ export default function ProfileEditPage() {
           .single();
 
         if (error) {
-          console.error('사용자 데이터 로드 실패:', error);
+          logger.error('사용자 데이터 로드 실패:', error);
           setLoading(false);
           return;
         }
@@ -88,7 +83,7 @@ export default function ProfileEditPage() {
           });
         }
       } catch (error) {
-        console.error('프로필 로드 중 오류:', error);
+        logger.error('프로필 로드 중 오류:', error);
       } finally {
         setLoading(false);
       }
@@ -164,7 +159,7 @@ export default function ProfileEditPage() {
         .eq('id', authUser.id);
 
       if (dbError) {
-        console.error('데이터베이스 저장 에러:', dbError);
+        logger.error('데이터베이스 저장 에러:', dbError);
         alert('프로필 저장에 실패했습니다.');
         setIsUploading(false);
         return;
@@ -182,11 +177,11 @@ export default function ProfileEditPage() {
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
       }
 
-      console.log('저장된 데이터:', profileData);
+      logger.info('저장된 데이터:', profileData);
       setShowSaveAlert(true);
 
     } catch (error) {
-      console.error('프로필 저장 중 오류:', error);
+      logger.error('프로필 저장 중 오류:', error);
       alert('프로필 저장에 실패했습니다.');
     } finally {
       setIsUploading(false);
@@ -235,17 +230,17 @@ export default function ProfileEditPage() {
           errorMsg = '⚠️ 인증 오류: Supabase 설정을 확인해주세요.';
         }
         
-        console.error('업로드 에러 상세:', uploadError);
+        logger.error('업로드 에러 상세:', uploadError);
         throw new Error(errorMsg);
       }
 
-      console.log('업로드 성공:', data);
+      logger.info('업로드 성공:', data);
 
       // 공개 URL 생성 - Supabase 기본 형식
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
       
-      console.log('생성된 공개 URL:', publicUrl);
+      logger.info('생성된 공개 URL:', publicUrl);
       setUploadedImageUrl(publicUrl);
 
       // 미리보기용으로 로컬 이미지도 설정
@@ -259,7 +254,7 @@ export default function ProfileEditPage() {
       reader.readAsDataURL(file);
 
     } catch (error: any) {
-      console.error('이미지 업로드 중 오류:', error);
+      logger.error('이미지 업로드 중 오류:', error);
       alert(error.message || '이미지 업로드에 실패했습니다.');
     } finally {
       setIsUploading(false);
@@ -420,7 +415,7 @@ export default function ProfileEditPage() {
                         avatar: prev.photos.length === 0 ? publicUrl : prev.avatar
                       }));
                     } catch (error) {
-                      console.error('사진 업로드 실패:', error);
+                      logger.error('사진 업로드 실패:', error);
                       alert('사진 업로드에 실패했습니다.');
                     } finally {
                       setIsUploading(false);
@@ -617,14 +612,18 @@ export default function ProfileEditPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 MBTI
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.mbti}
-                onChange={(e) => handleInputChange('mbti', e.target.value.toUpperCase())}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent uppercase"
-                placeholder="MBTI를 입력하세요 (예: ENFP)"
-                maxLength={4}
-              />
+                onChange={(e) => handleInputChange('mbti', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white cursor-pointer"
+              >
+                <option value="">MBTI를 선택하세요</option>
+                {MBTI_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

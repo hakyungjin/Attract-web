@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
+import { logger } from '../../../utils/logger';
 
 interface Comment {
   id: number;
@@ -40,46 +42,13 @@ interface PostDetailPageProps {
 
 export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePost }: PostDetailPageProps) {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [newComment, setNewComment] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-
-    // 현재 사용자 정보 가져오기
-    const getCurrentUser = async () => {
-      try {
-        // Supabase 인증 사용자 확인
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-          if (profile) {
-            setCurrentUser({ ...user, profile });
-          }
-        } else {
-          // 로컬 스토리지 사용자
-          const localUser = localStorage.getItem('user');
-          if (localUser) {
-            setCurrentUser(JSON.parse(localUser));
-          }
-        }
-      } catch (err) {
-        console.error('사용자 정보 조회 실패:', err);
-        // 로컬 스토리지 폴백
-        const localUser = localStorage.getItem('user');
-        if (localUser) {
-          setCurrentUser(JSON.parse(localUser));
-        }
-      }
-    };
-    getCurrentUser();
   }, [post]);
 
   const handleLike = async () => {
@@ -100,7 +69,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
         .update({ likes: newLikes })
         .eq('id', currentPost.id);
     } catch (error) {
-      console.error('좋아요 업데이트 오류:', error);
+      logger.error('좋아요 업데이트 오류', error);
     }
   };
 
@@ -132,13 +101,13 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
         .update({ likes: newLikes })
         .eq('id', commentId);
     } catch (error) {
-      console.error('댓글 좋아요 업데이트 오류:', error);
+      logger.error('댓글 좋아요 업데이트 오류', error);
     }
   };
 
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
-    if (!currentUser) {
+    if (!authUser) {
       alert('로그인이 필요합니다.');
       return;
     }
@@ -146,9 +115,9 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
     try {
       const commentData = {
         post_id: currentPost.id,
-        user_id: currentUser.id,
-        author_name: currentUser.profile?.name || '익명',
-        avatar_url: currentUser.profile?.avatar_url || '',
+        user_id: authUser.id,
+        author_name: authUser.name || '익명',
+        avatar_url: authUser.profile_image || '',
         content: newComment,
         likes: 0
       };
@@ -181,7 +150,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
         setNewComment('');
       }
     } catch (error) {
-      console.error('댓글 작성 오류:', error);
+      logger.error('댓글 작성 오류', error);
       alert('댓글 작성에 실패했습니다.');
     }
   };
@@ -194,7 +163,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
   };
 
   const handleDeletePost = async () => {
-    if (currentPost.userId !== currentUser?.id && currentPost.userId !== currentUser?.profile?.id) {
+    if (currentPost.userId !== authUser?.id) {
       alert('자신의 게시글만 삭제할 수 있습니다.');
       return;
     }
@@ -221,7 +190,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
       alert('게시글이 삭제되었습니다.');
       onBack();
     } catch (error) {
-      console.error('게시글 삭제 오류:', error);
+      logger.error('게시글 삭제 오류', error);
       alert('게시글 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsDeleting(false);

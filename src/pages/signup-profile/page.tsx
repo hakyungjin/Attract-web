@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { MBTI_TYPES } from '../../constants/mbti';
+import { logger } from '../../utils/logger';
 
 export default function SignupProfilePage() {
   const navigate = useNavigate();
@@ -102,7 +104,7 @@ export default function SignupProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('파일 선택:', file.name, file.type, file.size);
+    logger.info('파일 선택', { name: file.name, type: file.type, size: file.size });
 
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     if (!validTypes.includes(file.type)) {
@@ -119,7 +121,7 @@ export default function SignupProfilePage() {
     setIsUploading(true);
     try {
       const fileName = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('업로드 시작:', fileName);
+      logger.info('업로드 시작', { fileName });
 
       const { error: uploadError, data } = await supabase.storage
         .from('profile-images')
@@ -128,7 +130,7 @@ export default function SignupProfilePage() {
           upsert: false
         });
 
-      console.log('업로드 결과:', { error: uploadError, data });
+      logger.info('업로드 결과', { error: uploadError, data });
 
       if (uploadError) {
         let errorMsg = uploadError.message || '알 수 없는 오류';
@@ -141,7 +143,7 @@ export default function SignupProfilePage() {
         }
 
         alert('이미지 업로드 실패: ' + errorMsg);
-        console.error('업로드 에러 상세:', uploadError);
+        logger.error('업로드 에러 상세', uploadError);
         return;
       }
 
@@ -149,13 +151,13 @@ export default function SignupProfilePage() {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
 
-      console.log('생성된 공개 URL:', publicUrl);
+      logger.info('생성된 공개 URL', { publicUrl });
       setUploadedImageUrl(publicUrl);
       alert('이미지가 업로드되었습니다!');
     } catch (error: any) {
-      console.error('업로드 중 오류:', error);
+      logger.error('업로드 중 오류', error);
       alert('업로드 중 오류: ' + error.message);
-    } finally {
+    } finally{
       setIsUploading(false);
     }
   };
@@ -172,7 +174,7 @@ export default function SignupProfilePage() {
     }
 
     // 프로필 저장 및 완성 표시
-    console.log('프로필 저장:', { uploadedImageUrl, profile_image: formData.profile_image });
+    logger.info('프로필 저장', { uploadedImageUrl, profile_image: formData.profile_image });
 
     setIsSaving(true);
     try {
@@ -198,7 +200,7 @@ export default function SignupProfilePage() {
 
       if (error) {
         alert('프로필 저장 실패: ' + error.message);
-        console.error('저장 에러:', error);
+        logger.error('저장 에러', error);
         return;
       }
 
@@ -228,14 +230,18 @@ export default function SignupProfilePage() {
             <label className="block text-sm font-semibold text-gray-800 mb-2">
               MBTI
             </label>
-            <input
-              type="text"
+            <select
               value={formData.mbti}
-              onChange={(e) => setFormData(prev => ({ ...prev, mbti: e.target.value.toUpperCase() }))}
-              placeholder="예: ENFP"
-              maxLength={4}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500"
-            />
+              onChange={(e) => setFormData(prev => ({ ...prev, mbti: e.target.value }))}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 bg-white cursor-pointer"
+            >
+              <option value="">MBTI를 선택하세요</option>
+              {MBTI_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* 지역 */}
