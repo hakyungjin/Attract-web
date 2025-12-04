@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
 import { analyzeMBTICompatibility, getCompatibilityColor, getCompatibilityEmoji, type MBTICompatibility } from '../../services/mbtiCompatibility';
+import { getDefaultAvatar, getProfilePhotos } from '../../utils/avatarUtils';
+import { logger } from '../../utils/logger';
 
 interface Profile {
   id: string;
@@ -88,18 +90,8 @@ export default function ProfileDetailPage() {
     loadUserCoins();
   }, [authUser?.id]);
 
-  // 기본 프로필 이미지
-  const getDefaultAvatar = (gender: string) => {
-    if (gender === '남자' || gender === 'male') {
-      return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
-    }
-    return 'https://readdy.ai/api/search-image?query=minimalist%20female%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=female-default-avatar&orientation=squarish';
-  };
-
   // 프로필 사진 배열 - 사진이 없으면 기본 이미지 사용
-  const profilePhotos = profile?.photos && profile.photos.length > 0
-    ? profile.photos
-    : [getDefaultAvatar(profile?.gender || '')];
+  const profilePhotos = getProfilePhotos(profile?.photos, profile?.gender || '');
 
   const handleBack = () => {
     navigate(-1);
@@ -161,7 +153,7 @@ export default function ProfileDetailPage() {
       const fromUserId = String(authUser.id);
       const toUserId = String(profile.id);
 
-      console.log('📝 매칭 요청 정보:', { fromUserId, toUserId });
+      logger.info('매칭 요청 정보', { fromUserId, toUserId });
 
       // 상대방이 나에게 보낸 요청이 있는지 확인 (상호 매칭 체크)
       const { data: reverseRequest } = await supabase
@@ -173,7 +165,7 @@ export default function ProfileDetailPage() {
         .limit(1);
 
       const isMutualMatch = reverseRequest && reverseRequest.length > 0;
-      console.log('상호 매칭 여부:', isMutualMatch);
+      logger.info('상호 매칭 여부', { isMutualMatch });
 
       // 내가 이미 보낸 요청이 있는지 확인
       const { data: myRequest } = await supabase
@@ -195,7 +187,7 @@ export default function ProfileDetailPage() {
         .eq('id', authUser.id);
 
       if (coinError) {
-        console.error('코인 차감 실패:', coinError);
+        logger.error('코인 차감 실패', coinError);
         alert('자석 차감에 실패했습니다.');
         return;
       }
@@ -212,7 +204,7 @@ export default function ProfileDetailPage() {
         })
         .select();
 
-      console.log('매칭 요청 결과:', { data, error });
+      logger.info('매칭 요청 결과', { data, error });
 
       if (error) {
         if (error.code === '23505') {
@@ -242,9 +234,9 @@ export default function ProfileDetailPage() {
           .single();
 
         if (chatError) {
-          console.error('채팅방 생성 실패:', chatError);
+          logger.error('채팅방 생성 실패', chatError);
         } else {
-          console.log('✅ 채팅방 생성 완료:', chatRoom);
+          logger.info('채팅방 생성 완료', { chatRoom });
         }
 
         // 양쪽에 매칭 성사 알림 (DB)
@@ -292,7 +284,7 @@ export default function ProfileDetailPage() {
         }, 2000);
       }
     } catch (error: any) {
-      console.error('매칭 요청 실패:', error);
+      logger.error('매칭 요청 실패', error);
       alert('매칭 요청에 실패했습니다: ' + (error?.message || '알 수 없는 오류'));
     }
   };

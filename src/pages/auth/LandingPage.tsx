@@ -10,8 +10,12 @@ export default function LandingPage() {
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-6">
             <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl">
-                <i className="ri-heart-fill text-white text-4xl"></i>
+              <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-2xl">
+                <img
+                  src="/image/icon.png"
+                  alt="Attract Logo"
+                  className="w-16 h-16 object-contain"
+                />
               </div>
               <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white"></div>
             </div>
