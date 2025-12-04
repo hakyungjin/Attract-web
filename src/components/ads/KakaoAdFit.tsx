@@ -17,6 +17,14 @@ interface KakaoAdFitProps {
  * 예시:
  * <KakaoAdFit unit="DAN-XXXXXXXXXX" width={320} height={100} />
  */
+/**
+ * 카카오 애드핏 광고 컴포넌트
+ * 
+ * @param unit - 카카오 애드핏 광고 단위 ID (예: "DAN-XXXXXXXXXX")
+ * @param width - 광고 너비 (기본값: 320)
+ * @param height - 광고 높이 (기본값: 100)
+ * @param className - 추가 CSS 클래스
+ */
 export default function KakaoAdFit({ 
   unit, 
   width = 320, 
@@ -27,21 +35,40 @@ export default function KakaoAdFit({
   const isLoaded = useRef(false);
 
   useEffect(() => {
+    // 광고 단위 ID가 없으면 스킵
+    if (!unit) return;
+
     // 이미 로드된 경우 스킵
     if (isLoaded.current) return;
 
+    // 카카오 애드핏 스크립트 로드
     const script = document.createElement('script');
     script.src = 'https://t1.daumcdn.net/kas/static/ba.min.js';
     script.async = true;
 
     script.onload = () => {
       isLoaded.current = true;
+      
+      // 스크립트 로드 후 광고 영역 표시
+      if (adRef.current) {
+        adRef.current.style.display = 'block';
+      }
+    };
+
+    script.onerror = () => {
+      console.error('카카오 애드핏 스크립트 로드 실패');
     };
 
     // 스크립트가 이미 있는지 확인
     const existingScript = document.querySelector('script[src="https://t1.daumcdn.net/kas/static/ba.min.js"]');
     if (!existingScript) {
       document.head.appendChild(script);
+    } else {
+      // 이미 스크립트가 있으면 바로 표시
+      isLoaded.current = true;
+      if (adRef.current) {
+        adRef.current.style.display = 'block';
+      }
     }
 
     return () => {
@@ -50,14 +77,19 @@ export default function KakaoAdFit({
         adRef.current.innerHTML = '';
       }
     };
-  }, []);
+  }, [unit]);
+
+  // 광고 단위 ID가 없으면 null 반환
+  if (!unit) {
+    return null;
+  }
 
   return (
     <div className={`flex justify-center ${className}`}>
       <ins
         ref={adRef as any}
         className="kakao_ad_area"
-        style={{ display: 'none' }}
+        style={{ display: 'none', width: `${width}px`, height: `${height}px` }}
         data-ad-unit={unit}
         data-ad-width={width.toString()}
         data-ad-height={height.toString()}

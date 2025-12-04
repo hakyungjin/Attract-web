@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Supabase Edge Function URL
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/confirm-payment`;
 
 export default function PaymentSuccessPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [isProcessing, setIsProcessing] = useState(true);
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
 
   useEffect(() => {
+    /**
+     * 결제 승인 처리 함수
+     * Supabase Edge Function을 호출하여 결제를 승인하고 코인을 충전합니다.
+     */
     const confirmPayment = async () => {
       const orderId = searchParams.get('orderId');
       const paymentKey = searchParams.get('paymentKey');
@@ -21,26 +30,39 @@ export default function PaymentSuccessPage() {
         return;
       }
 
+      if (!user?.id) {
+        alert('로그인이 필요합니다.');
+        navigate('/login');
+        return;
+      }
+
       try {
         // localStorage에서 패키지 정보 가져오기
         const coins = parseInt(localStorage.getItem('selectedCoins') || '0');
+        const bonusCoins = parseInt(localStorage.getItem('selectedBonusCoins') || '0');
+        const packageId = localStorage.getItem('selectedPackageId') || '';
+        const packageName = localStorage.getItem('selectedPackageName') || '';
 
-        // TODO: 실제로는 로그인한 사용자 ID를 사용해야 함
-        const userId = localStorage.getItem('userId') || 'temp-user-id';
+        // Supabase Edge Function 호출하여 결제 승인
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
 
-        // 백엔드 API 호출하여 결제 승인
-        const response = await fetch(`${API_URL}/api/payment/confirm`, {
+        const response = await fetch(EDGE_FUNCTION_URL, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             orderId,
             paymentKey,
             amount: parseInt(amount),
-            userId,
-            coins
-          })
+            userId: user.id,
+            coins,
+            bonusCoins,
+            packageId,
+            packageName,
+          }),
         });
 
         const data = await response.json();
@@ -61,6 +83,8 @@ export default function PaymentSuccessPage() {
         // localStorage 정리
         localStorage.removeItem('selectedPackageId');
         localStorage.removeItem('selectedCoins');
+        localStorage.removeItem('selectedBonusCoins');
+        localStorage.removeItem('selectedPackageName');
 
         setIsProcessing(false);
       } catch (error: any) {
@@ -72,7 +96,7 @@ export default function PaymentSuccessPage() {
     };
 
     confirmPayment();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, user]);
 
   if (isProcessing) {
     return (
@@ -111,7 +135,7 @@ export default function PaymentSuccessPage() {
             {/* 충전된 자석 표시 */}
             <div className="flex items-center justify-center mb-6 pb-6 border-b border-gray-200">
               <img
-                src="/images/magnet.png"
+                src="/image/magnet.png"
                 alt="자석"
                 className="w-12 h-12 mr-3"
               />
@@ -137,7 +161,7 @@ export default function PaymentSuccessPage() {
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">현재 보유 자석</span>
                 <div className="flex items-center space-x-2">
-                  <img src="/images/magnet.png" alt="자석" className="w-5 h-5" />
+                  <img src="/image/magnet.png" alt="자석" className="w-5 h-5" />
                   <span className="text-gray-900 font-bold text-lg">
                     {paymentInfo.currentCoins?.toLocaleString() || 0}
                   </span>

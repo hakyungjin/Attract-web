@@ -1,64 +1,91 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CoinPackage {
   id: string;
+  name?: string;
   coins: number;
   price: number;
+  bonus_coins?: number;
   bonus?: number;
+  is_popular?: boolean;
   popular?: boolean;
 }
 
-// 토스페이먼츠 클라이언트 키 (테스트용)
-const TOSS_CLIENT_KEY = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+// 토스페이먼츠 클라이언트 키 (환경 변수에서 가져오기)
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
 
 export default function CoinShopPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'TRANSFER' | '토스페이'>('토스페이');
   const [tossPayments, setTossPayments] = useState<any>(null);
+  const [coinPackages, setCoinPackages] = useState<CoinPackage[]>([]);
+  const [userCoins, setUserCoins] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
 
-  const coinPackages: CoinPackage[] = [
-    {
-      id: 'basic',
-      coins: 50,
-      price: 5000
-    },
-    {
-      id: 'standard',
-      coins: 100,
-      price: 9000,
-      bonus: 10
-    },
-    {
-      id: 'premium',
-      coins: 300,
-      price: 25000,
-      bonus: 50,
-      popular: true
-    },
-    {
-      id: 'vip',
-      coins: 500,
-      price: 40000,
-      bonus: 100
-    },
-    {
-      id: 'mega',
-      coins: 1000,
-      price: 75000,
-      bonus: 250
-    },
-    {
-      id: 'ultra',
-      coins: 2000,
-      price: 140000,
-      bonus: 600
-    }
-  ];
+  // 코인 패키지 및 사용자 코인 로드
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // 코인 패키지 가져오기
+        const { data: packages, error: packagesError } = await supabase
+          .from('coin_packages')
+          .select('*')
+          .order('display_order', { ascending: true });
+
+        if (packagesError) {
+          console.error('코인 패키지 로드 실패:', packagesError);
+          // 기본 패키지 사용
+          setCoinPackages([
+            { id: 'basic', coins: 50, price: 5000 },
+            { id: 'standard', coins: 100, price: 9000, bonus: 10 },
+            { id: 'premium', coins: 300, price: 25000, bonus: 50, popular: true },
+            { id: 'vip', coins: 500, price: 40000, bonus: 100 },
+            { id: 'mega', coins: 1000, price: 75000, bonus: 250 },
+            { id: 'ultra', coins: 2000, price: 140000, bonus: 600 },
+          ]);
+        } else if (packages && packages.length > 0) {
+          // 데이터베이스에서 가져온 패키지 변환
+          const formattedPackages = packages.map((pkg: any) => ({
+            id: pkg.id.toString(),
+            name: pkg.name,
+            coins: pkg.coins,
+            price: pkg.price,
+            bonus_coins: pkg.bonus_coins,
+            bonus: pkg.bonus_coins,
+            is_popular: pkg.is_popular,
+            popular: pkg.is_popular,
+          }));
+          setCoinPackages(formattedPackages);
+        }
+
+        // 사용자 코인 가져오기
+        if (user?.id) {
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('coins')
+            .eq('id', user.id)
+            .single();
+
+          if (!userError && userData) {
+            setUserCoins(userData.coins || 0);
+          }
+        }
+      } catch (error) {
+        console.error('데이터 로드 실패:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   // 토스페이먼츠 SDK 초기화
   useEffect(() => {
@@ -78,33 +105,47 @@ export default function CoinShopPage() {
     setShowPaymentModal(true);
   };
 
+  /**
+   * 결제 처리 함수
+   * Toss Payments를 통해 결제를 요청합니다.
+   */
   const handlePayment = async () => {
     if (!selectedPackage || !tossPayments) return;
+    
+    if (!user?.id) {
+      alert('로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
 
     try {
-      // 주문 ID 생성 (실제로는 서버에서 생성해야 함)
+      // 주문 ID 생성 (고유한 ID 생성)
       const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      const orderName = `자석 ${selectedPackage.coins}개${selectedPackage.bonus ? ` (+${selectedPackage.bonus} 보너스)` : ''}`;
-
+      
       // 총 코인 계산 (기본 + 보너스)
-      const totalCoins = selectedPackage.coins + (selectedPackage.bonus || 0);
+      const bonusCoins = selectedPackage.bonus_coins || selectedPackage.bonus || 0;
+      const totalCoins = selectedPackage.coins + bonusCoins;
+      
+      const orderName = `자석 ${selectedPackage.coins}개${bonusCoins > 0 ? ` (+${bonusCoins} 보너스)` : ''}`;
 
       // localStorage에 패키지 정보 저장 (결제 완료 후 사용)
       localStorage.setItem('selectedPackageId', selectedPackage.id);
       localStorage.setItem('selectedCoins', totalCoins.toString());
+      localStorage.setItem('selectedBonusCoins', bonusCoins.toString());
+      localStorage.setItem('selectedPackageName', selectedPackage.name || orderName);
 
       // 결제 위젯 실행
       await tossPayments.requestPayment(paymentMethod, {
         amount: selectedPackage.price,
         orderId: orderId,
         orderName: orderName,
-        successUrl: `${window.location.origin}/payment/success`,
+        successUrl: `${window.location.origin}/payment/success?orderId=${orderId}`,
         failUrl: `${window.location.origin}/payment/fail`,
-        customerName: '사용자', // 실제로는 로그인한 사용자 정보 사용
+        customerName: user.name || '사용자',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('결제 요청 실패:', error);
-      alert('결제 요청에 실패했습니다. 다시 시도해주세요.');
+      alert(error.message || '결제 요청에 실패했습니다. 다시 시도해주세요.');
     }
   };
 
@@ -133,7 +174,9 @@ export default function CoinShopPage() {
             alt="자석"
             className="w-8 h-8"
           />
-          <span className="text-4xl font-bold text-gray-900">150</span>
+          <span className="text-4xl font-bold text-gray-900">
+            {loading ? '...' : userCoins.toLocaleString()}
+          </span>
         </div>
       </div>
 
@@ -165,13 +208,13 @@ export default function CoinShopPage() {
                     <span className="text-2xl font-bold text-gray-900">
                       {pkg.coins.toLocaleString()}
                     </span>
-                    {pkg.bonus && (
+                    {(pkg.bonus || pkg.bonus_coins) && (
                       <span className="text-sm font-medium text-pink-500">
-                        +{pkg.bonus}
+                        +{pkg.bonus_coins || pkg.bonus}
                       </span>
                     )}
                   </div>
-                  {pkg.popular && (
+                  {(pkg.popular || pkg.is_popular) && (
                     <span className="text-xs font-medium text-pink-500">인기</span>
                   )}
                 </div>
@@ -217,8 +260,10 @@ export default function CoinShopPage() {
                       <div className="text-sm text-gray-600 mb-1">자석</div>
                       <div className="text-2xl font-bold text-gray-900">
                         {selectedPackage.coins.toLocaleString()}
-                        {selectedPackage.bonus && (
-                          <span className="text-base text-pink-500 ml-1">+{selectedPackage.bonus}</span>
+                        {(selectedPackage.bonus || selectedPackage.bonus_coins) && (
+                          <span className="text-base text-pink-500 ml-1">
+                            +{selectedPackage.bonus_coins || selectedPackage.bonus}
+                          </span>
                         )}
                       </div>
                     </div>

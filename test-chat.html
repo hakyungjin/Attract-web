@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>채팅방 시스템 디버깅</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .section {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .section h3 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #555;
+      font-size: 13px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e1e5eb;
+      border-radius: 10px;
+      font-size: 14px;
+      margin-bottom: 15px;
+      transition: border-color 0.3s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    .btn-secondary {
+      background: #e1e5eb;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+    .btn-warning {
+      background: #f59e0b;
+      color: white;
+    }
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+    .status {
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      font-size: 13px;
+    }
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+    .status.info {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+    }
+    .status.warning {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fcd34d;
+    }
+    .log-container {
+      background: #1a1a2e;
+      border-radius: 10px;
+      padding: 15px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      padding: 5px 0;
+      border-bottom: 1px solid #2d2d44;
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .log-time {
+      color: #6b7280;
+    }
+    .log-type {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      margin: 0 5px;
+    }
+    .log-type.info { background: #3b82f6; color: white; }
+    .log-type.success { background: #10b981; color: white; }
+    .log-type.error { background: #ef4444; color: white; }
+    .log-type.realtime { background: #8b5cf6; color: white; }
+    .log-type.warning { background: #f59e0b; color: white; }
+    .log-message {
+      color: #e5e7eb;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+    }
+    .message-list {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .message-item {
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .message-sent {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-left: 50px;
+    }
+    .message-received {
+      background: #f3f4f6;
+      color: #333;
+      margin-right: 50px;
+    }
+    .realtime-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .realtime-indicator.connected {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .realtime-indicator.disconnected {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    .pulse.green { background: #10b981; }
+    .pulse.red { background: #ef4444; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .room-card {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 10px;
+      border: 2px solid #e1e5eb;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .room-card:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+    }
+    .room-card.selected {
+      border-color: #667eea;
+      background: #f0f4ff;
+    }
+    .room-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge.active { background: #d1fae5; color: #065f46; }
+    .badge.inactive { background: #fee2e2; color: #991b1b; }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: #e1e5eb;
+      color: #333;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+    .tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    code {
+      font-size: 11px;
+      background: #e1e5eb;
+      padding: 2px 6px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💬 채팅방 시스템 디버깅</h1>
+    <p class="subtitle">매칭 → 채팅방 생성 → 메시지 전송 플로우를 테스트합니다</p>
+
+    <!-- 연결 상태 -->
+    <div class="section">
+      <h3>📡 Supabase 연결</h3>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div id="connectionStatus" class="realtime-indicator disconnected">
+          <span class="pulse red"></span>
+          <span>연결 중...</span>
+        </div>
+        <div id="realtimeStatus" class="realtime-indicator disconnected">
+          <span class="pulse red"></span>
+          <span>실시간 대기</span>
+        </div>
+      </div>
+      <div style="margin-top: 15px;">
+        <div class="grid-2">
+          <div>
+            <label>Supabase URL</label>
+            <input type="text" id="supabaseUrl" value="https://ytffobltrwkgxiedorsd.supabase.co" />
+          </div>
+          <div>
+            <label>Supabase Anon Key</label>
+            <input type="text" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+          </div>
+        </div>
+        <button class="btn-primary" onclick="initSupabase()">🔌 연결</button>
+        <button class="btn-secondary" onclick="loadUsers()">👥 사용자 조회</button>
+      </div>
+      <div id="userList" class="status info" style="display:none;"></div>
+    </div>
+
+    <!-- 탭 메뉴 -->
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('matching')">🎯 매칭 테스트</div>
+      <div class="tab" onclick="showTab('chatroom')">🏠 채팅방</div>
+      <div class="tab" onclick="showTab('message')">✉️ 메시지</div>
+    </div>
+
+    <!-- 매칭 테스트 탭 -->
+    <div id="tab-matching" class="tab-content active">
+      <div class="section">
+        <h3>🎯 매칭 요청 테스트</h3>
+        <p style="color: #666; font-size: 13px; margin-bottom: 15px;">
+          매칭이 수락되면 자동으로 채팅방이 생성됩니다.
+        </p>
+        <div class="grid-2">
+          <div>
+            <label>요청자 ID (from_user_id)</label>
+            <input type="text" id="fromUserId" placeholder="요청 보내는 사람 ID" />
+          </div>
+          <div>
+            <label>수신자 ID (to_user_id)</label>
+            <input type="text" id="toUserId" placeholder="요청 받는 사람 ID" />
+          </div>
+        </div>
+        <button class="btn-primary" onclick="createMatchingRequest()">💌 매칭 요청 생성</button>
+        <button class="btn-secondary" onclick="loadMatchingRequests()">📋 요청 목록 조회</button>
+        <div id="matchingResult"></div>
+        <div id="matchingList" style="margin-top: 15px;"></div>
+      </div>
+
+      <div class="section">
+        <h3>✅ 매칭 수락/거절</h3>
+        <div class="grid-2">
+          <div>
+            <label>매칭 요청 ID</label>
+            <input type="text" id="matchingRequestId" placeholder="매칭 요청 UUID" />
+          </div>
+          <div>
+            <label>상태 변경</label>
+            <select id="matchingStatus">
+              <option value="accepted">✅ 수락 (accepted)</option>
+              <option value="rejected">❌ 거절 (rejected)</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-success" onclick="updateMatchingStatus()">🔄 상태 변경</button>
+        <div id="matchingUpdateResult"></div>
+      </div>
+    </div>
+
+    <!-- 채팅방 탭 -->
+    <div id="tab-chatroom" class="tab-content">
+      <div class="section">
+        <h3>🏠 채팅방 조회</h3>
+        <div>
+          <label>사용자 ID (내 ID)</label>
+          <input type="text" id="myUserId" placeholder="내 사용자 ID" />
+        </div>
+        <button class="btn-primary" onclick="loadChatRooms()">🔍 내 채팅방 조회</button>
+        <button class="btn-secondary" onclick="loadAllChatRooms()">📋 전체 채팅방 조회</button>
+        <div id="chatRoomList" style="margin-top: 15px;"></div>
+      </div>
+
+      <div class="section">
+        <h3>🔗 두 사용자 간 채팅방 확인</h3>
+        <div class="grid-2">
+          <div>
+            <label>사용자 1 ID</label>
+            <input type="text" id="checkUser1" placeholder="첫 번째 사용자 ID" />
+          </div>
+          <div>
+            <label>사용자 2 ID</label>
+            <input type="text" id="checkUser2" placeholder="두 번째 사용자 ID" />
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="checkChatRoomExists()">🔍 채팅방 존재 확인</button>
+        <div id="chatRoomCheckResult"></div>
+      </div>
+
+      <div class="section">
+        <h3>➕ 채팅방 수동 생성 (테스트용)</h3>
+        <div class="grid-2">
+          <div>
+            <label>사용자 1 ID</label>
+            <input type="text" id="createUser1" placeholder="첫 번째 사용자 ID" />
+          </div>
+          <div>
+            <label>사용자 2 ID</label>
+            <input type="text" id="createUser2" placeholder="두 번째 사용자 ID" />
+          </div>
+        </div>
+        <button class="btn-warning" onclick="createChatRoomManually()">🏠 채팅방 생성</button>
+        <div id="createRoomResult"></div>
+      </div>
+    </div>
+
+    <!-- 메시지 탭 -->
+    <div id="tab-message" class="tab-content">
+      <div class="section">
+        <h3>✉️ 메시지 전송</h3>
+        <div class="grid-3">
+          <div>
+            <label>채팅방 ID (room_id)</label>
+            <input type="text" id="roomId" placeholder="채팅방 UUID" />
+          </div>
+          <div>
+            <label>발신자 ID (sender_id)</label>
+            <input type="text" id="senderId" placeholder="보내는 사람 ID" />
+          </div>
+          <div>
+            <label>수신자 ID (recipient_id)</label>
+            <input type="text" id="recipientId" placeholder="받는 사람 ID" />
+          </div>
+        </div>
+        <label>메시지 내용</label>
+        <textarea id="messageContent" rows="3" placeholder="안녕하세요! 테스트 메시지입니다."></textarea>
+        <button class="btn-success" onclick="sendMessage()">📤 메시지 전송</button>
+        <button class="btn-secondary" onclick="loadMessages()">📥 메시지 조회</button>
+        <div id="sendResult"></div>
+      </div>
+
+      <div class="section">
+        <h3>📋 메시지 목록</h3>
+        <div id="messageList" class="message-list">
+          <p style="color: #999; text-align: center;">채팅방 ID를 입력하고 메시지를 조회하세요</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 실시간 구독 -->
+    <div class="section">
+      <h3>🔴 실시간 구독</h3>
+      <button class="btn-primary" onclick="subscribeToAll()">📡 전체 구독</button>
+      <button class="btn-danger" onclick="unsubscribeAll()">🔇 구독 해제</button>
+    </div>
+
+    <!-- 로그 -->
+    <div class="section">
+      <h3>📝 디버그 로그</h3>
+      <button class="btn-secondary" onclick="clearLogs()">🗑️ 로그 지우기</button>
+      <div id="logContainer" class="log-container">
+        <div class="log-entry">
+          <span class="log-time">[시작]</span>
+          <span class="log-type info">INFO</span>
+          <span class="log-message">채팅방 시스템 디버깅 페이지 로드됨</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let supabase = null;
+    let subscriptions = [];
+
+    // ==========================================
+    // 유틸리티 함수
+    // ==========================================
+
+    function addLog(type, message) {
+      const container = document.getElementById('logContainer');
+      const time = new Date().toLocaleTimeString('ko-KR');
+      const typeClass = type.toLowerCase();
+      
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <span class="log-time">[${time}]</span>
+        <span class="log-type ${typeClass}">${type.toUpperCase()}</span>
+        <span class="log-message">${message}</span>
+      `;
+      container.appendChild(entry);
+      container.scrollTop = container.scrollHeight;
+      console.log(`[${type}] ${message}`);
+    }
+
+    function clearLogs() {
+      document.getElementById('logContainer').innerHTML = '';
+      addLog('info', '로그가 지워졌습니다.');
+    }
+
+    function showTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    // ==========================================
+    // Supabase 연결
+    // ==========================================
+
+    async function initSupabase() {
+      const url = document.getElementById('supabaseUrl').value;
+      const key = document.getElementById('supabaseKey').value;
+
+      if (!url || !key) {
+        addLog('error', 'Supabase URL과 Anon Key를 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', 'Supabase 연결 시도 중...');
+        supabase = window.supabase.createClient(url, key);
+        
+        const { data, error } = await supabase.from('users').select('count').limit(1);
+        if (error) throw error;
+
+        document.getElementById('connectionStatus').className = 'realtime-indicator connected';
+        document.getElementById('connectionStatus').innerHTML = `
+          <span class="pulse green"></span>
+          <span>연결됨 ✓</span>
+        `;
+        
+        addLog('success', 'Supabase 연결 성공!');
+      } catch (error) {
+        addLog('error', `연결 실패: ${error.message}`);
+        document.getElementById('connectionStatus').className = 'realtime-indicator disconnected';
+        document.getElementById('connectionStatus').innerHTML = `
+          <span class="pulse red"></span>
+          <span>연결 실패</span>
+        `;
+      }
+    }
+
+    // ==========================================
+    // 사용자 조회
+    // ==========================================
+
+    async function loadUsers() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '사용자 목록 조회 중...');
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, name, gender, phone_number')
+          .limit(15);
+
+        if (error) throw error;
+
+        const userList = document.getElementById('userList');
+        userList.style.display = 'block';
+        
+        if (data.length === 0) {
+          userList.innerHTML = '등록된 사용자가 없습니다.';
+        } else {
+          userList.innerHTML = '<strong>👥 사용자 목록 (클릭하여 복사):</strong><br><br>' + 
+            data.map(u => `
+              <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 8px;">
+                <strong>${u.name || '이름없음'}</strong> 
+                <span style="color: #666;">(${u.gender || '미지정'})</span>
+                <br>
+                <code onclick="navigator.clipboard.writeText('${u.id}'); addLog('info', 'ID 복사됨: ${u.id.substring(0,8)}...')" 
+                      style="cursor: pointer;" title="클릭하여 복사">${u.id}</code>
+              </div>
+            `).join('');
+        }
+        
+        addLog('success', `${data.length}명의 사용자를 조회했습니다.`);
+      } catch (error) {
+        addLog('error', `사용자 조회 실패: ${error.message}`);
+      }
+    }
+
+    // ==========================================
+    // 매칭 요청
+    // ==========================================
+
+    async function createMatchingRequest() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const fromUserId = document.getElementById('fromUserId').value;
+      const toUserId = document.getElementById('toUserId').value;
+
+      if (!fromUserId || !toUserId) {
+        addLog('error', '요청자 ID와 수신자 ID를 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '매칭 요청 생성 중...');
+        
+        const { data, error } = await supabase
+          .from('matching_requests')
+          .insert({
+            from_user_id: fromUserId,
+            to_user_id: toUserId,
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        document.getElementById('matchingResult').innerHTML = `
+          <div class="status success">
+            ✅ 매칭 요청 생성 성공!<br>
+            요청 ID: <code>${data.id}</code><br>
+            상태: ${data.status}
+          </div>
+        `;
+        
+        // 매칭 요청 ID 자동 입력
+        document.getElementById('matchingRequestId').value = data.id;
+        
+        addLog('success', `매칭 요청 생성 완료! ID: ${data.id}`);
+      } catch (error) {
+        document.getElementById('matchingResult').innerHTML = `
+          <div class="status error">❌ 실패: ${error.message}</div>
+        `;
+        addLog('error', `매칭 요청 실패: ${error.message}`);
+      }
+    }
+
+    async function loadMatchingRequests() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '매칭 요청 목록 조회 중...');
+        
+        const { data, error } = await supabase
+          .from('matching_requests')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+
+        const list = document.getElementById('matchingList');
+        
+        if (data.length === 0) {
+          list.innerHTML = '<div class="status info">매칭 요청이 없습니다.</div>';
+        } else {
+          list.innerHTML = data.map(req => `
+            <div class="room-card" onclick="document.getElementById('matchingRequestId').value='${req.id}'">
+              <div class="room-info">
+                <div>
+                  <strong>ID:</strong> <code>${req.id.substring(0, 8)}...</code><br>
+                  <small>from: ${req.from_user_id.substring(0, 8)}... → to: ${req.to_user_id.substring(0, 8)}...</small>
+                </div>
+                <span class="badge ${req.status === 'accepted' ? 'active' : req.status === 'pending' ? '' : 'inactive'}" 
+                      style="${req.status === 'pending' ? 'background: #fef3c7; color: #92400e;' : ''}">
+                  ${req.status}
+                </span>
+              </div>
+            </div>
+          `).join('');
+        }
+        
+        addLog('success', `${data.length}개의 매칭 요청을 조회했습니다.`);
+      } catch (error) {
+        addLog('error', `매칭 요청 조회 실패: ${error.message}`);
+      }
+    }
+
+    async function updateMatchingStatus() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const requestId = document.getElementById('matchingRequestId').value;
+      const status = document.getElementById('matchingStatus').value;
+
+      if (!requestId) {
+        addLog('error', '매칭 요청 ID를 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', `매칭 상태를 "${status}"로 변경 중...`);
+        
+        const { data, error } = await supabase
+          .from('matching_requests')
+          .update({ status: status, updated_at: new Date().toISOString() })
+          .eq('id', requestId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        document.getElementById('matchingUpdateResult').innerHTML = `
+          <div class="status success">
+            ✅ 상태 변경 성공! → ${status}<br>
+            ${status === 'accepted' ? '🏠 채팅방이 자동으로 생성되었을 수 있습니다!' : ''}
+          </div>
+        `;
+        
+        addLog('success', `매칭 상태 변경 완료: ${status}`);
+        
+        if (status === 'accepted') {
+          addLog('info', '채팅방 탭에서 생성된 채팅방을 확인하세요!');
+        }
+      } catch (error) {
+        document.getElementById('matchingUpdateResult').innerHTML = `
+          <div class="status error">❌ 실패: ${error.message}</div>
+        `;
+        addLog('error', `상태 변경 실패: ${error.message}`);
+      }
+    }
+
+    // ==========================================
+    // 채팅방
+    // ==========================================
+
+    async function loadChatRooms() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const myUserId = document.getElementById('myUserId').value;
+
+      if (!myUserId) {
+        addLog('error', '내 사용자 ID를 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '내 채팅방 조회 중...');
+        
+        const { data, error } = await supabase
+          .from('chat_rooms')
+          .select('*')
+          .or(`user1_id.eq.${myUserId},user2_id.eq.${myUserId}`)
+          .order('last_message_at', { ascending: false, nullsFirst: false });
+
+        if (error) throw error;
+
+        displayChatRooms(data, myUserId);
+        addLog('success', `${data.length}개의 채팅방을 조회했습니다.`);
+      } catch (error) {
+        addLog('error', `채팅방 조회 실패: ${error.message}`);
+      }
+    }
+
+    async function loadAllChatRooms() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '전체 채팅방 조회 중...');
+        
+        const { data, error } = await supabase
+          .from('chat_rooms')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+
+        displayChatRooms(data, null);
+        addLog('success', `${data.length}개의 채팅방을 조회했습니다.`);
+      } catch (error) {
+        addLog('error', `채팅방 조회 실패: ${error.message}`);
+      }
+    }
+
+    function displayChatRooms(rooms, myUserId) {
+      const list = document.getElementById('chatRoomList');
+      
+      if (rooms.length === 0) {
+        list.innerHTML = '<div class="status warning">채팅방이 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = rooms.map(room => {
+        const partnerId = myUserId 
+          ? (room.user1_id === myUserId ? room.user2_id : room.user1_id)
+          : null;
+        
+        return `
+          <div class="room-card" onclick="selectChatRoom('${room.id}', '${room.user1_id}', '${room.user2_id}')">
+            <div class="room-info">
+              <div>
+                <strong>Room:</strong> <code>${room.id.substring(0, 8)}...</code><br>
+                <small>
+                  User1: ${room.user1_id.substring(0, 8)}...<br>
+                  User2: ${room.user2_id.substring(0, 8)}...
+                </small>
+                ${room.last_message ? `<br><em style="color: #666;">"${room.last_message.substring(0, 30)}..."</em>` : ''}
+              </div>
+              <span class="badge ${room.is_active !== false ? 'active' : 'inactive'}">
+                ${room.is_active !== false ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectChatRoom(roomId, user1Id, user2Id) {
+      document.getElementById('roomId').value = roomId;
+      document.getElementById('senderId').value = user1Id;
+      document.getElementById('recipientId').value = user2Id;
+      
+      // 메시지 탭으로 이동
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab')[2].classList.add('active');
+      document.getElementById('tab-message').classList.add('active');
+      
+      addLog('info', `채팅방 선택됨: ${roomId.substring(0, 8)}...`);
+      loadMessages();
+    }
+
+    async function checkChatRoomExists() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const user1 = document.getElementById('checkUser1').value;
+      const user2 = document.getElementById('checkUser2').value;
+
+      if (!user1 || !user2) {
+        addLog('error', '두 사용자 ID를 모두 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '채팅방 존재 여부 확인 중...');
+        
+        const { data, error } = await supabase
+          .from('chat_rooms')
+          .select('*')
+          .or(`and(user1_id.eq.${user1},user2_id.eq.${user2}),and(user1_id.eq.${user2},user2_id.eq.${user1})`)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        const result = document.getElementById('chatRoomCheckResult');
+        
+        if (data) {
+          result.innerHTML = `
+            <div class="status success">
+              ✅ 채팅방이 존재합니다!<br>
+              Room ID: <code>${data.id}</code><br>
+              상태: ${data.is_active !== false ? '활성' : '비활성'}
+            </div>
+          `;
+          addLog('success', `채팅방 존재: ${data.id}`);
+        } else {
+          result.innerHTML = `
+            <div class="status warning">
+              ⚠️ 채팅방이 없습니다.<br>
+              매칭이 수락되어야 채팅방이 생성됩니다.
+            </div>
+          `;
+          addLog('warning', '채팅방이 존재하지 않습니다.');
+        }
+      } catch (error) {
+        addLog('error', `확인 실패: ${error.message}`);
+      }
+    }
+
+    async function createChatRoomManually() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const user1 = document.getElementById('createUser1').value;
+      const user2 = document.getElementById('createUser2').value;
+
+      if (!user1 || !user2) {
+        addLog('error', '두 사용자 ID를 모두 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '채팅방 수동 생성 중...');
+        
+        const { data, error } = await supabase
+          .from('chat_rooms')
+          .insert({
+            user1_id: user1,
+            user2_id: user2,
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        document.getElementById('createRoomResult').innerHTML = `
+          <div class="status success">
+            ✅ 채팅방 생성 성공!<br>
+            Room ID: <code>${data.id}</code>
+          </div>
+        `;
+        
+        addLog('success', `채팅방 생성 완료: ${data.id}`);
+      } catch (error) {
+        document.getElementById('createRoomResult').innerHTML = `
+          <div class="status error">❌ 실패: ${error.message}</div>
+        `;
+        addLog('error', `채팅방 생성 실패: ${error.message}`);
+      }
+    }
+
+    // ==========================================
+    // 메시지
+    // ==========================================
+
+    async function sendMessage() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const roomId = document.getElementById('roomId').value;
+      const senderId = document.getElementById('senderId').value;
+      const recipientId = document.getElementById('recipientId').value;
+      const content = document.getElementById('messageContent').value;
+
+      if (!roomId || !senderId || !recipientId || !content) {
+        addLog('error', '모든 필드를 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '메시지 전송 중...');
+        
+        const { data, error } = await supabase
+          .from('messages')
+          .insert({
+            room_id: roomId,
+            sender_id: senderId,
+            recipient_id: recipientId,
+            content: content,
+            is_read: false
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        document.getElementById('sendResult').innerHTML = `
+          <div class="status success">
+            ✅ 메시지 전송 성공!<br>
+            ID: ${data.id}
+          </div>
+        `;
+        
+        document.getElementById('messageContent').value = '';
+        addLog('success', `메시지 전송 성공! ID: ${data.id}`);
+        loadMessages();
+      } catch (error) {
+        document.getElementById('sendResult').innerHTML = `
+          <div class="status error">
+            ❌ 전송 실패: ${error.message}<br>
+            <small>채팅방이 존재하고 활성화되어 있는지 확인하세요.</small>
+          </div>
+        `;
+        addLog('error', `메시지 전송 실패: ${error.message}`);
+      }
+    }
+
+    async function loadMessages() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      const roomId = document.getElementById('roomId').value;
+      const senderId = document.getElementById('senderId').value;
+
+      if (!roomId) {
+        addLog('error', '채팅방 ID를 입력해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '메시지 목록 조회 중...');
+        
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('room_id', roomId)
+          .order('created_at', { ascending: true })
+          .limit(50);
+
+        if (error) throw error;
+
+        const messageList = document.getElementById('messageList');
+        
+        if (data.length === 0) {
+          messageList.innerHTML = '<p style="color: #999; text-align: center;">메시지가 없습니다. 첫 메시지를 보내보세요!</p>';
+        } else {
+          messageList.innerHTML = data.map(msg => `
+            <div class="message-item ${msg.sender_id === senderId ? 'message-sent' : 'message-received'}">
+              <strong>${msg.sender_id === senderId ? '나' : '상대방'}:</strong> ${msg.content}
+              <div style="font-size: 10px; opacity: 0.7; margin-top: 5px;">
+                ${new Date(msg.created_at).toLocaleString('ko-KR')} 
+                ${msg.is_read ? '✓ 읽음' : ''}
+              </div>
+            </div>
+          `).join('');
+        }
+        
+        addLog('success', `${data.length}개의 메시지를 조회했습니다.`);
+      } catch (error) {
+        addLog('error', `메시지 조회 실패: ${error.message}`);
+      }
+    }
+
+    // ==========================================
+    // 실시간 구독
+    // ==========================================
+
+    async function subscribeToAll() {
+      if (!supabase) {
+        addLog('error', '먼저 Supabase를 연결해주세요.');
+        return;
+      }
+
+      try {
+        addLog('info', '실시간 구독 시작...');
+
+        // 메시지 구독
+        const msgSub = supabase
+          .channel('debug-messages')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+            addLog('realtime', `📨 Messages ${payload.eventType}: ID=${payload.new?.id || payload.old?.id}`);
+          })
+          .subscribe();
+
+        // 채팅방 구독
+        const roomSub = supabase
+          .channel('debug-rooms')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, (payload) => {
+            addLog('realtime', `🏠 Chat Room ${payload.eventType}: ID=${payload.new?.id || payload.old?.id}`);
+          })
+          .subscribe();
+
+        // 매칭 요청 구독
+        const matchSub = supabase
+          .channel('debug-matching')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'matching_requests' }, (payload) => {
+            addLog('realtime', `🎯 Matching ${payload.eventType}: ${payload.new?.status || ''}`);
+          })
+          .subscribe();
+
+        subscriptions = [msgSub, roomSub, matchSub];
+
+        document.getElementById('realtimeStatus').className = 'realtime-indicator connected';
+        document.getElementById('realtimeStatus').innerHTML = `
+          <span class="pulse green"></span>
+          <span>구독 중 ✓</span>
+        `;
+
+        addLog('success', '실시간 구독 활성화됨 (messages, chat_rooms, matching_requests)');
+      } catch (error) {
+        addLog('error', `구독 실패: ${error.message}`);
+      }
+    }
+
+    async function unsubscribeAll() {
+      for (const sub of subscriptions) {
+        await sub.unsubscribe();
+      }
+      subscriptions = [];
+
+      document.getElementById('realtimeStatus').className = 'realtime-indicator disconnected';
+      document.getElementById('realtimeStatus').innerHTML = `
+        <span class="pulse red"></span>
+        <span>구독 해제됨</span>
+      `;
+
+      addLog('success', '모든 구독이 해제되었습니다.');
+    }
+
+    // ==========================================
+    // 초기화
+    // ==========================================
+
+    window.addEventListener('load', () => {
+      addLog('info', '📋 테스트 순서:');
+      addLog('info', '1. Supabase 연결 → 사용자 조회');
+      addLog('info', '2. 매칭 요청 생성 → 수락');
+      addLog('info', '3. 채팅방 자동 생성 확인');
+      addLog('info', '4. 메시지 전송 테스트');
+    });
+  </script>
+</body>
+</html>
