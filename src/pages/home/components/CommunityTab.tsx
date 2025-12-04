@@ -49,6 +49,7 @@ export default function CommunityTab() {
   const [isLoading, setIsLoading] = useState(!cachedPosts);
   const [currentUser, setCurrentUser] = useState<any>(undefined); // undefined = 아직 확인 안됨, null = 로그인 안됨
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'latest' | 'views'>('latest'); // 최신순/조회순
   const isLoadingRef = useRef(false); // 중복 로드 방지
 
   // 현재 사용자 정보 가져오기
@@ -266,10 +267,6 @@ export default function CommunityTab() {
     return `${diffInDays}일 전`;
   };
 
-  const filteredPosts = useMemo(
-    () => posts.filter(post => post.category === selectedCategory),
-    [posts, selectedCategory]
-  );
 
   const handleLike = async (postId: number) => {
     if (!currentUser) {
@@ -422,6 +419,17 @@ export default function CommunityTab() {
     }
   };
 
+  // 정렬된 게시글
+  const sortedPosts = useMemo(() => {
+    const categoryPosts = posts.filter(p => p.category === selectedCategory);
+
+    if (sortOrder === 'latest') {
+      return categoryPosts; // 이미 최신순으로 정렬되어 있음
+    } else {
+      return [...categoryPosts].sort((a, b) => (b.views || 0) - (a.views || 0));
+    }
+  }, [posts, selectedCategory, sortOrder]);
+
   if (selectedPost) {
     return (
       <PostDetailPage
@@ -441,18 +449,26 @@ export default function CommunityTab() {
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold font-display text-slate-800 whitespace-nowrap">커뮤니티</h2>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-full">
-            <span className="bg-gradient-to-r from-primary-500 to-primary-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-              TODAY
-            </span>
-            <span className="text-primary-600 font-bold text-sm">30,301</span>
-          </div>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
-            <i className="ri-equalizer-line text-lg text-slate-400 group-hover:text-primary-500 transition-colors"></i>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setSortOrder('latest')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+              sortOrder === 'latest'
+                ? 'bg-cyan-500 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            최신순
           </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
-            <i className="ri-layout-grid-line text-lg text-slate-400 group-hover:text-primary-500 transition-colors"></i>
+          <button
+            onClick={() => setSortOrder('views')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+              sortOrder === 'views'
+                ? 'bg-cyan-500 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            조회순
           </button>
         </div>
       </div>
@@ -494,7 +510,7 @@ export default function CommunityTab() {
         <CommunityListSkeleton />
       ) : (
         <div className="space-y-3">
-          {filteredPosts.map((post) => (
+          {sortedPosts.map((post) => (
             <div
               key={post.id}
               className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary-100 transition-all duration-300"
