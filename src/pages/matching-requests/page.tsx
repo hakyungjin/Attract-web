@@ -119,11 +119,13 @@ export default function MatchingRequestsPage() {
     setIsLoading(true);
 
     try {
+      const currentUserId = String(authUser.id);
+
       // 1. 받은 요청 조회 (pending만)
       const { data: receivedData, error: receivedError } = await supabase
         .from('matching_requests')
         .select('id, from_user_id, status, created_at')
-        .eq('to_user_id', authUser.id)
+        .eq('to_user_id', currentUserId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
@@ -131,7 +133,7 @@ export default function MatchingRequestsPage() {
       const { data: sentData, error: sentError } = await supabase
         .from('matching_requests')
         .select('id, to_user_id, from_user_id, status, created_at')
-        .eq('from_user_id', authUser.id)
+        .eq('from_user_id', currentUserId)
         .order('created_at', { ascending: false });
 
       if (receivedError || sentError) {
@@ -252,11 +254,14 @@ export default function MatchingRequestsPage() {
     if (!selectedUser || !authUser?.id) return;
 
     try {
+      const currentUserId = String(authUser.id);
+      const otherUserId = String(selectedUser.userId);
+
       // 1. 내 코인 잔액 확인
       const { data: userData } = await supabase
         .from('users')
         .select('coins')
-        .eq('id', authUser.id)
+        .eq('id', currentUserId)
         .single();
 
       const myCoins = userData?.coins || 0;
@@ -272,13 +277,46 @@ export default function MatchingRequestsPage() {
       await supabase
         .from('users')
         .update({ coins: myCoins - MATCH_COST })
-        .eq('id', authUser.id);
+        .eq('id', currentUserId);
 
       // 3. 매칭 요청 상태 업데이트
       await supabase
         .from('matching_requests')
         .update({ status: 'accepted' })
         .eq('id', selectedUser.id);
+
+      // 4. 상대방이 나에게 보낸 요청도 있는지 확인하고 업데이트
+      await supabase
+        .from('matching_requests')
+        .update({ status: 'accepted' })
+        .eq('from_user_id', otherUserId)
+        .eq('to_user_id', currentUserId)
+        .eq('status', 'pending');
+
+      // 5. 채팅방 생성 (이미 존재하지 않는 경우만)
+      const { data: existingRoom } = await supabase
+        .from('chat_rooms')
+        .select('id')
+        .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${otherUserId}),and(user1_id.eq.${otherUserId},user2_id.eq.${currentUserId})`)
+        .single();
+
+      if (!existingRoom) {
+        const { data: chatRoom, error: chatError } = await supabase
+          .from('chat_rooms')
+          .insert({
+            user1_id: currentUserId,
+            user2_id: otherUserId,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (chatError) {
+          console.error('채팅방 생성 실패:', chatError);
+        } else {
+          console.log('✅ 채팅방 생성 완료:', chatRoom);
+        }
+      }
 
       // 채팅방 시작 이벤트
       const event = new CustomEvent('openChat', {
