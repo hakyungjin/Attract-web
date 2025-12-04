@@ -1,21 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 
 /**
  * 채팅방 정보 인터페이스
- * chat_rooms 테이블에서 조회한 데이터를 표현
  */
 interface ChatRoom {
-  roomId: string;           // 채팅방 ID
-  partnerId: string;        // 상대방 사용자 ID
-  partnerName: string;      // 상대방 이름
-  partnerAvatar: string;    // 상대방 프로필 이미지
-  partnerGender?: string;   // 상대방 성별
-  lastMessage: string;      // 마지막 메시지
-  lastMessageTime: string;  // 마지막 메시지 시간
-  unreadCount: number;      // 안 읽은 메시지 수
-  isOnline: boolean;        // 온라인 상태 (현재는 항상 true)
+  roomId: string;
+  partnerId: string;
+  partnerName: string;
+  partnerAvatar: string;
+  partnerGender?: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
 }
 
 /**
@@ -31,8 +30,6 @@ interface Message {
 
 /**
  * 기본 프로필 이미지 반환 함수
- * @param gender 성별 ('male' | 'female')
- * @returns 기본 아바타 이미지 URL
  */
 const getDefaultAvatar = (gender?: string) => {
   if (gender === 'male') {
@@ -43,23 +40,23 @@ const getDefaultAvatar = (gender?: string) => {
 
 /**
  * ChatTab 컴포넌트
- * 매칭된 사용자들과의 채팅을 관리하는 메인 컴포넌트
- * - 채팅방 목록 표시
- * - 1:1 채팅 기능
- * - 실시간 메시지 수신
+ * 매칭된 사용자들과의 채팅을 관리
  */
 export default function ChatTab() {
+  const navigate = useNavigate();
   const { user: authUser } = useAuth();
   
-  // 현재 선택된 채팅방 정보
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 채팅방 목록 및 메시지
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 방 나가기 확인 모달 상태
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   /**
    * 메시지 목록이 변경될 때 스크롤을 아래로 이동
@@ -78,7 +75,6 @@ export default function ChatTab() {
     
     loadChatRooms();
     
-    // 실시간 메시지 구독 (새 메시지 도착 시 목록 갱신)
     const messageSubscription = supabase
       .channel('chat-messages')
       .on(
@@ -90,9 +86,8 @@ export default function ChatTab() {
         },
         (payload) => {
           console.log('📨 새 메시지 수신:', payload);
-          loadChatRooms(); // 채팅방 목록 갱신
+          loadChatRooms();
           
-          // 현재 열려있는 채팅방의 메시지인 경우 메시지 목록 갱신
           if (selectedRoom && payload.new.room_id === selectedRoom.roomId) {
             loadMessages(selectedRoom.roomId);
           }
@@ -100,7 +95,6 @@ export default function ChatTab() {
       )
       .subscribe();
 
-    // 채팅방 실시간 구독 (새 채팅방 생성 시)
     const roomSubscription = supabase
       .channel('chat-rooms')
       .on(
@@ -125,7 +119,6 @@ export default function ChatTab() {
 
   /**
    * 채팅방 목록 로드
-   * chat_rooms 테이블에서 내가 참여한 채팅방 목록을 조회
    */
   const loadChatRooms = async () => {
     if (!authUser?.id) return;
@@ -133,13 +126,7 @@ export default function ChatTab() {
     try {
       setIsLoading(true);
       
-      // 디버깅: 현재 사용자 ID 확인
-      console.log('🔍 [ChatTab] 현재 사용자 ID:', authUser.id);
-      console.log('🔍 [ChatTab] ID 타입:', typeof authUser.id);
-      
-      // 내가 참여한 채팅방 조회 (user_id를 문자열로 비교)
       const userId = String(authUser.id);
-      console.log('🔍 [ChatTab] 변환된 userId:', userId);
       
       const { data: rooms, error } = await supabase
         .from('chat_rooms')
@@ -158,50 +145,35 @@ export default function ChatTab() {
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (error) {
-        console.error('❌ [ChatTab] 채팅방 조회 에러:', error);
+        console.error('❌ 채팅방 조회 에러:', error);
         setChatRooms([]);
         return;
       }
-
-      // 디버깅: 조회된 채팅방 확인
-      console.log('📋 [ChatTab] 조회된 채팅방:', rooms);
-      console.log('📋 [ChatTab] 채팅방 수:', rooms?.length || 0);
 
       if (!rooms || rooms.length === 0) {
-        console.log('⚠️ [ChatTab] 채팅방이 없습니다.');
         setChatRooms([]);
         return;
       }
 
-      // 상대방 사용자 ID 목록 추출 (문자열 비교)
       const partnerIds = rooms.map(room => {
         const isUser1 = room.user1_id === userId;
-        console.log(`🔍 [ChatTab] Room ${room.id}: user1=${room.user1_id}, user2=${room.user2_id}, isUser1=${isUser1}`);
         return isUser1 ? room.user2_id : room.user1_id;
       });
 
-      console.log('👥 [ChatTab] 상대방 ID 목록:', partnerIds);
-
-      // 상대방 정보 일괄 조회
       const { data: partners } = await supabase
         .from('users')
         .select('id, name, profile_image, gender')
         .in('id', partnerIds);
 
-      console.log('👥 [ChatTab] 상대방 정보:', partners);
-
-      // 상대방 정보 맵 생성
       const partnerMap = new Map(
         (partners || []).map(p => [p.id, p])
       );
 
-      // 각 채팅방의 안 읽은 메시지 수 조회
       const chatRoomList: ChatRoom[] = await Promise.all(
         rooms.map(async (room) => {
           const partnerId = room.user1_id === userId ? room.user2_id : room.user1_id;
           const partner = partnerMap.get(partnerId);
 
-          // 안 읽은 메시지 수 조회
           const { count: unreadCount } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
@@ -223,8 +195,7 @@ export default function ChatTab() {
                   hour12: true 
                 })
               : '방금 전',
-            unreadCount: unreadCount || 0,
-            isOnline: true // TODO: 실제 온라인 상태 구현
+            unreadCount: unreadCount || 0
           };
         })
       );
@@ -240,7 +211,6 @@ export default function ChatTab() {
 
   /**
    * 특정 채팅방의 메시지 목록 로드
-   * @param roomId 채팅방 ID
    */
   const loadMessages = async (roomId: string) => {
     if (!authUser?.id) return;
@@ -271,7 +241,6 @@ export default function ChatTab() {
         }));
         setMessages(formattedMessages);
 
-        // 메시지 읽음 표시
         await supabase
           .from('messages')
           .update({ is_read: true })
@@ -285,22 +254,89 @@ export default function ChatTab() {
   };
 
   /**
+   * 상대방 프로필 상세 페이지로 이동
+   */
+  const goToProfileDetail = async (partnerId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', partnerId)
+        .single();
+
+      if (error) throw error;
+
+      // 프로필 상세 페이지로 이동 (매칭창과 동일한 형식)
+      navigate('/profile-detail', {
+        state: {
+          profile: {
+            id: data.id,
+            name: data.name,
+            age: data.age,
+            gender: data.gender,
+            location: data.location,
+            school: data.school,
+            mbti: data.mbti,
+            bio: data.bio,
+            photos: data.profile_image ? [data.profile_image] : [],
+            interests: data.interests || [],
+            height: data.height,
+            bodyType: data.body_type,
+            style: data.style,
+            religion: data.religion,
+            smoking: data.smoking,
+            drinking: data.drinking,
+            isMatched: true // 이미 매칭된 상대
+          }
+        }
+      });
+    } catch (error) {
+      console.error('프로필 로드 실패:', error);
+      alert('프로필을 불러오는데 실패했습니다.');
+    }
+  };
+
+  /**
+   * 채팅방 나가기 (삭제)
+   */
+  const handleLeaveRoom = async () => {
+    if (!selectedRoom) return;
+
+    setIsLeaving(true);
+    try {
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('room_id', selectedRoom.roomId);
+
+      const { error } = await supabase
+        .from('chat_rooms')
+        .delete()
+        .eq('id', selectedRoom.roomId);
+
+      if (error) throw error;
+
+      setChatRooms(prev => prev.filter(room => room.roomId !== selectedRoom.roomId));
+      setSelectedRoom(null);
+      setMessages([]);
+      setShowLeaveModal(false);
+      
+      alert('채팅방을 나갔습니다.');
+    } catch (error) {
+      console.error('채팅방 나가기 실패:', error);
+      alert('채팅방 나가기에 실패했습니다.');
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
+  /**
    * 메시지 전송 핸들러
-   * 현재 선택된 채팅방에 메시지를 전송
    */
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedRoom || !authUser?.id) return;
 
     try {
-      // 디버깅: 전송 정보 확인
-      console.log('📤 [ChatTab] 메시지 전송 시도:', {
-        room_id: selectedRoom.roomId,
-        sender_id: authUser.id,
-        recipient_id: selectedRoom.partnerId,
-        content: newMessage.substring(0, 20) + '...'
-      });
-
-      // DB에 메시지 저장 (room_id 포함)
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -313,20 +349,13 @@ export default function ChatTab() {
         .select()
         .single();
 
-      if (error) {
-        console.error('❌ [ChatTab] 메시지 전송 에러:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ [ChatTab] 메시지 전송 성공:', data);
-
-      // 입력창 초기화 (실시간 구독으로 메시지 목록 자동 갱신됨)
+      console.log('✅ 메시지 전송 성공:', data);
       setNewMessage('');
-      
-      // 즉시 메시지 목록 갱신 (더 빠른 UX를 위해)
       loadMessages(selectedRoom.roomId);
     } catch (error: any) {
-      console.error('❌ [ChatTab] 메시지 전송 실패:', error);
+      console.error('❌ 메시지 전송 실패:', error);
       alert(`메시지 전송 실패: ${error.message || '알 수 없는 오류'}`);
     }
   };
@@ -343,7 +372,6 @@ export default function ChatTab() {
 
   /**
    * 채팅방 선택 핸들러
-   * @param room 선택한 채팅방
    */
   const handleChatSelect = (room: ChatRoom) => {
     setSelectedRoom(room);
@@ -368,38 +396,37 @@ export default function ChatTab() {
             >
               <i className="ri-arrow-left-line text-xl text-slate-600"></i>
             </button>
-            <div className="relative">
-              <img
-                src={selectedRoom.partnerAvatar || getDefaultAvatar(selectedRoom.partnerGender)}
-                alt={selectedRoom.partnerName}
-                loading="lazy"
-                decoding="async"
-                className="w-10 h-10 rounded-full object-cover object-top shadow-sm"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = getDefaultAvatar(selectedRoom.partnerGender);
-                }}
-              />
-              {selectedRoom.isOnline && (
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-              )}
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-800 font-display">{selectedRoom.partnerName}</h3>
-              {selectedRoom.isOnline && <span className="text-[10px] text-green-500 font-medium">온라인</span>}
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-primary-500">
-              <i className="ri-phone-line text-xl"></i>
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-primary-500">
-              <i className="ri-video-line text-xl"></i>
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-primary-500">
-              <i className="ri-more-line text-xl"></i>
+            
+            {/* 프로필 클릭 시 프로필 상세 페이지로 이동 */}
+            <button
+              onClick={() => goToProfileDetail(selectedRoom.partnerId)}
+              className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <div className="relative">
+                <img
+                  src={selectedRoom.partnerAvatar || getDefaultAvatar(selectedRoom.partnerGender)}
+                  alt={selectedRoom.partnerName}
+                  className="w-10 h-10 rounded-full object-cover object-top shadow-sm"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = getDefaultAvatar(selectedRoom.partnerGender);
+                  }}
+                />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-slate-800">{selectedRoom.partnerName}</h3>
+                <span className="text-[10px] text-slate-400">프로필 보기 →</span>
+              </div>
             </button>
           </div>
+          
+          {/* 방 나가기 버튼 */}
+          <button
+            onClick={() => setShowLeaveModal(true)}
+            className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
+          >
+            <i className="ri-logout-box-r-line text-xl"></i>
+          </button>
         </div>
 
         {/* 메시지 목록 */}
@@ -417,52 +444,64 @@ export default function ChatTab() {
                 key={message.id}
                 className={`flex ${message.senderId === authUser?.id ? 'justify-end' : 'justify-start'} animate-slide-up`}
               >
-                <div className="flex items-end space-x-2 max-w-[80%]">
+                <div className={`flex items-end space-x-2 max-w-[80%] ${message.senderId !== authUser?.id ? 'flex-row' : 'flex-row-reverse space-x-reverse'}`}>
+                  {/* 상대방 메시지일 경우 프로필 이미지 */}
                   {message.senderId !== authUser?.id && (
-                    <img
-                      src={selectedRoom.partnerAvatar || getDefaultAvatar(selectedRoom.partnerGender)}
-                      alt={selectedRoom.partnerName}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-8 h-8 rounded-full object-cover object-top shadow-sm mb-1"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = getDefaultAvatar(selectedRoom.partnerGender);
-                      }}
-                    />
+                    <button
+                      onClick={() => goToProfileDetail(selectedRoom.partnerId)}
+                      className="flex-shrink-0"
+                    >
+                      <img
+                        src={selectedRoom.partnerAvatar || getDefaultAvatar(selectedRoom.partnerGender)}
+                        alt={selectedRoom.partnerName}
+                        className="w-8 h-8 rounded-full object-cover object-top shadow-sm mb-1 cursor-pointer hover:opacity-80 transition-opacity"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = getDefaultAvatar(selectedRoom.partnerGender);
+                        }}
+                      />
+                    </button>
                   )}
-                  <div
-                    className={`px-5 py-3 rounded-2xl shadow-sm ${message.senderId === authUser?.id
-                        ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-none'
-                        : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
-                      }`}
-                  >
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  
+                  <div className="flex flex-col">
+                    {/* 상대방 이름 (상대방 메시지일 경우만) */}
+                    {message.senderId !== authUser?.id && (
+                      <span className="text-xs text-slate-400 mb-1 ml-1">{selectedRoom.partnerName}</span>
+                    )}
+                    
+                    <div className="flex items-end space-x-1">
+                      {/* 내 메시지일 경우 시간을 왼쪽에 */}
+                      {message.senderId === authUser?.id && (
+                        <span className="text-[10px] text-slate-400 mb-1">{message.timestamp}</span>
+                      )}
+                      
+                      <div
+                        className={`px-4 py-2.5 rounded-2xl shadow-sm ${
+                          message.senderId === authUser?.id
+                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-sm'
+                            : 'bg-white text-slate-700 rounded-bl-sm border border-slate-100'
+                        }`}
+                      >
+                        <p className="text-sm leading-relaxed">{message.content}</p>
+                      </div>
+                      
+                      {/* 상대방 메시지일 경우 시간을 오른쪽에 */}
+                      {message.senderId !== authUser?.id && (
+                        <span className="text-[10px] text-slate-400 mb-1">{message.timestamp}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             ))
           )}
 
-          {/* 시간 표시 */}
-          {messages.length > 0 && (
-            <div className="text-center py-2">
-              <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                {messages[messages.length - 1]?.timestamp}
-              </span>
-            </div>
-          )}
-
-          {/* 스크롤 앵커 */}
           <div ref={messagesEndRef} />
         </div>
 
         {/* 메시지 입력 */}
         <div className="p-4 bg-white border-t border-slate-100 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <button className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-primary-500">
-              <i className="ri-add-line text-xl"></i>
-            </button>
             <div className="flex-1 relative">
               <input
                 type="text"
@@ -473,22 +512,55 @@ export default function ChatTab() {
                 className="w-full px-5 py-3 bg-slate-50 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-sm border border-transparent focus:border-primary-200"
                 maxLength={500}
               />
-              <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-primary-500 transition-colors">
-                <i className="ri-emotion-line text-xl"></i>
-              </button>
             </div>
             <button
               onClick={handleSendMessage}
               disabled={!newMessage.trim()}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${newMessage.trim()
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
+                newMessage.trim()
                   ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:scale-105 hover:shadow-primary-500/30'
                   : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                }`}
+              }`}
             >
               <i className="ri-send-plane-fill text-lg"></i>
             </button>
           </div>
         </div>
+
+        {/* 방 나가기 확인 모달 */}
+        {showLeaveModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-slide-up">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="ri-logout-box-r-line text-3xl text-red-500"></i>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">채팅방 나가기</h3>
+                <p className="text-sm text-slate-500">
+                  채팅방을 나가면 모든 대화 내용이 삭제됩니다.<br />
+                  정말 나가시겠습니까?
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowLeaveModal(false)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-medium"
+                  disabled={isLeaving}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleLeaveRoom}
+                  disabled={isLeaving}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium disabled:opacity-50"
+                >
+                  {isLeaving ? '나가는 중...' : '나가기'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -502,17 +574,12 @@ export default function ChatTab() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold font-display text-slate-800">채팅</h2>
-          <div className="flex space-x-2">
-            <button 
-              onClick={loadChatRooms}
-              className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-primary-500 hover:shadow-md transition-all"
-            >
-              <i className="ri-refresh-line text-xl"></i>
-            </button>
-            <button className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-primary-500 hover:shadow-md transition-all">
-              <i className="ri-search-line text-xl"></i>
-            </button>
-          </div>
+          <button 
+            onClick={loadChatRooms}
+            className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-primary-500 hover:shadow-md transition-all"
+          >
+            <i className="ri-refresh-line text-xl"></i>
+          </button>
         </div>
 
         {/* 로딩 상태 */}
@@ -550,17 +617,12 @@ export default function ChatTab() {
                       <img
                         src={room.partnerAvatar || getDefaultAvatar(room.partnerGender)}
                         alt={room.partnerName}
-                        loading="lazy"
-                        decoding="async"
                         className="w-14 h-14 rounded-2xl object-cover object-top shadow-sm group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.src = getDefaultAvatar(room.partnerGender);
                         }}
                       />
-                      {room.isOnline && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
-                      )}
                     </div>
 
                     <div className="flex-1 min-w-0">

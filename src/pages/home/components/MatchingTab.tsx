@@ -242,19 +242,21 @@ export default function MatchingTab() {
           >
             {/* 상호 좋아요 표시 */}
             {profile.hasLikedMe && (
-              <div className="absolute top-2 right-2 w-7 h-7 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center z-10 shadow-lg shadow-pink-500/30 animate-pulse-soft">
+              <div className="absolute top-3 right-3 w-7 h-7 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center z-10 shadow-lg shadow-pink-500/30 animate-pulse-soft">
                 <i className="ri-heart-fill text-white text-xs"></i>
               </div>
             )}
 
-            {/* 성별 아이콘 */}
-            <div className="absolute top-2 left-2 w-7 h-7 glass rounded-full flex items-center justify-center z-10">
-              <i className={`text-sm ${profile.gender === 'female' ? 'ri-women-line text-pink-500' : 'ri-men-line text-blue-500'} font-bold`}></i>
-            </div>
-
-            {/* MBTI 태그 */}
-            <div className="absolute top-2 left-10 z-10">
-              <span className="glass text-primary-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+            {/* 상단 태그 - 성별 + MBTI 함께 */}
+            <div className="absolute top-3 left-3 z-10 flex items-center space-x-1.5">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center shadow-md ${
+                profile.gender === 'female' 
+                  ? 'bg-gradient-to-br from-pink-400 to-pink-500' 
+                  : 'bg-gradient-to-br from-blue-400 to-blue-500'
+              }`}>
+                <i className={`text-xs text-white ${profile.gender === 'female' ? 'ri-women-line' : 'ri-men-line'}`}></i>
+              </div>
+              <span className="bg-white/95 text-slate-700 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-md">
                 {profile.mbti || 'MBTI'}
               </span>
             </div>
