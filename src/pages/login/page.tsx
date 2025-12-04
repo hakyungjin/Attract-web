@@ -278,10 +278,12 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="relative">
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl">
-                <div className="w-12 h-12 flex items-center justify-center">
-                  <i className="ri-heart-fill text-white text-3xl"></i>
-                </div>
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-2xl">
+                <img
+                  src="/image/icon.png"
+                  alt="Attract Logo"
+                  className="w-14 h-14 object-contain"
+                />
               </div>
               <div className="absolute -top-2 -right-2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white"></div>
             </div>

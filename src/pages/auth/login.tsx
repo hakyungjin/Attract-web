@@ -57,8 +57,12 @@ export default function LoginAuthPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="relative">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <i className="ri-heart-fill text-white text-3xl"></i>
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg">
+                <img
+                  src="/image/icon.png"
+                  alt="Attract Logo"
+                  className="w-14 h-14 object-contain"
+                />
               </div>
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-secondary-400 rounded-full border-2 border-white"></div>
             </div>
