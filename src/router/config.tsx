@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 // Lazy load all pages for better performance
 const NotFound = lazy(() => import("../pages/NotFound"));
@@ -23,10 +24,57 @@ const SupportPage = lazy(() => import("../pages/support/page"));
 const PolicyDetailPage = lazy(() => import("../pages/policy/page"));
 
 const routes: RouteObject[] = [
+  // 🔒 로그인 필요한 페이지들
   {
     path: "/",
-    element: <Home />,
+    element: <ProtectedRoute><Home /></ProtectedRoute>,
   },
+  {
+    path: "/profile-edit",
+    element: <ProtectedRoute><ProfileEditPage /></ProtectedRoute>,
+  },
+  {
+    path: "/notifications",
+    element: <ProtectedRoute><NotificationsPage /></ProtectedRoute>,
+  },
+  {
+    path: "/profile-detail",
+    element: <ProtectedRoute><ProfileDetailPage /></ProtectedRoute>,
+  },
+  {
+    path: "/my-profile",
+    element: <ProtectedRoute><MyProfilePage /></ProtectedRoute>,
+  },
+  {
+    path: "/admin",
+    element: <ProtectedRoute><AdminPage /></ProtectedRoute>,
+  },
+  {
+    path: "/coin-shop",
+    element: <ProtectedRoute><CoinShopPage /></ProtectedRoute>,
+  },
+  {
+    path: "/matching-requests",
+    element: <ProtectedRoute><MatchingRequestsPage /></ProtectedRoute>,
+  },
+  {
+    path: "/payment/success",
+    element: <ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>,
+  },
+  {
+    path: "/payment/fail",
+    element: <ProtectedRoute><PaymentFailPage /></ProtectedRoute>,
+  },
+  {
+    path: "/post/create",
+    element: <ProtectedRoute><CreatePostPage /></ProtectedRoute>,
+  },
+  {
+    path: "/settings",
+    element: <ProtectedRoute><SettingsPage /></ProtectedRoute>,
+  },
+  
+  // 🔓 로그인 없이 접근 가능한 페이지들
   {
     path: "/login",
     element: <LoginPage />,
@@ -38,50 +86,6 @@ const routes: RouteObject[] = [
   {
     path: "/signup/quick",
     element: <QuickSignupPage />,
-  },
-  {
-    path: "/profile-edit",
-    element: <ProfileEditPage />,
-  },
-  {
-    path: "/notifications",
-    element: <NotificationsPage />,
-  },
-  {
-    path: "/profile-detail",
-    element: <ProfileDetailPage />,
-  },
-  {
-    path: "/my-profile",
-    element: <MyProfilePage />,
-  },
-  {
-    path: "/admin",
-    element: <AdminPage />,
-  },
-  {
-    path: "/coin-shop",
-    element: <CoinShopPage />,
-  },
-  {
-    path: "/matching-requests",
-    element: <MatchingRequestsPage />,
-  },
-  {
-    path: "/payment/success",
-    element: <PaymentSuccessPage />,
-  },
-  {
-    path: "/payment/fail",
-    element: <PaymentFailPage />,
-  },
-  {
-    path: "/post/create",
-    element: <CreatePostPage />,
-  },
-  {
-    path: "/settings",
-    element: <SettingsPage />,
   },
   {
     path: "/faq",

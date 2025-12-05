@@ -169,20 +169,17 @@ export default function PhoneLoginPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="relative">
-              <div className="w-28 h-28 bg-white rounded-3xl flex items-center justify-center shadow-2xl">
-                <img
-                  src="/image/icon.png"
-                  alt="Attract Logo"
-                  className="w-24 h-24 object-contain"
-                />
-              </div>
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white"></div>
+              <img
+                src="/image/icon.png"
+                alt="Attract Logo"
+                className="w-28 h-28 rounded-3xl object-cover drop-shadow-lg"
+              />
             </div>
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent mb-2">
             Attract
           </h1>
-          <p className="text-gray-600">당신의 특별한 인연을 찾아보세요</p>
+          <p className="text-gray-600">두근거리는 첫 만남처럼</p>
         </div>
 
         {/* 로그인 카드 */}
