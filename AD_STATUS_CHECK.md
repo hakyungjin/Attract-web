@@ -131,3 +131,5 @@ console.log('카카오 애드핏 요소:', document.querySelector('.kakao_ad_are
 - ⚠️ 더미 배너가 표시됨 (회색 점선 박스)
 
 
+
+

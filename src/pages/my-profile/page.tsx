@@ -164,9 +164,9 @@ export default function MyProfilePage() {
   const interests = profile.interests || [];
 
   return (
-    <div className="min-h-screen bg-cyan-50 pb-24">
+    <div className="min-h-screen bg-cyan-50 pb-24 pb-[calc(96px+env(safe-area-inset-bottom))]">
       {/* 헤더 */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b sticky top-0 z-10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={handleBack}
@@ -203,33 +203,29 @@ export default function MyProfilePage() {
             className="w-full h-full object-cover"
           />
 
-          {/* 좌우 네비게이션 버튼 */}
-          {profilePhotos.length > 1 && (
-            <>
-              <button
-                onClick={handlePrevPhoto}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <i className="ri-arrow-left-s-line text-white text-xl"></i>
-              </button>
-              <button
-                onClick={handleNextPhoto}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <i className="ri-arrow-right-s-line text-white text-xl"></i>
-              </button>
-            </>
-          )}
+          {/* 좌우 화살표 버튼 - 항상 표시 (사진 1장이어도) */}
+          <button
+            onClick={handlePrevPhoto}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-lg"
+          >
+            <i className="ri-arrow-left-s-line text-white text-2xl"></i>
+          </button>
+          <button
+            onClick={handleNextPhoto}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-lg"
+          >
+            <i className="ri-arrow-right-s-line text-white text-2xl"></i>
+          </button>
 
-          {/* 사진 인디케이터 */}
+          {/* 사진 인디케이터 (하단 점) */}
           {profilePhotos.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
               {profilePhotos.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentPhotoIndex(index)}
-                  className={`w-2 h-2 rounded-full transition-colors cursor-pointer ${
-                    index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
+                  className={`w-2 h-2 rounded-full transition-all cursor-pointer shadow-sm ${
+                    index === currentPhotoIndex ? 'bg-white w-4' : 'bg-white/50 hover:bg-white/80'
                   }`}
                 />
               ))}
@@ -237,9 +233,9 @@ export default function MyProfilePage() {
           )}
 
           {/* 이름, 나이, 위치 오버레이 */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-6">
-            <h2 className="text-white text-2xl font-bold">{profile.name}, {profile.age}</h2>
-            <p className="text-white/80 text-sm flex items-center mt-1">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-6">
+            <h2 className="text-white text-2xl font-bold drop-shadow-lg">{profile.name}, {profile.age}</h2>
+            <p className="text-white/90 text-sm flex items-center mt-1">
               <i className="ri-map-pin-line mr-1"></i>
               {profile.location || '위치 정보 없음'}
             </p>

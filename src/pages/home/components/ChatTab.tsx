@@ -39,10 +39,17 @@ const getDefaultAvatar = (gender?: string) => {
 };
 
 /**
+ * ChatTab Props 인터페이스
+ */
+interface ChatTabProps {
+  onChatViewChange?: (isInChat: boolean) => void;
+}
+
+/**
  * ChatTab 컴포넌트
  * 매칭된 사용자들과의 채팅을 관리
  */
-export default function ChatTab() {
+export default function ChatTab({ onChatViewChange }: ChatTabProps) {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   
@@ -54,9 +61,15 @@ export default function ChatTab() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 방 나가기 확인 모달 상태
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+
+  /**
+   * 채팅 뷰 상태 변경 시 부모에게 알림
+   */
+  useEffect(() => {
+    onChatViewChange?.(!!selectedRoom);
+  }, [selectedRoom, onChatViewChange]);
 
   /**
    * 메시지 목록이 변경될 때 스크롤을 아래로 이동
@@ -66,6 +79,27 @@ export default function ChatTab() {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, selectedRoom]);
+
+  /**
+   * 브라우저 뒤로가기 버튼 처리
+   */
+  useEffect(() => {
+    const handlePopState = () => {
+      if (selectedRoom) {
+        setSelectedRoom(null);
+        setMessages([]);
+      }
+    };
+
+    if (selectedRoom) {
+      window.history.pushState({ chatRoom: true }, '');
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [selectedRoom]);
 
   /**
    * 채팅방 목록 로드 및 실시간 구독 설정
@@ -266,7 +300,6 @@ export default function ChatTab() {
 
       if (error) throw error;
 
-      // 프로필 상세 페이지로 이동 (매칭창과 동일한 형식)
       navigate('/profile-detail', {
         state: {
           profile: {
@@ -286,7 +319,7 @@ export default function ChatTab() {
             religion: data.religion,
             smoking: data.smoking,
             drinking: data.drinking,
-            isMatched: true // 이미 매칭된 상대
+            isMatched: true
           }
         }
       });
@@ -337,7 +370,7 @@ export default function ChatTab() {
     if (!newMessage.trim() || !selectedRoom || !authUser?.id) return;
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('messages')
         .insert({
           room_id: selectedRoom.roomId,
@@ -351,7 +384,6 @@ export default function ChatTab() {
 
       if (error) throw error;
 
-      console.log('✅ 메시지 전송 성공:', data);
       setNewMessage('');
       loadMessages(selectedRoom.roomId);
     } catch (error: any) {
@@ -378,41 +410,47 @@ export default function ChatTab() {
     loadMessages(room.roomId);
   };
 
+  /**
+   * 뒤로가기 핸들러
+   */
+  const handleBack = () => {
+    setSelectedRoom(null);
+    setMessages([]);
+    window.history.replaceState(null, '');
+  };
+
   // ==========================================
   // 채팅 화면 (채팅방 선택된 상태)
   // ==========================================
   if (selectedRoom) {
     return (
-      <div className="fixed inset-0 top-0 bottom-20 flex flex-col bg-slate-50 z-50">
+      <div className="fixed inset-0 bg-white z-50 flex flex-col">
         {/* 채팅 헤더 */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white/90 backdrop-blur-md flex-shrink-0 pt-16">
+        <div 
+          className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white flex-shrink-0"
+          style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
+        >
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => {
-                setSelectedRoom(null);
-                setMessages([]);
-              }}
+              onClick={handleBack}
               className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors"
             >
               <i className="ri-arrow-left-line text-xl text-slate-600"></i>
             </button>
             
-            {/* 프로필 클릭 시 프로필 상세 페이지로 이동 */}
             <button
               onClick={() => goToProfileDetail(selectedRoom.partnerId)}
               className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <div className="relative">
-                <img
-                  src={selectedRoom.partnerAvatar || getDefaultAvatar(selectedRoom.partnerGender)}
-                  alt={selectedRoom.partnerName}
-                  className="w-10 h-10 rounded-full object-cover object-top shadow-sm"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = getDefaultAvatar(selectedRoom.partnerGender);
-                  }}
-                />
-              </div>
+              <img
+                src={selectedRoom.partnerAvatar || getDefaultAvatar(selectedRoom.partnerGender)}
+                alt={selectedRoom.partnerName}
+                className="w-10 h-10 rounded-full object-cover object-top shadow-sm"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = getDefaultAvatar(selectedRoom.partnerGender);
+                }}
+              />
               <div className="text-left">
                 <h3 className="font-bold text-slate-800">{selectedRoom.partnerName}</h3>
                 <span className="text-[10px] text-slate-400">프로필 보기 →</span>
@@ -420,7 +458,6 @@ export default function ChatTab() {
             </button>
           </div>
           
-          {/* 방 나가기 버튼 */}
           <button
             onClick={() => setShowLeaveModal(true)}
             className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
@@ -432,7 +469,7 @@ export default function ChatTab() {
         {/* 메시지 목록 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
           {messages.length === 0 ? (
-            <div className="text-center py-10">
+            <div className="text-center py-16">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="ri-chat-smile-2-line text-3xl text-slate-400"></i>
               </div>
@@ -442,10 +479,9 @@ export default function ChatTab() {
             messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.senderId === authUser?.id ? 'justify-end' : 'justify-start'} animate-slide-up`}
+                className={`flex ${message.senderId === authUser?.id ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex items-end space-x-2 max-w-[80%] ${message.senderId !== authUser?.id ? 'flex-row' : 'flex-row-reverse space-x-reverse'}`}>
-                  {/* 상대방 메시지일 경우 프로필 이미지 */}
+                <div className={`flex items-end space-x-2 max-w-[75%] ${message.senderId !== authUser?.id ? 'flex-row' : 'flex-row-reverse space-x-reverse'}`}>
                   {message.senderId !== authUser?.id && (
                     <button
                       onClick={() => goToProfileDetail(selectedRoom.partnerId)}
@@ -464,13 +500,11 @@ export default function ChatTab() {
                   )}
                   
                   <div className="flex flex-col">
-                    {/* 상대방 이름 (상대방 메시지일 경우만) */}
                     {message.senderId !== authUser?.id && (
                       <span className="text-xs text-slate-400 mb-1 ml-1">{selectedRoom.partnerName}</span>
                     )}
                     
                     <div className="flex items-end space-x-1">
-                      {/* 내 메시지일 경우 시간을 왼쪽에 */}
                       {message.senderId === authUser?.id && (
                         <span className="text-[10px] text-slate-400 mb-1">{message.timestamp}</span>
                       )}
@@ -478,14 +512,13 @@ export default function ChatTab() {
                       <div
                         className={`px-4 py-2.5 rounded-2xl shadow-sm ${
                           message.senderId === authUser?.id
-                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-sm'
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-br-sm'
                             : 'bg-white text-slate-700 rounded-bl-sm border border-slate-100'
                         }`}
                       >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
                       </div>
                       
-                      {/* 상대방 메시지일 경우 시간을 오른쪽에 */}
                       {message.senderId !== authUser?.id && (
                         <span className="text-[10px] text-slate-400 mb-1">{message.timestamp}</span>
                       )}
@@ -495,30 +528,32 @@ export default function ChatTab() {
               </div>
             ))
           )}
-
           <div ref={messagesEndRef} />
         </div>
 
         {/* 메시지 입력 */}
-        <div className="p-4 bg-white border-t border-slate-100 flex-shrink-0">
+        <div 
+          className="p-4 bg-white border-t border-slate-100 flex-shrink-0"
+          style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+        >
           <div className="flex items-center space-x-3">
-            <div className="flex-1 relative">
+            <div className="flex-1">
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="메시지를 입력하세요..."
-                className="w-full px-5 py-3 bg-slate-50 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-sm border border-transparent focus:border-primary-200"
+                className="w-full px-5 py-3 bg-slate-50 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all text-sm border border-transparent focus:border-cyan-200"
                 maxLength={500}
               />
             </div>
             <button
               onClick={handleSendMessage}
               disabled={!newMessage.trim()}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md flex-shrink-0 ${
                 newMessage.trim()
-                  ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:scale-105 hover:shadow-primary-500/30'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-105'
                   : 'bg-slate-100 text-slate-300 cursor-not-allowed'
               }`}
             >
@@ -529,8 +564,8 @@ export default function ChatTab() {
 
         {/* 방 나가기 확인 모달 */}
         {showLeaveModal && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-slide-up">
+          <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <i className="ri-logout-box-r-line text-3xl text-red-500"></i>
@@ -541,7 +576,6 @@ export default function ChatTab() {
                   정말 나가시겠습니까?
                 </p>
               </div>
-
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowLeaveModal(false)}
@@ -569,103 +603,95 @@ export default function ChatTab() {
   // 채팅방 목록 화면
   // ==========================================
   return (
-    <div className="px-4 py-6 pb-20 min-h-screen">
-      <div className="max-w-md mx-auto">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold font-display text-slate-800">채팅</h2>
-          <button 
-            onClick={loadChatRooms}
-            className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-primary-500 hover:shadow-md transition-all"
-          >
-            <i className="ri-refresh-line text-xl"></i>
-          </button>
-        </div>
-
-        {/* 로딩 상태 */}
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-3xl p-4 animate-pulse">
-                <div className="flex items-center space-x-4">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-200"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
-                    <div className="h-3 bg-slate-100 rounded w-40"></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            {/* 채팅방 목록 */}
-            <div className="space-y-4">
-              {chatRooms.length > 0 && (
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 px-2">
-                  매칭된 대화 ({chatRooms.length})
-                </h3>
-              )}
-              {chatRooms.map((room) => (
-                <div
-                  key={room.roomId}
-                  onClick={() => handleChatSelect(room)}
-                  className="bg-white rounded-3xl p-4 shadow-sm hover:shadow-lg hover:shadow-primary-500/5 transition-all duration-300 cursor-pointer border border-slate-50 group transform hover:-translate-y-0.5"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <img
-                        src={room.partnerAvatar || getDefaultAvatar(room.partnerGender)}
-                        alt={room.partnerName}
-                        className="w-14 h-14 rounded-2xl object-cover object-top shadow-sm group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = getDefaultAvatar(room.partnerGender);
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-slate-800 truncate text-base font-display group-hover:text-primary-600 transition-colors">
-                          {room.partnerName}
-                        </h3>
-                        <span className="text-[10px] font-medium text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">
-                          {room.lastMessageTime}
-                        </span>
-                      </div>
-                      <p className={`text-sm truncate ${room.unreadCount > 0 ? 'text-slate-800 font-bold' : 'text-slate-500'}`}>
-                        {room.lastMessage}
-                      </p>
-                    </div>
-
-                    {room.unreadCount > 0 && (
-                      <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg shadow-primary-500/30 animate-bounce">
-                        {room.unreadCount}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 빈 상태 */}
-            {chatRooms.length === 0 && (
-              <div className="text-center py-20">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                  <i className="ri-chat-3-line text-4xl text-slate-300"></i>
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2 font-display">아직 채팅이 없어요</h3>
-                <p className="text-slate-500 mb-4">매칭이 성사되면 채팅을 시작할 수 있어요!</p>
-                <p className="text-xs text-slate-400">
-                  프로필 탭에서 마음에 드는 상대에게<br />
-                  매칭 요청을 보내보세요 💕
-                </p>
-              </div>
-            )}
-          </>
-        )}
+    <div className="min-h-screen">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-slate-800">채팅</h2>
+        <button 
+          onClick={loadChatRooms}
+          className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-cyan-500 hover:shadow-md transition-all"
+        >
+          <i className="ri-refresh-line text-xl"></i>
+        </button>
       </div>
+
+      {/* 로딩 상태 */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl p-4 animate-pulse">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 rounded-full bg-slate-200"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
+                  <div className="h-3 bg-slate-100 rounded w-40"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : chatRooms.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1 mb-3">
+            매칭된 대화 ({chatRooms.length})
+          </p>
+          {chatRooms.map((room) => (
+            <div
+              key={room.roomId}
+              onClick={() => handleChatSelect(room)}
+              className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border border-slate-100 active:scale-[0.98]"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={room.partnerAvatar || getDefaultAvatar(room.partnerGender)}
+                    alt={room.partnerName}
+                    className="w-14 h-14 rounded-full object-cover object-top shadow-sm"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = getDefaultAvatar(room.partnerGender);
+                    }}
+                  />
+                  {room.unreadCount > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {room.unreadCount}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-bold text-slate-800 truncate">
+                      {room.partnerName}
+                    </h3>
+                    <span className="text-[11px] text-slate-400 flex-shrink-0 ml-2">
+                      {room.lastMessageTime}
+                    </span>
+                  </div>
+                  <p className={`text-sm truncate ${room.unreadCount > 0 ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>
+                    {room.lastMessage}
+                  </p>
+                </div>
+
+                <i className="ri-arrow-right-s-line text-slate-300 text-xl"></i>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // 빈 상태
+        <div className="text-center py-20">
+          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i className="ri-chat-3-line text-4xl text-slate-300"></i>
+          </div>
+          <h3 className="text-xl font-bold text-slate-700 mb-2">아직 채팅이 없어요</h3>
+          <p className="text-slate-500 mb-2">매칭이 성사되면 채팅을 시작할 수 있어요!</p>
+          <p className="text-xs text-slate-400">
+            매칭 탭에서 마음에 드는 상대에게<br />
+            하트를 보내보세요 💕
+          </p>
+        </div>
+      )}
     </div>
   );
 }

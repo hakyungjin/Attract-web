@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
 import { MBTI_TYPES } from '../../constants/mbti';
+import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
+import { searchSchools } from '../../constants/schools';
 import { logger } from '../../utils/logger';
 
 export default function ProfileEditPage() {
@@ -35,6 +37,13 @@ export default function ProfileEditPage() {
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const MAX_PHOTOS = 6; // 최대 사진 수
+
+  // 지역 선택 상태
+  const [selectedSido, setSelectedSido] = useState('');
+  
+  // 학교 검색 상태
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [schoolSearchResults, setSchoolSearchResults] = useState<string[]>([]);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -130,8 +139,26 @@ export default function ProfileEditPage() {
     setIsUploading(true);
 
     try {
+      // 프로필 이미지 URL 결정 (base64는 제외, URL만 사용)
+      let finalProfileImage = '';
+      if (uploadedImageUrl) {
+        // 새로 업로드된 이미지 URL 사용
+        finalProfileImage = uploadedImageUrl;
+      } else if (formData.avatar && !formData.avatar.startsWith('data:')) {
+        // 기존 이미지 URL 유지 (base64가 아닌 경우만)
+        finalProfileImage = formData.avatar;
+      } else if (formData.photos.length > 0 && !formData.photos[0].startsWith('data:')) {
+        // photos 배열에서 URL 가져오기
+        finalProfileImage = formData.photos[0];
+      }
+
+      // photos 배열에서 URL만 필터링 (base64 제외)
+      const validPhotos = formData.photos.filter(photo => 
+        photo && !photo.startsWith('data:')
+      );
+
       // 데이터베이스에 저장할 데이터 준비
-      const profileData = {
+      const profileData: Record<string, any> = {
         name: formData.name,
         age: formData.age,
         gender: formData.gender === '여자' ? 'female' : 'male',
@@ -139,7 +166,6 @@ export default function ProfileEditPage() {
         bio: formData.bio,
         mbti: formData.mbti,
         school: formData.school,
-        job: formData.name, // job 필드 추가
         height: formData.height,
         body_type: formData.bodyType,
         style: formData.style,
@@ -147,10 +173,18 @@ export default function ProfileEditPage() {
         smoking: formData.smoking,
         drinking: formData.drinking,
         interests: formData.interests,
-        profile_image: uploadedImageUrl || formData.avatar || formData.photos[0] || '',
-        photos: formData.photos,
         updated_at: new Date().toISOString()
       };
+
+      // 프로필 이미지가 있을 때만 추가
+      if (finalProfileImage) {
+        profileData.profile_image = finalProfileImage;
+      }
+
+      // photos 배열 저장 (유효한 URL만)
+      if (validPhotos.length > 0) {
+        profileData.photos = validPhotos;
+      }
 
       // users 테이블에 데이터 저장 (update)
       const { error: dbError } = await supabase
@@ -240,7 +274,7 @@ export default function ProfileEditPage() {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
       
-      logger.info('생성된 공개 URL:', publicUrl);
+      logger.info('생성된 공개 URL:', { url: publicUrl });
       setUploadedImageUrl(publicUrl);
 
       // 미리보기용으로 로컬 이미지도 설정
@@ -292,9 +326,9 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cyan-50 pb-20">
+    <div className="min-h-screen bg-cyan-50 pb-20 pb-[calc(80px+env(safe-area-inset-bottom))]">
       {/* 헤더 */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b sticky top-0 z-10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-4 py-4">
           <button
             onClick={handleBack}
@@ -393,30 +427,54 @@ export default function ProfileEditPage() {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     
+                    // 파일 타입 검증
+                    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+                    if (!validTypes.includes(file.type)) {
+                      alert('JPG, PNG, WEBP, GIF 형식의 이미지만 업로드 가능합니다.');
+                      return;
+                    }
+
+                    // 파일 크기 검증 (5MB 제한)
+                    const maxSize = 5 * 1024 * 1024;
+                    if (file.size > maxSize) {
+                      alert('이미지 크기는 5MB 이하여야 합니다.');
+                      return;
+                    }
+                    
                     setIsUploading(true);
                     try {
-                      const fileExt = file.name.split('.').pop();
-                      const fileName = `${authUser?.id}_${Date.now()}.${fileExt}`;
-                      const filePath = `profile-photos/${fileName}`;
+                      // 파일명 생성 (profile-images 버킷 사용 - 대표 사진과 동일)
+                      const fileName = `photo_${authUser?.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                       
-                      const { error: uploadError } = await supabase.storage
-                        .from('profiles')
-                        .upload(filePath, file);
+                      const { error: uploadError, data } = await supabase.storage
+                        .from('profile-images')
+                        .upload(fileName, file, {
+                          cacheControl: '3600',
+                          upsert: false
+                        });
                       
-                      if (uploadError) throw uploadError;
+                      if (uploadError) {
+                        let errorMsg = uploadError.message || '이미지 업로드에 실패했습니다.';
+                        if (errorMsg.includes('Bucket not found')) {
+                          errorMsg = '⚠️ Supabase Storage가 설정되지 않았습니다.\n관리자에게 문의해주세요.';
+                        }
+                        throw new Error(errorMsg);
+                      }
+
+                      logger.info('갤러리 사진 업로드 성공:', data);
                       
-                      const { data: { publicUrl } } = supabase.storage
-                        .from('profiles')
-                        .getPublicUrl(filePath);
+                      // 공개 URL 생성
+                      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+                      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
                       
                       setFormData(prev => ({
                         ...prev,
                         photos: [...prev.photos, publicUrl],
                         avatar: prev.photos.length === 0 ? publicUrl : prev.avatar
                       }));
-                    } catch (error) {
+                    } catch (error: any) {
                       logger.error('사진 업로드 실패:', error);
-                      alert('사진 업로드에 실패했습니다.');
+                      alert(error.message || '사진 업로드에 실패했습니다.');
                     } finally {
                       setIsUploading(false);
                     }
@@ -492,17 +550,59 @@ export default function ProfileEditPage() {
               </p>
             </div>
 
+            {/* 거주지역 선택 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                지역
+                <span className="text-cyan-500 font-bold">거주지역</span>을 선택해 주세요
               </label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                placeholder="지역을 입력하세요"
-              />
+              <div className="space-y-2">
+                {/* 시/도 선택 */}
+                <div className="relative">
+                  <select
+                    value={selectedSido}
+                    onChange={(e) => {
+                      setSelectedSido(e.target.value);
+                      setFormData({ ...formData, location: '' });
+                    }}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="">시/도 선택</option>
+                    {KOREA_LOCATIONS.map((loc) => (
+                      <option key={loc.sido} value={loc.sido}>{loc.sido}</option>
+                    ))}
+                  </select>
+                  <i className="ri-arrow-down-s-line absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                </div>
+                
+                {/* 시/군/구 선택 */}
+                {selectedSido && (
+                  <div className="relative">
+                    <select
+                      value={formData.location ? formData.location.split(' ').slice(1).join(' ') : ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setFormData({ ...formData, location: `${selectedSido} ${e.target.value}` });
+                        }
+                      }}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white appearance-none cursor-pointer"
+                    >
+                      <option value="">시/군/구 선택</option>
+                      {getSigunguList(selectedSido).map((sigungu) => (
+                        <option key={sigungu} value={sigungu}>{sigungu}</option>
+                      ))}
+                    </select>
+                    <i className="ri-arrow-down-s-line absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                  </div>
+                )}
+                
+                {/* 선택된 지역 표시 */}
+                {formData.location && (
+                  <div className="bg-cyan-50 text-cyan-700 px-4 py-2 rounded-xl text-sm flex items-center">
+                    <i className="ri-map-pin-line mr-2"></i>
+                    선택된 지역: <span className="font-bold ml-1">{formData.location}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -515,17 +615,89 @@ export default function ProfileEditPage() {
           </h3>
 
           <div className="space-y-4">
+            {/* 학교 선택 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                학교
+                <span className="text-cyan-500 font-bold">학교</span>에 재학중이신가요, 졸업생이신가요?
               </label>
-              <input
-                type="text"
-                value={formData.school}
-                onChange={(e) => handleInputChange('school', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                placeholder="학교를 입력하세요"
-              />
+              
+              {/* 학교 검색 입력 */}
+              <div className="relative mb-2">
+                <input
+                  type="text"
+                  value={schoolSearchQuery}
+                  onChange={(e) => {
+                    setSchoolSearchQuery(e.target.value);
+                    setSchoolSearchResults(searchSchools(e.target.value, 10));
+                  }}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  placeholder="학교를 입력해 주세요."
+                />
+                {schoolSearchQuery && (
+                  <button
+                    onClick={() => {
+                      setSchoolSearchQuery('');
+                      setSchoolSearchResults([]);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <i className="ri-close-line"></i>
+                  </button>
+                )}
+              </div>
+              
+              {/* 검색 결과 */}
+              {schoolSearchResults.length > 0 && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden mb-2 max-h-48 overflow-y-auto">
+                  {schoolSearchResults.map((school) => (
+                    <button
+                      key={school}
+                      onClick={() => {
+                        setFormData({ ...formData, school });
+                        setSchoolSearchQuery('');
+                        setSchoolSearchResults([]);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-cyan-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                    >
+                      {school}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* 선택된 학교 표시 */}
+              {formData.school && (
+                <div className="bg-gray-100 px-4 py-3 rounded-xl flex items-center justify-between mb-2">
+                  <span className="font-medium">{formData.school}</span>
+                  <button
+                    onClick={() => setFormData({ ...formData, school: '' })}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <i className="ri-close-line"></i>
+                  </button>
+                </div>
+              )}
+              
+              {/* 안내 문구 */}
+              <div className="flex items-start text-sm text-gray-500 mb-3">
+                <i className="ri-information-line mr-2 mt-0.5 text-cyan-500"></i>
+                <span>직장인, 스타트업, 자영업 등 검색하면 추가 됩니다!</span>
+              </div>
+              
+              {/* 재학/졸업 선택 (선택사항) */}
+              {formData.school && (
+                <div className="relative">
+                  <select
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="재학중">재학중</option>
+                    <option value="졸업">졸업</option>
+                    <option value="휴학중">휴학중</option>
+                    <option value="재직중">재직중</option>
+                  </select>
+                  <i className="ri-arrow-down-s-line absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                </div>
+              )}
             </div>
 
             <div>

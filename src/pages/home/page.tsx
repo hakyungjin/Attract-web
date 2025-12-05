@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/base/Header';
@@ -13,6 +13,17 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('matching');
   const [coins] = useState(150);
+  const [isInChatView, setIsInChatView] = useState(false);
+
+  /**
+   * 탭 변경 핸들러 - 탭 전환 시 스크롤을 맨 위로 이동
+   * @param tab - 전환할 탭 이름
+   */
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    // 스크롤을 맨 위로 부드럽게 이동
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
     // 로그인 체크 - Supabase 인증 또는 로컬 스토리지 확인
@@ -43,7 +54,7 @@ export default function Home() {
       case 'community':
         return <CommunityTab />;
       case 'chat':
-        return <ChatTab />;
+        return <ChatTab onChatViewChange={setIsInChatView} />;
       case 'profile':
         return <ProfileTab />;
       default:
@@ -53,14 +64,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header coins={coins} />
+      {!isInChatView && <Header coins={coins} />}
       <main 
-        className="pb-28 px-4 max-w-screen-xl mx-auto"
-        style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top))' }}
+        className={isInChatView ? '' : 'pb-28 px-4 max-w-screen-xl mx-auto'}
+        style={isInChatView ? {} : { paddingTop: 'calc(5rem + env(safe-area-inset-top))' }}
       >
         {renderContent()}
       </main>
-      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      {!isInChatView && <TabBar activeTab={activeTab} onTabChange={handleTabChange} />}
     </div>
   );
 }

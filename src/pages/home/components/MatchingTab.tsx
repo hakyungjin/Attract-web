@@ -16,8 +16,17 @@ interface Profile {
   character: string;
   bio: string;
   photos?: string[];
+  profile_image?: string;
   hasLikedMe?: boolean;
   isMatched?: boolean;
+  height?: string;
+  body_type?: string;
+  bodyType?: string;
+  style?: string;
+  religion?: string;
+  smoking?: string;
+  drinking?: string;
+  interests?: string[];
 }
 
 // 전역 캐시 - 컴포넌트 외부에 선언하여 리렌더링에도 유지
@@ -97,7 +106,7 @@ export default function MatchingTab() {
       // 성별 필터링
       let query = supabase
         .from('users')
-        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image', { count: 'exact' });
+        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image, photos, height, body_type, style, religion, smoking, drinking, interests', { count: 'exact' });
 
       // 로그인한 경우에만 내 프로필 제외
       if (authUser?.id) {
@@ -137,6 +146,17 @@ export default function MatchingTab() {
           })
           .map((user: any) => {
             const avatarUrl = user.avatar_url || user.profile_image || '';
+            // photos 배열 생성 (profile_image + photos 배열 합치기)
+            const allPhotos: string[] = [];
+            if (avatarUrl) allPhotos.push(avatarUrl);
+            if (user.photos && Array.isArray(user.photos)) {
+              user.photos.forEach((photo: string) => {
+                if (photo && !allPhotos.includes(photo)) {
+                  allPhotos.push(photo);
+                }
+              });
+            }
+            
             return {
               id: user.id,
               name: user.name || '알 수 없음',
@@ -144,11 +164,21 @@ export default function MatchingTab() {
               gender: user.gender || '무관',
               location: user.location || '위치 미설정',
               school: user.school || '학교 미설정',
-              mbti: user.mbti || 'MBTI',
+              mbti: user.mbti || '',
               character: avatarUrl,
               bio: user.bio || '자기소개가 없습니다.',
               hasLikedMe: false,
-              photos: avatarUrl ? [avatarUrl] : [] // photos 배열 추가
+              photos: allPhotos,
+              profile_image: avatarUrl,
+              // 상세 정보 필드
+              height: user.height || '',
+              body_type: user.body_type || '',
+              bodyType: user.body_type || '',
+              style: user.style || '',
+              religion: user.religion || '',
+              smoking: user.smoking || '',
+              drinking: user.drinking || '',
+              interests: user.interests || []
             };
           });
 
@@ -190,7 +220,12 @@ export default function MatchingTab() {
   };
 
   const handleProfileClick = (profile: Profile) => {
-    navigate('/profile-detail', { state: { profile } });
+    // DB 필드명(snake_case)을 인터페이스 필드명(camelCase)으로 변환
+    const mappedProfile = {
+      ...profile,
+      bodyType: profile.body_type || profile.bodyType,
+    };
+    navigate('/profile-detail', { state: { profile: mappedProfile } });
   };
 
   // 로딩 상태 - 스켈레톤 UI

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createUserProfile } from '../../services/phoneAuth';
 import { supabase } from '../../lib/supabase';
+import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
+import { searchSchools } from '../../constants/schools';
 
 interface LocationState {
   firebaseUid: string;
@@ -41,6 +43,11 @@ export default function SignupPage() {
   const [uploading, setUploading] = useState(false);
   const [interests, setInterests] = useState<string[]>([]);
   const [newInterest, setNewInterest] = useState('');
+  
+  // 지역/학교 선택 상태
+  const [selectedSido, setSelectedSido] = useState('');
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [schoolSearchResults, setSchoolSearchResults] = useState<string[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -397,20 +404,53 @@ export default function SignupPage() {
               />
             </div>
 
-            {/* 학교 */}
+            {/* 학교/직업 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                학교
+                <span className="text-cyan-500 font-bold">학교/직업</span>을 입력해 주세요
               </label>
-              <input
-                type="text"
-                name="school"
-                value={formData.school}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="학교명을 입력하세요"
-                maxLength={50}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={schoolSearchQuery || formData.school}
+                  onChange={(e) => {
+                    setSchoolSearchQuery(e.target.value);
+                    setSchoolSearchResults(searchSchools(e.target.value, 8));
+                  }}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  placeholder="학교 또는 직업을 검색하세요"
+                />
+                {schoolSearchResults.length > 0 && (
+                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    {schoolSearchResults.map((school) => (
+                      <button
+                        key={school}
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, school }));
+                          setSchoolSearchQuery('');
+                          setSchoolSearchResults([]);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-cyan-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        {school}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {formData.school && (
+                <div className="mt-2 bg-cyan-50 px-4 py-2 rounded-lg flex items-center justify-between">
+                  <span className="text-cyan-700 font-medium">{formData.school}</span>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, school: '' }))} className="text-cyan-500 hover:text-cyan-700">
+                    <i className="ri-close-line"></i>
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                <i className="ri-information-line mr-1 text-cyan-500"></i>
+                직장인, 스타트업, 자영업 등도 검색 가능합니다
+              </p>
             </div>
 
             {/* 키 */}
@@ -532,20 +572,52 @@ export default function SignupPage() {
               </select>
             </div>
 
-            {/* 지역 */}
+            {/* 거주지역 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                지역
+                <span className="text-cyan-500 font-bold">거주지역</span>을 선택해 주세요
               </label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="예: 서울, 강남구"
-                maxLength={50}
-              />
+              <div className="grid grid-cols-2 gap-2">
+                {/* 시/도 선택 */}
+                <div className="relative">
+                  <select
+                    value={selectedSido}
+                    onChange={(e) => {
+                      setSelectedSido(e.target.value);
+                      setFormData(prev => ({ ...prev, location: '' }));
+                    }}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="">시/도 선택</option>
+                    {KOREA_LOCATIONS.map((loc) => (
+                      <option key={loc.sido} value={loc.sido}>{loc.sido}</option>
+                    ))}
+                  </select>
+                  <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                </div>
+                
+                {/* 시/군/구 선택 */}
+                <div className="relative">
+                  <select
+                    value={formData.location ? formData.location.split(' ')[1] || '' : ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, location: selectedSido ? `${selectedSido} ${e.target.value}` : '' }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white appearance-none cursor-pointer"
+                    disabled={!selectedSido}
+                  >
+                    <option value="">시/군/구 선택</option>
+                    {selectedSido && getSigunguList(selectedSido).map((sigungu) => (
+                      <option key={sigungu} value={sigungu}>{sigungu}</option>
+                    ))}
+                  </select>
+                  <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                </div>
+              </div>
+              {formData.location && (
+                <div className="mt-2 bg-cyan-50 px-4 py-2 rounded-lg flex items-center">
+                  <i className="ri-map-pin-line mr-2 text-cyan-500"></i>
+                  <span className="text-cyan-700 font-medium">{formData.location}</span>
+                </div>
+              )}
             </div>
 
             {/* 관심사 */}

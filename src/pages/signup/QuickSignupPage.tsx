@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { hashPassword } from '../../services/passwordService';
+import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
+import { searchSchools } from '../../constants/schools';
 
 export default function QuickSignupPage() {
   const navigate = useNavigate();
@@ -29,6 +31,11 @@ export default function QuickSignupPage() {
   const [loading, setLoading] = useState(false);
   const [interests, setInterests] = useState<string[]>([]);
   const [newInterest, setNewInterest] = useState('');
+  
+  // 지역/학교 선택 상태
+  const [selectedSido, setSelectedSido] = useState('');
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [schoolSearchResults, setSchoolSearchResults] = useState<string[]>([]);
 
   const mbtiOptions = ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'];
   const heightOptions = ['150~155', '155~160', '160~165', '165~170', '170~175', '175~180', '180~185', '185~190'];
@@ -304,10 +311,73 @@ export default function QuickSignupPage() {
               <button type="button" onClick={() => setFormData(prev => ({ ...prev, gender: 'female' }))} className={`py-2 rounded-lg text-sm font-medium transition-all ${formData.gender === 'female' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-600'}`}>여자</button>
             </div>
 
-            {/* 학교 + 지역 */}
+            {/* 학교 검색 */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">학교/직업</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={schoolSearchQuery || formData.school}
+                  onChange={(e) => {
+                    setSchoolSearchQuery(e.target.value);
+                    setSchoolSearchResults(searchSchools(e.target.value, 5));
+                  }}
+                  placeholder="학교 또는 직업 검색" 
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" 
+                />
+                {schoolSearchResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                    {schoolSearchResults.map((school) => (
+                      <button
+                        key={school}
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, school }));
+                          setSchoolSearchQuery('');
+                          setSchoolSearchResults([]);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        {school}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 지역 선택 */}
             <div className="grid grid-cols-2 gap-2">
-              <input type="text" name="school" value={formData.school} onChange={handleChange} placeholder="학교" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="지역" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              <div className="relative">
+                <select
+                  value={selectedSido}
+                  onChange={(e) => {
+                    setSelectedSido(e.target.value);
+                    setFormData(prev => ({ ...prev, location: '' }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white appearance-none"
+                >
+                  <option value="">시/도 선택</option>
+                  {KOREA_LOCATIONS.map((loc) => (
+                    <option key={loc.sido} value={loc.sido}>{loc.sido.replace('특별시', '').replace('광역시', '').replace('특별자치시', '').replace('특별자치도', '').replace('도', '')}</option>
+                  ))}
+                </select>
+                <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm"></i>
+              </div>
+              <div className="relative">
+                <select
+                  value={formData.location ? formData.location.split(' ')[1] || '' : ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, location: selectedSido ? `${selectedSido} ${e.target.value}` : '' }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white appearance-none"
+                  disabled={!selectedSido}
+                >
+                  <option value="">구/군 선택</option>
+                  {selectedSido && getSigunguList(selectedSido).map((sigungu) => (
+                    <option key={sigungu} value={sigungu}>{sigungu}</option>
+                  ))}
+                </select>
+                <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm"></i>
+              </div>
             </div>
 
             {/* MBTI */}
