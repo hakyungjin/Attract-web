@@ -47,6 +47,10 @@ export default function MatchingTab() {
   const [hasMore, setHasMore] = useState(true);
   const PROFILES_PER_PAGE = 20;
   const isLoadingRef = useRef(false); // 중복 로드 방지
+  
+  // 임시 필터 상태 (적용 버튼 누르기 전까지 유지)
+  const [tempGender, setTempGender] = useState<string>('');
+  const [tempRegion, setTempRegion] = useState<string>('전체');
 
   // 필터 모달 열릴 때 body 스크롤 잠금
   useEffect(() => {
@@ -272,7 +276,10 @@ export default function MatchingTab() {
 
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => setShowFilter(!showFilter)}
+            onClick={() => {
+              setTempGender(selectedGender);
+              setShowFilter(!showFilter);
+            }}
             className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:shadow-lg transition-all hover:scale-105 group"
           >
             <i className="ri-filter-line text-slate-400 group-hover:text-primary-500 text-lg transition-colors"></i>
@@ -350,78 +357,99 @@ export default function MatchingTab() {
 
       {/* 필터 팝업 */}
       {showFilter && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={() => setShowFilter(false)}>
-          <div 
-            className="bg-white w-full rounded-t-[2rem] p-8 max-h-[85vh] overflow-y-auto animate-slide-up shadow-2xl overscroll-contain touch-pan-y" 
-            style={{ WebkitOverflowScrolling: 'touch' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-2xl font-bold font-display text-slate-800">필터</h3>
-              <button
-                onClick={() => setShowFilter(false)}
-                className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors"
-              >
-                <i className="ri-close-line text-2xl text-slate-400"></i>
-              </button>
-            </div>
-
-            <div className="space-y-8">
-              <div>
-                <h4 className="font-bold text-slate-800 mb-4 text-lg">성별</h4>
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => setSelectedGender('female')}
-                    className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === 'female'
-                      ? 'border-primary-500 bg-primary-50 text-primary-600'
-                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
-                      }`}
-                  >
-                    여자
-                  </button>
-                  <button
-                    onClick={() => setSelectedGender('male')}
-                    className={`flex-1 py-4 rounded-2xl font-bold transition-all cursor-pointer border-2 ${selectedGender === 'male'
-                      ? 'border-primary-500 bg-primary-50 text-primary-600'
-                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
-                      }`}
-                  >
-                    남자
-                  </button>
-                </div>
+        <div className="fixed inset-0 z-50 flex justify-center" onClick={() => setShowFilter(false)}>
+          {/* 배경 오버레이 */}
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in"></div>
+          
+          {/* 모달 컨테이너 - 앱 너비에 맞춤 */}
+          <div className="relative w-full max-w-[400px] flex items-start justify-center pt-20">
+            <div 
+              className="bg-white w-[90%] rounded-3xl p-6 max-h-[70vh] overflow-y-auto shadow-2xl overscroll-contain touch-pan-y animate-slide-up" 
+              style={{ WebkitOverflowScrolling: 'touch' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold font-display text-slate-800">필터</h3>
+                <button
+                  onClick={() => setShowFilter(false)}
+                  className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <i className="ri-close-line text-2xl text-slate-400"></i>
+                </button>
               </div>
 
-              <div>
-                <h4 className="font-bold text-slate-800 mb-4 text-lg">지역</h4>
-                <div className="grid grid-cols-3 gap-3">
-                  {['전체', '인천/서울', '경기/강원', '경상권', '충청권', '호남권'].map((region) => (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-3 text-base">성별</h4>
+                  <div className="flex space-x-3">
                     <button
-                      key={region}
-                      className="px-2 py-3 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium hover:bg-primary-50 hover:text-primary-600 transition-colors cursor-pointer whitespace-nowrap border border-transparent hover:border-primary-200"
+                      onClick={() => setTempGender('female')}
+                      className={`flex-1 py-3 rounded-xl font-bold transition-all cursor-pointer border-2 ${tempGender === 'female'
+                        ? 'border-primary-500 bg-primary-50 text-primary-600'
+                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                        }`}
                     >
-                      {region}
+                      여자
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setTempGender('male')}
+                      className={`flex-1 py-3 rounded-xl font-bold transition-all cursor-pointer border-2 ${tempGender === 'male'
+                        ? 'border-primary-500 bg-primary-50 text-primary-600'
+                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                        }`}
+                    >
+                      남자
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-3 text-base">지역</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['전체', '인천/서울', '경기/강원', '경상권', '충청권', '호남권'].map((region) => (
+                      <button
+                        key={region}
+                        onClick={() => setTempRegion(region)}
+                        className={`px-2 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap border ${
+                          tempRegion === region
+                            ? 'border-primary-500 bg-primary-50 text-primary-600'
+                            : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-primary-50 hover:text-primary-600'
+                        }`}
+                      >
+                        {region}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex space-x-4 mt-10">
-              <button
-                onClick={() => setShowFilter(false)}
-                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold cursor-pointer hover:bg-slate-200 transition-colors"
-              >
-                닫기
-              </button>
-              <button
-                onClick={() => {
-                  setShowFilter(false);
-                  loadProfiles();
-                }}
-                className="flex-1 py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-2xl font-bold cursor-pointer shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all"
-              >
-                적용하기
-              </button>
+              <div className="flex space-x-3 mt-8">
+                <button
+                  onClick={() => {
+                    setTempGender(selectedGender);
+                    setTempRegion('전체');
+                    setShowFilter(false);
+                  }}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold cursor-pointer hover:bg-slate-200 transition-colors"
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedGender(tempGender);
+                    setShowFilter(false);
+                    // 필터 적용 후 프로필 다시 로드
+                    cachedProfiles = { male: [], female: [] };
+                    lastLoadTime = { male: 0, female: 0 };
+                    setProfiles([]);
+                    setPage(0);
+                    setHasMore(true);
+                  }}
+                  className="flex-1 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold cursor-pointer shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all"
+                >
+                  적용하기
+                </button>
+              </div>
             </div>
           </div>
         </div>
