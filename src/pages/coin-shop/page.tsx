@@ -255,137 +255,63 @@ export default function CoinShopPage() {
         </div>
       </div>
 
-      {/* 결제 모달 */}
+      {/* 결제 모달 - 간결한 버전 */}
       {showPaymentModal && selectedPackage && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden animate-slide-up">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden animate-scale-in shadow-2xl">
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-              <h3 className="text-xl font-bold text-gray-900">결제하기</h3>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">결제하기</h3>
               <button 
                 onClick={() => setShowPaymentModal(false)}
-                className="w-9 h-9 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center cursor-pointer rounded-full hover:bg-gray-100"
               >
-                <i className="ri-close-line text-2xl text-gray-600"></i>
+                <i className="ri-close-line text-xl text-gray-500"></i>
               </button>
             </div>
 
-            <div className="p-6">
-              {/* 선택한 패키지 */}
-              <div className="bg-gray-50 rounded-2xl p-5 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-pink-50 rounded-full flex items-center justify-center">
-                      <img
-                        src="/images/magnet.png"
-                        alt="자석"
-                        className="w-8 h-8"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 mb-1">자석</div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {selectedPackage.coins.toLocaleString()}
-                        {(selectedPackage.bonus || selectedPackage.bonus_coins) && (
-                          <span className="text-base text-pink-500 ml-1">
-                            +{selectedPackage.bonus_coins || selectedPackage.bonus}
-                          </span>
-                        )}
-                      </div>
+            <div className="p-5">
+              {/* 선택한 패키지 - 간결하게 */}
+              <div className="flex items-center justify-between bg-gray-50 rounded-xl p-4 mb-5">
+                <div className="flex items-center space-x-3">
+                  <img src="/image/magnet.png" alt="자석" className="w-10 h-10" />
+                  <div>
+                    <div className="text-xl font-bold text-gray-900">
+                      {selectedPackage.coins.toLocaleString()}
+                      {(selectedPackage.bonus || selectedPackage.bonus_coins) && (
+                        <span className="text-sm text-pink-500 ml-1">
+                          +{selectedPackage.bonus_coins || selectedPackage.bonus}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                  <span className="text-gray-600">결제금액</span>
-                  <div className="text-3xl font-bold text-gray-900">
-                    {selectedPackage.price.toLocaleString()}
-                    <span className="text-lg text-gray-600 ml-1">원</span>
-                  </div>
+                <div className="text-xl font-bold text-gray-900">
+                  {selectedPackage.price.toLocaleString()}원
                 </div>
               </div>
 
-              {/* 결제 수단 */}
-              <div className="mb-6">
-                <h4 className="font-bold text-gray-900 mb-3">결제 수단</h4>
-                <div className="space-y-2">
-                  {/* 카카오페이 */}
-                  <button
-                    onClick={() => setPaymentMethod('KAKAOPAY')}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      paymentMethod === 'KAKAOPAY'
-                        ? 'border-yellow-400 bg-yellow-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
-                        <span className="text-black font-bold text-xs">kakao</span>
-                      </div>
-                      <span className="font-medium text-gray-900">카카오페이</span>
-                    </div>
-                    {paymentMethod === 'KAKAOPAY' && (
-                      <i className="ri-check-line text-xl text-yellow-500"></i>
-                    )}
-                  </button>
-
-                  {/* 토스페이 */}
-                  <button
-                    onClick={() => setPaymentMethod('토스페이')}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      paymentMethod === '토스페이'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">toss</span>
-                      </div>
-                      <span className="font-medium text-gray-900">토스페이</span>
-                    </div>
-                    {paymentMethod === '토스페이' && (
-                      <i className="ri-check-line text-xl text-blue-500"></i>
-                    )}
-                  </button>
-
-                  {/* 신용/체크카드 */}
-                  <button
-                    onClick={() => setPaymentMethod('CARD')}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      paymentMethod === 'CARD'
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                        <i className="ri-bank-card-2-line text-white text-lg"></i>
-                      </div>
-                      <span className="font-medium text-gray-900">신용/체크카드</span>
-                    </div>
-                    {paymentMethod === 'CARD' && (
-                      <i className="ri-check-line text-xl text-purple-500"></i>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* 결제 버튼 */}
+              {/* 카카오페이 결제 버튼 */}
               <button
                 onClick={handlePayment}
                 disabled={isProcessing}
-                className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 transition-all cursor-pointer whitespace-nowrap disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold text-lg hover:bg-yellow-500 transition-all cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {isProcessing ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                     <span>결제 진행 중...</span>
                   </>
                 ) : (
-                  <span>{selectedPackage.price.toLocaleString()}원 결제하기</span>
+                  <>
+                    <span className="font-bold">카카오페이</span>
+                  </>
                 )}
               </button>
+              
+              <p className="text-xs text-gray-400 text-center mt-3">
+                결제 시 카카오페이 앱으로 이동합니다
+              </p>
             </div>
           </div>
         </div>

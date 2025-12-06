@@ -565,23 +565,62 @@ export default function ProfileDetailPage() {
               </p>
             </div>
             <p className="text-slate-500 mb-6">
-              내 자석: <span className="font-bold text-slate-800">{userCoins}개</span>
+              내 자석: <span className={`font-bold ${userCoins < MATCH_COST ? 'text-red-500' : 'text-slate-800'}`}>{userCoins}개</span>
             </p>
-            <div className="space-y-3">
-              <button
-                onClick={handleLike}
-                disabled={userCoins < MATCH_COST}
-                className={`w-full bg-gradient-to-r ${themeGradient} text-white py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg`}
-              >
-                {userCoins < MATCH_COST ? '자석이 부족해요' : '💕 하트 보내기'}
-              </button>
-              <button
-                onClick={() => setShowCoinConfirmModal(false)}
-                className="w-full text-slate-500 py-3 font-medium hover:text-slate-700 transition-colors cursor-pointer"
-              >
-                다음에 할게요
-              </button>
-            </div>
+            
+            {userCoins >= MATCH_COST ? (
+              // 코인 충분할 때
+              <div className="space-y-3">
+                <button
+                  onClick={handleLike}
+                  className={`w-full bg-gradient-to-r ${themeGradient} text-white py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all cursor-pointer shadow-lg`}
+                >
+                  💕 하트 보내기
+                </button>
+                <button
+                  onClick={() => setShowCoinConfirmModal(false)}
+                  className="w-full text-slate-500 py-3 font-medium hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  다음에 할게요
+                </button>
+              </div>
+            ) : (
+              // 코인 부족할 때 - 결제 유도 UI
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-center mb-2">
+                    <i className="ri-coin-line text-2xl text-amber-500 mr-2"></i>
+                    <span className="font-bold text-amber-700">자석이 부족해요!</span>
+                  </div>
+                  <p className="text-sm text-amber-600 text-center">
+                    {MATCH_COST - userCoins}개만 더 있으면 하트를 보낼 수 있어요
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setShowCoinConfirmModal(false);
+                    navigate('/coin-shop');
+                  }}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-amber-500/30 flex items-center justify-center"
+                >
+                  <i className="ri-flashlight-line mr-2 text-xl"></i>
+                  지금 충전하기
+                </button>
+                
+                <div className="flex items-center justify-center text-xs text-slate-400">
+                  <i className="ri-gift-line mr-1"></i>
+                  첫 충전 시 보너스 코인 지급!
+                </div>
+                
+                <button
+                  onClick={() => setShowCoinConfirmModal(false)}
+                  className="w-full text-slate-500 py-2 font-medium hover:text-slate-700 transition-colors cursor-pointer text-sm"
+                >
+                  다음에 할게요
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
