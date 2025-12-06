@@ -336,6 +336,8 @@ export default function ProfileDetailPage() {
   const themeColor = isFemale ? 'rose' : 'cyan';
 
   return (
+    <div className={`bg-cyan-50 pb-20 ${showLoginModal ? 'overflow-hidden' : ''}`}>
+      {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
     <div className={`min-h-screen bg-slate-50 ${showLoginModal ? 'overflow-hidden' : ''}`}>
       <div className={`${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
         
