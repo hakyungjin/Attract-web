@@ -351,7 +351,11 @@ export default function MatchingTab() {
       {/* 필터 팝업 */}
       {showFilter && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={() => setShowFilter(false)}>
-          <div className="bg-white w-full rounded-t-[2rem] p-8 max-h-[85vh] overflow-y-auto animate-slide-up shadow-2xl overscroll-contain" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="bg-white w-full rounded-t-[2rem] p-8 max-h-[85vh] overflow-y-auto animate-slide-up shadow-2xl overscroll-contain touch-pan-y" 
+            style={{ WebkitOverflowScrolling: 'touch' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-2xl font-bold font-display text-slate-800">필터</h3>
               <button

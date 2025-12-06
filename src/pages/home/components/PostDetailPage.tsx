@@ -381,7 +381,10 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
       </div>
 
       {/* Input Bar */}
-      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-3 z-40" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div 
+        className="fixed left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-3 z-40"
+        style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}
+      >
         <img
           src={authUser?.profile_image || 'https://via.placeholder.com/100'}
           alt="내 프로필"

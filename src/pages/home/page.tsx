@@ -66,7 +66,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50">
       {!isInChatView && <Header coins={coins} />}
       <main 
-        className={isInChatView ? '' : 'pb-28 px-4 max-w-screen-xl mx-auto'}
+        className={isInChatView ? '' : 'pb-28'}
         style={isInChatView ? {} : { paddingTop: 'calc(5rem + env(safe-area-inset-top))' }}
       >
         {renderContent()}

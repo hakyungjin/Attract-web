@@ -424,7 +424,8 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
   // ==========================================
   if (selectedRoom) {
     return (
-      <div className="fixed inset-0 bg-white z-50 flex flex-col">
+      <div className="fixed inset-0 z-50 flex justify-center bg-slate-100">
+        <div className="w-full max-w-[400px] bg-white flex flex-col">
         {/* 채팅 헤더 */}
         <div 
           className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white flex-shrink-0"
@@ -533,31 +534,29 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
 
         {/* 메시지 입력 */}
         <div 
-          className="p-4 bg-white border-t border-slate-100 flex-shrink-0"
-          style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+          className="px-4 pt-3 bg-white border-t border-slate-100 flex-shrink-0"
+          style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 12px))' }}
         >
           <div className="flex items-center space-x-3">
-            <div className="flex-1">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="메시지를 입력하세요..."
-                className="w-full px-5 py-3 bg-slate-50 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all text-sm border border-transparent focus:border-cyan-200"
-                maxLength={500}
-              />
-            </div>
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="메시지를 입력하세요..."
+              className="flex-1 px-4 py-2.5 bg-slate-100 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all text-sm"
+              maxLength={500}
+            />
             <button
               onClick={handleSendMessage}
               disabled={!newMessage.trim()}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md flex-shrink-0 ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
                 newMessage.trim()
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-105'
-                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-105 shadow-md'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >
-              <i className="ri-send-plane-fill text-lg"></i>
+              <i className="ri-send-plane-fill text-base"></i>
             </button>
           </div>
         </div>
@@ -595,6 +594,7 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
             </div>
           </div>
         )}
+        </div>
       </div>
     );
   }
@@ -603,7 +603,7 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
   // 채팅방 목록 화면
   // ==========================================
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen px-5 pt-2">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-slate-800">채팅</h2>

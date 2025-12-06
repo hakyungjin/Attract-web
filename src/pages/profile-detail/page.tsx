@@ -50,6 +50,11 @@ export default function ProfileDetailPage() {
 
   const MATCH_COST = 50;
 
+  // 페이지 진입 시 스크롤 맨 위로
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   const getCurrentUserId = () => {
     const localUser = localStorage.getItem('user');
     if (!localUser) return null;
@@ -334,8 +339,6 @@ export default function ProfileDetailPage() {
   const themeColor = isFemale ? 'rose' : 'cyan';
 
   return (
-    <div className={`bg-cyan-50 pb-20 ${showLoginModal ? 'overflow-hidden' : ''}`}>
-      {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
     <div className={`min-h-screen bg-slate-50 ${showLoginModal ? 'overflow-hidden' : ''}`}>
       <div className={`${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
         
@@ -361,8 +364,8 @@ export default function ProfileDetailPage() {
           </div>
 
           {/* 프로필 사진 */}
-          <div className="relative w-full aspect-[3/4] max-h-[70vh] bg-slate-200 overflow-hidden">
-            <img
+          <div className="relative w-full aspect-[3/4] max-h-[85vh] bg-slate-200 overflow-hidden">
+            <img 
               src={profilePhotos[currentPhotoIndex]}
               alt={`${profile.name}`}
               className="w-full h-full object-cover"
@@ -438,7 +441,7 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* 프로필 정보 영역 */}
-        <div className="px-4 py-6 space-y-4 pb-36">
+        <div className="px-4 py-6 space-y-4 pb-6">
           
           {/* 자기소개 (가장 먼저, 가장 크게) */}
           {profile?.bio && (
@@ -754,4 +757,4 @@ export default function ProfileDetailPage() {
       `}</style>
     </div>
   );
-}
+} 
