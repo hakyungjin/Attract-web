@@ -331,7 +331,7 @@ export default function ProfileDetailPage() {
   };
 
   return (
-    <div className={`min-h-screen bg-cyan-50 pb-24 ${showLoginModal ? 'overflow-hidden' : ''}`}>
+    <div className={`bg-cyan-50 pb-20 ${showLoginModal ? 'overflow-hidden' : ''}`}>
       {/* 프로필 컨텐츠 - 로그인 모달이 떠있으면 blur 처리 */}
       <div className={`${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
         {/* 헤더 */}
