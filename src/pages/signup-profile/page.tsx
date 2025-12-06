@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { MBTI_TYPES } from '../../constants/mbti';
 import { logger } from '../../utils/logger';
+import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
+import { searchSchools } from '../../constants/schools';
 
 export default function SignupProfilePage() {
   const navigate = useNavigate();
@@ -28,10 +30,14 @@ export default function SignupProfilePage() {
   });
 
   const [newInterest, setNewInterest] = useState('');
-  const [showLocationModal, setShowLocationModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  
+  // 지역/학교 선택 상태
+  const [selectedSido, setSelectedSido] = useState('');
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [schoolSearchResults, setSchoolSearchResults] = useState<string[]>([]);
 
   // 회원가입 후 전달된 사용자 정보 로드
   useEffect(() => {
@@ -63,17 +69,6 @@ export default function SignupProfilePage() {
     }
   }, [location]);
 
-  const locationData: Record<string, string[]> = {
-    '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
-    '인천': ['계양구', '남동구', '동구', '미추홀구', '부평구', '서구', '연수구', '중구', '강화군', '옹진군'],
-    '부산': ['강서구', '금정구', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구', '기장군'],
-    '대구': ['남구', '달서구', '동구', '북구', '서구', '수성구', '중구', '달성군'],
-    '대전': ['대덕구', '동구', '서구', '유성구', '중구'],
-    '광주': ['광산구', '남구', '동구', '북구', '서구'],
-    '울산': ['남구', '동구', '북구', '중구', '울주군'],
-    '경기': ['고양시', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시', '수원시', '시흥시', '안산시', '안성시', '안양시', '양주시', '여주시', '오산시', '용인시', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시'],
-    '강원': ['강릉시', '동해시', '삼척시', '속초시', '원주시', '춘천시', '태백시', '고성군', '양구군', '양양군', '영월군', '인제군', '정선군', '철원군', '평창군', '홍천군', '화천군', '횡성군'],
-  };
 
   const handleAddInterest = () => {
     if (newInterest.trim() && !formData.interests.includes(newInterest)) {
@@ -92,13 +87,6 @@ export default function SignupProfilePage() {
     }));
   };
 
-  const handleLocationSelect = (city: string, district: string) => {
-    setFormData(prev => ({
-      ...prev,
-      location: `${city} ${district}`
-    }));
-    setShowLocationModal(false);
-  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -247,96 +235,113 @@ export default function SignupProfilePage() {
           {/* 지역 */}
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-2">
-              지역
+              <span className="text-cyan-500">거주지역</span>을 선택해 주세요
             </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowLocationModal(true)}
-                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl bg-white text-gray-700 hover:border-cyan-500 transition-colors cursor-pointer"
-              >
-                {formData.location || '지역 선택'}
-              </button>
+            <div className="grid grid-cols-2 gap-2">
+              {/* 시/도 선택 */}
+              <div className="relative">
+                <select
+                  value={selectedSido}
+                  onChange={(e) => {
+                    setSelectedSido(e.target.value);
+                    setFormData(prev => ({ ...prev, location: '' }));
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 bg-white appearance-none cursor-pointer"
+                >
+                  <option value="">시/도 선택</option>
+                  {KOREA_LOCATIONS.map((loc) => (
+                    <option key={loc.sido} value={loc.sido}>{loc.sido}</option>
+                  ))}
+                </select>
+                <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+              </div>
+              
+              {/* 시/군/구 선택 */}
+              <div className="relative">
+                <select
+                  value={formData.location ? formData.location.split(' ').slice(1).join(' ') : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setFormData(prev => ({ ...prev, location: `${selectedSido} ${e.target.value}` }));
+                    }
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 bg-white appearance-none cursor-pointer"
+                  disabled={!selectedSido}
+                >
+                  <option value="">시/군/구 선택</option>
+                  {selectedSido && getSigunguList(selectedSido).map((sigungu) => (
+                    <option key={sigungu} value={sigungu}>{sigungu}</option>
+                  ))}
+                </select>
+                <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+              </div>
             </div>
-
-            {/* 지역 선택 모달 */}
-            {showLocationModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-3xl p-6 max-w-md w-full max-h-96 overflow-y-auto">
-                  <h3 className="text-lg font-bold mb-4">지역 선택</h3>
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {Object.entries(locationData).map(([city, districts]) => (
-                      <div key={city}>
-                        <h4 className="font-semibold text-gray-800 py-2">{city}</h4>
-                        <div className="grid grid-cols-2 gap-2 ml-2">
-                          {districts.slice(0, 10).map(district => (
-                            <button
-                              key={district}
-                              onClick={() => handleLocationSelect(city, district)}
-                              className="text-left px-3 py-2 bg-gray-100 hover:bg-cyan-200 rounded-lg text-sm transition-colors cursor-pointer"
-                            >
-                              {district}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setShowLocationModal(false)}
-                    className="w-full mt-4 px-4 py-3 bg-gray-200 rounded-xl cursor-pointer"
-                  >
-                    닫기
-                  </button>
-                </div>
+            {formData.location && (
+              <div className="mt-2 bg-cyan-50 px-4 py-2 rounded-xl flex items-center">
+                <i className="ri-map-pin-line mr-2 text-cyan-500"></i>
+                <span className="text-cyan-700 font-medium">{formData.location}</span>
               </div>
             )}
           </div>
 
-          {/* 자기소개 */}
+          {/* 학교/직업 */}
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-2">
-              자기소개
+              <span className="text-cyan-500">학교/직업</span>을 입력해 주세요
             </label>
-            <textarea
-              value={formData.bio}
-              onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-              placeholder="자신을 소개해주세요..."
-              maxLength={200}
-              rows={4}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 resize-none"
-            />
-            <p className="text-xs text-gray-500 mt-1">{formData.bio.length}/200</p>
-          </div>
-
-          {/* 학교 */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-800 mb-2">
-              학교
-            </label>
-            <input
-              type="text"
-              value={formData.school}
-              onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
-              placeholder="학교명"
-              maxLength={50}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500"
-            />
-          </div>
-
-          {/* 직업 */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-800 mb-2">
-              직업
-            </label>
-            <input
-              type="text"
-              value={formData.job}
-              onChange={(e) => setFormData(prev => ({ ...prev, job: e.target.value }))}
-              placeholder="직업"
-              maxLength={50}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={schoolSearchQuery || formData.school || formData.job}
+                onChange={(e) => {
+                  setSchoolSearchQuery(e.target.value);
+                  setSchoolSearchResults(searchSchools(e.target.value, 8));
+                }}
+                placeholder="학교 또는 직업을 검색하세요"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500"
+              />
+              {schoolSearchResults.length > 0 && (
+                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {schoolSearchResults.map((result) => (
+                    <button
+                      key={result}
+                      type="button"
+                      onClick={() => {
+                        // 대학교인지 직업인지 판단
+                        if (result.includes('대학교') || result.includes('대학') || result.includes('학교')) {
+                          setFormData(prev => ({ ...prev, school: result, job: '' }));
+                        } else {
+                          setFormData(prev => ({ ...prev, job: result, school: '' }));
+                        }
+                        setSchoolSearchQuery('');
+                        setSchoolSearchResults([]);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-cyan-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                    >
+                      {result}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {(formData.school || formData.job) && (
+              <div className="mt-2 bg-cyan-50 px-4 py-2 rounded-xl flex items-center justify-between">
+                <span className="text-cyan-700 font-medium">
+                  {formData.school || formData.job}
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setFormData(prev => ({ ...prev, school: '', job: '' }))} 
+                  className="text-cyan-500 hover:text-cyan-700"
+                >
+                  <i className="ri-close-line"></i>
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              <i className="ri-information-line mr-1 text-cyan-500"></i>
+              직장인, 스타트업, 자영업 등도 검색 가능합니다
+            </p>
           </div>
 
           {/* 키 */}
@@ -484,6 +489,22 @@ export default function SignupProfilePage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* 자기소개 */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-800 mb-2">
+              자기소개
+            </label>
+            <textarea
+              value={formData.bio}
+              onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+              placeholder="자신을 소개해주세요..."
+              maxLength={200}
+              rows={4}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 resize-none"
+            />
+            <p className="text-xs text-gray-500 mt-1">{formData.bio.length}/200</p>
           </div>
 
           {/* 프로필 사진 (필수) */}

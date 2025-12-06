@@ -82,7 +82,7 @@ i  hosting[attract--web]: beginning deploy...
 
 +  Deploy complete!
 
-Hosting URL: https://attract--web.web.app
+Hosting URL: https://attract.web.app
 ```
 
 ---
@@ -90,7 +90,7 @@ Hosting URL: https://attract--web.web.app
 ## 🚀 배포 후 확인
 
 ### 1. 앱 접속
-- **URL**: https://attract--web.web.app
+- **URL**: https://attract.web.app
 - 캐시 문제가 있으면: **Ctrl+Shift+Delete** 후 새로고침
 
 ### 2. 브라우저 개발자도구 확인
@@ -264,4 +264,4 @@ npm run build
 
 **마지막 배포**: 2025년 11월 28일
 **현재 프로젝트**: attract--web
-**배포 URL**: https://attract--web.web.app
+**배포 URL**: https://attract.web.app

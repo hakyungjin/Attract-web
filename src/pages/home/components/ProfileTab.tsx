@@ -4,6 +4,11 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import KakaoAdFit, { DummyAdBanner } from '../../../components/ads/KakaoAdFit';
 
+// 카카오 애드핏 광고 단위 ID
+// 환경 변수가 없으면 기본값 사용
+const KAKAO_AD_UNIT_1 = import.meta.env.VITE_KAKAO_AD_UNIT_1 || 'DAN-xzcTogwnUXAFXJ7t';
+const KAKAO_AD_UNIT_2 = import.meta.env.VITE_KAKAO_AD_UNIT_2 || 'DAN-VPAvNk4a33lBM3D8';
+
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
   if (gender === '남자' || gender === 'male') {
@@ -217,20 +222,20 @@ export default function ProfileTab() {
 
         {/* 광고 배너 1 - 카카오 애드핏 */}
         <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
-          {/* 실제 광고 (unit ID 발급 후 주석 해제)
-          <KakaoAdFit unit="DAN-XXXXXXXXXX" width={320} height={100} />
-          */}
-          {/* 테스트용 더미 배너 (광고 승인 전까지 표시) */}
-          <DummyAdBanner width={320} height={100} text="광고 영역 1" className="mx-auto" />
+          {KAKAO_AD_UNIT_1 ? (
+            <KakaoAdFit unit={KAKAO_AD_UNIT_1} width={320} height={100} className="mx-auto" />
+          ) : (
+            <DummyAdBanner width={320} height={100} text="광고 영역 1" className="mx-auto" />
+          )}
         </div>
 
         {/* 광고 배너 2 - 카카오 애드핏 */}
         <div className="animate-slide-up" style={{ animationDelay: '0.25s' }}>
-          {/* 실제 광고 (unit ID 발급 후 주석 해제)
-          <KakaoAdFit unit="DAN-YYYYYYYYYY" width={320} height={100} />
-          */}
-          {/* 테스트용 더미 배너 (광고 승인 전까지 표시) */}
-          <DummyAdBanner width={320} height={100} text="광고 영역 2" className="mx-auto" />
+          {KAKAO_AD_UNIT_2 ? (
+            <KakaoAdFit unit={KAKAO_AD_UNIT_2} width={320} height={100} className="mx-auto" />
+          ) : (
+            <DummyAdBanner width={320} height={100} text="광고 영역 2" className="mx-auto" />
+          )}
         </div>
 
         {/* 메뉴 */}

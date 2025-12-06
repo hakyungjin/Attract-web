@@ -51,6 +51,48 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
     window.scrollTo(0, 0);
   }, [post]);
 
+  /**
+   * userId로 프로필을 로드하고 프로필 상세 페이지로 이동
+   */
+  const loadAndNavigateToProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        navigate('/profile-detail', {
+          state: {
+            profile: {
+              id: data.id,
+              name: data.name,
+              age: data.age,
+              gender: data.gender,
+              location: data.location,
+              school: data.school,
+              mbti: data.mbti,
+              bio: data.bio,
+              photos: data.profile_image ? [data.profile_image] : [],
+              interests: data.interests || [],
+              height: data.height,
+              bodyType: data.body_type,
+              religion: data.religion,
+              smoking: data.smoking,
+              drinking: data.drinking
+            }
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('프로필 로드 실패', error);
+      alert('프로필을 불러오는데 실패했습니다.');
+    }
+  };
+
   const handleLike = async () => {
     const newLikes = currentPost.isLiked ? currentPost.likes - 1 : currentPost.likes + 1;
 
@@ -215,8 +257,43 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
             <img
               src={currentPost.avatar}
               alt={currentPost.author}
-              className="w-10 h-10 rounded-full object-cover mr-3 flex-shrink-0 border border-gray-100"
-              onClick={() => navigate('/profile-detail', { state: { authorData: currentPost.authorData || { id: currentPost.id, name: currentPost.author, avatar_url: currentPost.avatar } } })}
+              className="w-10 h-10 rounded-full object-cover mr-3 flex-shrink-0 border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => {
+                // 내 게시글이면 내 프로필 페이지로 이동
+                if (currentPost.userId === authUser?.id) {
+                  navigate('/my-profile');
+                  return;
+                }
+                
+                // authorData가 있으면 사용, 없으면 userId로 프로필 조회
+                if (currentPost.authorData) {
+                  const avatarUrl = currentPost.authorData.avatar_url || currentPost.authorData.profile_image;
+                  navigate('/profile-detail', { 
+                    state: { 
+                      profile: {
+                        id: currentPost.authorData.id,
+                        name: currentPost.authorData.name,
+                        age: currentPost.authorData.age,
+                        gender: currentPost.authorData.gender,
+                        location: currentPost.authorData.location,
+                        school: currentPost.authorData.school,
+                        mbti: currentPost.authorData.mbti,
+                        bio: currentPost.authorData.bio,
+                        photos: avatarUrl ? [avatarUrl] : [],
+                        interests: currentPost.authorData.interests || [],
+                        height: currentPost.authorData.height,
+                        bodyType: currentPost.authorData.body_type,
+                        religion: currentPost.authorData.religion,
+                        smoking: currentPost.authorData.smoking,
+                        drinking: currentPost.authorData.drinking
+                      }
+                    } 
+                  });
+                } else if (currentPost.userId) {
+                  // userId만 있으면 DB에서 조회 후 이동
+                  loadAndNavigateToProfile(currentPost.userId);
+                }
+              }}
             />
             <div className="flex-1 min-w-0">
               <div className="font-bold text-gray-900 text-sm truncate">
@@ -225,7 +302,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
               <div className="text-xs text-gray-400 mt-0.5">{currentPost.timeAgo}</div>
             </div>
 
-            {(currentPost.userId === currentUser?.id || currentPost.userId === currentUser?.profile?.id) && (
+            {(currentPost.userId === authUser?.id) && (
               <button
                 onClick={handleDeletePost}
                 disabled={isDeleting}
@@ -282,7 +359,6 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
                   src={comment.avatar}
                   alt={comment.author}
                   className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
-                  onClick={() => navigate('/profile-detail', { state: { userId: comment.id } })}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -307,7 +383,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
       {/* Input Bar */}
       <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-3 z-40" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <img
-          src={currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://via.placeholder.com/100'}
+          src={authUser?.profile_image || 'https://via.placeholder.com/100'}
           alt="내 프로필"
           className="w-8 h-8 rounded-full object-cover border border-gray-100 flex-shrink-0"
         />

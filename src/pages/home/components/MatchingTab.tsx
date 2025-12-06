@@ -16,8 +16,17 @@ interface Profile {
   character: string;
   bio: string;
   photos?: string[];
+  profile_image?: string;
   hasLikedMe?: boolean;
   isMatched?: boolean;
+  height?: string;
+  body_type?: string;
+  bodyType?: string;
+  style?: string;
+  religion?: string;
+  smoking?: string;
+  drinking?: string;
+  interests?: string[];
 }
 
 // 전역 캐시 - 컴포넌트 외부에 선언하여 리렌더링에도 유지
@@ -110,7 +119,7 @@ export default function MatchingTab() {
       // 성별 필터링
       let query = supabase
         .from('users')
-        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image', { count: 'exact' });
+        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image, photos, height, body_type, style, religion, smoking, drinking, interests', { count: 'exact' });
 
       // 로그인한 경우에만 내 프로필 제외
       if (authUser?.id) {
@@ -150,6 +159,17 @@ export default function MatchingTab() {
           })
           .map((user: any) => {
             const avatarUrl = user.avatar_url || user.profile_image || '';
+            // photos 배열 생성 (profile_image + photos 배열 합치기)
+            const allPhotos: string[] = [];
+            if (avatarUrl) allPhotos.push(avatarUrl);
+            if (user.photos && Array.isArray(user.photos)) {
+              user.photos.forEach((photo: string) => {
+                if (photo && !allPhotos.includes(photo)) {
+                  allPhotos.push(photo);
+                }
+              });
+            }
+            
             return {
               id: user.id,
               name: user.name || '알 수 없음',
@@ -157,11 +177,21 @@ export default function MatchingTab() {
               gender: user.gender || '무관',
               location: user.location || '위치 미설정',
               school: user.school || '학교 미설정',
-              mbti: user.mbti || 'MBTI',
+              mbti: user.mbti || '',
               character: avatarUrl,
               bio: user.bio || '자기소개가 없습니다.',
               hasLikedMe: false,
-              photos: avatarUrl ? [avatarUrl] : [] // photos 배열 추가
+              photos: allPhotos,
+              profile_image: avatarUrl,
+              // 상세 정보 필드
+              height: user.height || '',
+              body_type: user.body_type || '',
+              bodyType: user.body_type || '',
+              style: user.style || '',
+              religion: user.religion || '',
+              smoking: user.smoking || '',
+              drinking: user.drinking || '',
+              interests: user.interests || []
             };
           });
 
@@ -203,7 +233,12 @@ export default function MatchingTab() {
   };
 
   const handleProfileClick = (profile: Profile) => {
-    navigate('/profile-detail', { state: { profile } });
+    // DB 필드명(snake_case)을 인터페이스 필드명(camelCase)으로 변환
+    const mappedProfile = {
+      ...profile,
+      bodyType: profile.body_type || profile.bodyType,
+    };
+    navigate('/profile-detail', { state: { profile: mappedProfile } });
   };
 
   // 로딩 상태 - 스켈레톤 UI
@@ -255,19 +290,21 @@ export default function MatchingTab() {
           >
             {/* 상호 좋아요 표시 */}
             {profile.hasLikedMe && (
-              <div className="absolute top-2 right-2 w-7 h-7 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center z-10 shadow-lg shadow-pink-500/30 animate-pulse-soft">
+              <div className="absolute top-3 right-3 w-7 h-7 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center z-10 shadow-lg shadow-pink-500/30 animate-pulse-soft">
                 <i className="ri-heart-fill text-white text-xs"></i>
               </div>
             )}
 
-            {/* 성별 아이콘 */}
-            <div className="absolute top-2 left-2 w-7 h-7 glass rounded-full flex items-center justify-center z-10">
-              <i className={`text-sm ${profile.gender === 'female' ? 'ri-women-line text-pink-500' : 'ri-men-line text-blue-500'} font-bold`}></i>
-            </div>
-
-            {/* MBTI 태그 */}
-            <div className="absolute top-2 left-10 z-10">
-              <span className="glass text-primary-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+            {/* 상단 태그 - 성별 + MBTI 함께 */}
+            <div className="absolute top-3 left-3 z-10 flex items-center space-x-1.5">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center shadow-md ${
+                profile.gender === 'female' 
+                  ? 'bg-gradient-to-br from-pink-400 to-pink-500' 
+                  : 'bg-gradient-to-br from-blue-400 to-blue-500'
+              }`}>
+                <i className={`text-xs text-white ${profile.gender === 'female' ? 'ri-women-line' : 'ri-men-line'}`}></i>
+              </div>
+              <span className="bg-white/95 text-slate-700 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-md">
                 {profile.mbti || 'MBTI'}
               </span>
             </div>
