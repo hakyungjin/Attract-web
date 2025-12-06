@@ -110,7 +110,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40">
+      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
             <button 
@@ -141,7 +141,7 @@ export default function NotificationsPage() {
       </header>
 
       {/* 알림 목록 */}
-      <main className="pt-16 pb-6">
+      <main className="pb-6" style={{ paddingTop: 'calc(64px + env(safe-area-inset-top))', paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}>
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full"></div>

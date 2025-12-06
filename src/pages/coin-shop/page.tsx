@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { kakaoPayReady, redirectToKakaoPay } from '../../services/kakaoPayService';
 
 interface CoinPackage {
   id: string;
@@ -23,7 +24,8 @@ export default function CoinShopPage() {
   const { user } = useAuth();
   const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'TRANSFER' | '토스페이'>('토스페이');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | '토스페이' | 'KAKAOPAY'>('KAKAOPAY');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [tossPayments, setTossPayments] = useState<any>(null);
   const [coinPackages, setCoinPackages] = useState<CoinPackage[]>([]);
   const [userCoins, setUserCoins] = useState<number>(0);
@@ -107,10 +109,9 @@ export default function CoinShopPage() {
 
   /**
    * 결제 처리 함수
-   * Toss Payments를 통해 결제를 요청합니다.
    */
   const handlePayment = async () => {
-    if (!selectedPackage || !tossPayments) return;
+    if (!selectedPackage) return;
     
     if (!user?.id) {
       alert('로그인이 필요합니다.');
@@ -118,14 +119,12 @@ export default function CoinShopPage() {
       return;
     }
 
+    setIsProcessing(true);
+
     try {
-      // 주문 ID 생성 (고유한 ID 생성)
-      const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      
       // 총 코인 계산 (기본 + 보너스)
       const bonusCoins = selectedPackage.bonus_coins || selectedPackage.bonus || 0;
       const totalCoins = selectedPackage.coins + bonusCoins;
-      
       const orderName = `자석 ${selectedPackage.coins}개${bonusCoins > 0 ? ` (+${bonusCoins} 보너스)` : ''}`;
 
       // localStorage에 패키지 정보 저장 (결제 완료 후 사용)
@@ -134,7 +133,32 @@ export default function CoinShopPage() {
       localStorage.setItem('selectedBonusCoins', bonusCoins.toString());
       localStorage.setItem('selectedPackageName', selectedPackage.name || orderName);
 
-      // 결제 위젯 실행
+      // 카카오페이 결제
+      if (paymentMethod === 'KAKAOPAY') {
+        const result = await kakaoPayReady(user.id, {
+          id: selectedPackage.id,
+          name: orderName,
+          coins: selectedPackage.coins,
+          price: selectedPackage.price,
+          bonus: bonusCoins,
+        });
+
+        if (result.success && result.data) {
+          redirectToKakaoPay(result.data);
+        } else {
+          alert(result.error || '카카오페이 결제 요청에 실패했습니다.');
+        }
+        return;
+      }
+
+      // 토스페이먼츠 결제 (카드, 토스페이)
+      if (!tossPayments) {
+        alert('결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+
+      const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
       await tossPayments.requestPayment(paymentMethod, {
         amount: selectedPackage.price,
         orderId: orderId,
@@ -146,6 +170,8 @@ export default function CoinShopPage() {
     } catch (error: any) {
       console.error('결제 요청 실패:', error);
       alert(error.message || '결제 요청에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -283,6 +309,27 @@ export default function CoinShopPage() {
               <div className="mb-6">
                 <h4 className="font-bold text-gray-900 mb-3">결제 수단</h4>
                 <div className="space-y-2">
+                  {/* 카카오페이 */}
+                  <button
+                    onClick={() => setPaymentMethod('KAKAOPAY')}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                      paymentMethod === 'KAKAOPAY'
+                        ? 'border-yellow-400 bg-yellow-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
+                        <span className="text-black font-bold text-xs">kakao</span>
+                      </div>
+                      <span className="font-medium text-gray-900">카카오페이</span>
+                    </div>
+                    {paymentMethod === 'KAKAOPAY' && (
+                      <i className="ri-check-line text-xl text-yellow-500"></i>
+                    )}
+                  </button>
+
+                  {/* 토스페이 */}
                   <button
                     onClick={() => setPaymentMethod('토스페이')}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
@@ -302,6 +349,7 @@ export default function CoinShopPage() {
                     )}
                   </button>
 
+                  {/* 신용/체크카드 */}
                   <button
                     onClick={() => setPaymentMethod('CARD')}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
@@ -320,34 +368,23 @@ export default function CoinShopPage() {
                       <i className="ri-check-line text-xl text-purple-500"></i>
                     )}
                   </button>
-
-                  <button
-                    onClick={() => setPaymentMethod('TRANSFER')}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      paymentMethod === 'TRANSFER'
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                        <i className="ri-bank-line text-white text-lg"></i>
-                      </div>
-                      <span className="font-medium text-gray-900">계좌이체</span>
-                    </div>
-                    {paymentMethod === 'TRANSFER' && (
-                      <i className="ri-check-line text-xl text-green-500"></i>
-                    )}
-                  </button>
                 </div>
               </div>
 
               {/* 결제 버튼 */}
               <button
                 onClick={handlePayment}
-                className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 transition-all cursor-pointer whitespace-nowrap"
+                disabled={isProcessing}
+                className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 transition-all cursor-pointer whitespace-nowrap disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
-                {selectedPackage.price.toLocaleString()}원 결제하기
+                {isProcessing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>결제 진행 중...</span>
+                  </>
+                ) : (
+                  <span>{selectedPackage.price.toLocaleString()}원 결제하기</span>
+                )}
               </button>
             </div>
           </div>

@@ -113,6 +113,8 @@ export default function ProfileDetailPage() {
   })();
 
   const handleBack = () => {
+    // 돌아갈 때 스크롤을 맨 위로
+    window.scrollTo({ top: 0, behavior: 'instant' });
     navigate(-1);
   };
 
@@ -293,10 +295,6 @@ export default function ProfileDetailPage() {
       alert('매칭 요청에 실패했습니다: ' + (error?.message || '알 수 없는 오류'));
       setIsLikeAnimating(false);
     }
-  };
-
-  const handlePass = () => {
-    navigate(-1);
   };
 
   const startChatWithMatch = () => {
@@ -514,42 +512,23 @@ export default function ProfileDetailPage() {
               ))}
             </div>
           </div>
+
+          {/* 하트 버튼 (페이지 내부) */}
+          {!isOwnProfile && (
+            <div className="flex justify-center py-8">
+              <button
+                onClick={handleLikeClick}
+                disabled={isLikeAnimating}
+                className={`bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center shadow-2xl hover:shadow-3xl hover:scale-110 transition-all cursor-pointer disabled:opacity-70 ${
+                  isLikeAnimating ? 'animate-pulse scale-110' : ''
+                }`}
+                style={{ width: '72px', height: '72px' }}
+              >
+                <i className={`ri-heart-fill text-white text-4xl ${isLikeAnimating ? 'animate-bounce' : ''}`}></i>
+              </button>
+            </div>
+          )}
         </div>
-
-        {/* 하단 액션 버튼 */}
-        {!isOwnProfile && (
-          <div 
-            className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent px-6 py-4 flex justify-center items-center space-x-6"
-            style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
-          >
-            {/* 패스 버튼 */}
-            <button
-              onClick={handlePass}
-              className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all cursor-pointer border-2 border-slate-200 group"
-            >
-              <i className="ri-close-line text-slate-400 text-3xl group-hover:text-slate-600 transition-colors"></i>
-            </button>
-
-            {/* 하트 버튼 */}
-            <button
-              onClick={handleLikeClick}
-              disabled={isLikeAnimating}
-              className={`w-20 h-20 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-110 transition-all cursor-pointer disabled:opacity-70 ${
-                isLikeAnimating ? 'animate-pulse scale-110' : ''
-              }`}
-            >
-              <i className={`ri-heart-fill text-white text-4xl ${isLikeAnimating ? 'animate-bounce' : ''}`}></i>
-            </button>
-
-            {/* MBTI 궁합 버튼 */}
-            <button
-              onClick={handleMBTICompatibility}
-              className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all cursor-pointer border-2 border-purple-200 group"
-            >
-              <span className="text-2xl group-hover:scale-110 transition-transform">💜</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* 좋아요 토스트 */}

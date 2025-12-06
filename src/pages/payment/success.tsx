@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { kakaoPayApprove } from '../../services/kakaoPayService';
 
 // Supabase Edge Function URL
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -17,13 +18,62 @@ export default function PaymentSuccessPage() {
   useEffect(() => {
     /**
      * 결제 승인 처리 함수
-     * Supabase Edge Function을 호출하여 결제를 승인하고 코인을 충전합니다.
      */
     const confirmPayment = async () => {
+      const pgToken = searchParams.get('pg_token'); // 카카오페이
       const orderId = searchParams.get('orderId');
       const paymentKey = searchParams.get('paymentKey');
       const amount = searchParams.get('amount');
 
+      // 카카오페이 결제 승인
+      if (pgToken) {
+        try {
+          const result = await kakaoPayApprove(pgToken);
+          
+          if (result.success && result.data) {
+            // localStorage에서 패키지 정보 가져오기
+            const coins = parseInt(localStorage.getItem('selectedCoins') || '0');
+            
+            // 사용자 코인 조회
+            const localUser = localStorage.getItem('user');
+            let currentCoins = 0;
+            if (localUser) {
+              const userData = JSON.parse(localUser);
+              const { data: userCoins } = await supabase
+                .from('users')
+                .select('coins')
+                .eq('id', userData.id)
+                .single();
+              currentCoins = userCoins?.coins || 0;
+            }
+
+            setPaymentInfo({
+              orderId: result.data.partner_order_id,
+              amount: result.data.amount.total,
+              coins: coins,
+              currentCoins: currentCoins,
+              approvedAt: result.data.approved_at,
+            });
+
+            // localStorage 정리
+            localStorage.removeItem('selectedPackageId');
+            localStorage.removeItem('selectedCoins');
+            localStorage.removeItem('selectedBonusCoins');
+            localStorage.removeItem('selectedPackageName');
+
+            setIsProcessing(false);
+          } else {
+            throw new Error(result.error || '카카오페이 결제 승인에 실패했습니다.');
+          }
+        } catch (error: any) {
+          console.error('카카오페이 승인 실패:', error);
+          alert(error.message || '결제 승인에 실패했습니다.');
+          navigate(`/payment/fail?message=${encodeURIComponent(error.message)}`);
+        }
+        return;
+      }
+
+      // 토스페이먼츠 결제 승인
       if (!orderId || !paymentKey || !amount) {
         alert('결제 정보가 올바르지 않습니다.');
         navigate('/coin-shop');
