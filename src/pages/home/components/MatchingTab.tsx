@@ -39,6 +39,19 @@ export default function MatchingTab() {
   const PROFILES_PER_PAGE = 20;
   const isLoadingRef = useRef(false); // 중복 로드 방지
 
+  // 필터 모달 열릴 때 body 스크롤 잠금
+  useEffect(() => {
+    if (showFilter) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showFilter]);
+
   // 컴포넌트 마운트 시 로그인 사용자 성별에 따라 반대 성별로 초기화
   useEffect(() => {
     const loadCurrentUserInfo = async () => {
@@ -217,9 +230,9 @@ export default function MatchingTab() {
   }
 
   return (
-    <div className="px-3 py-4 min-h-screen">
+    <div className="px-3 pt-2 pb-4 min-h-screen">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-bold text-slate-800">매칭</h2>
 
         <div className="flex items-center space-x-2">
@@ -300,8 +313,8 @@ export default function MatchingTab() {
 
       {/* 필터 팝업 */}
       {showFilter && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end animate-fade-in">
-          <div className="bg-white w-full rounded-t-[2rem] p-8 max-h-[85vh] overflow-y-auto animate-slide-up shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={() => setShowFilter(false)}>
+          <div className="bg-white w-full rounded-t-[2rem] p-8 max-h-[85vh] overflow-y-auto animate-slide-up shadow-2xl overscroll-contain" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-2xl font-bold font-display text-slate-800">필터</h3>
               <button
