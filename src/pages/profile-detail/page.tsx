@@ -48,6 +48,7 @@ export default function ProfileDetailPage() {
   const [myMBTI, setMyMBTI] = useState<string | null>(null);
   const [compatibility, setCompatibility] = useState<MBTICompatibility | null>(null);
   const [isLikeAnimating, setIsLikeAnimating] = useState(false);
+  const [profileInterests, setProfileInterests] = useState<string[]>([]);
 
   const MATCH_COST = 50;
 
@@ -91,6 +92,31 @@ export default function ProfileDetailPage() {
     };
     loadUserCoins();
   }, [authUser?.id]);
+
+  // 프로필 관심사 로드 (DB에서 직접 가져오기)
+  useEffect(() => {
+    const loadProfileInterests = async () => {
+      if (!profile?.id) return;
+      
+      // 이미 전달받은 interests가 있으면 사용
+      if (profile.interests && profile.interests.length > 0) {
+        setProfileInterests(profile.interests);
+        return;
+      }
+      
+      // 없으면 DB에서 직접 가져오기
+      const { data } = await supabase
+        .from('users')
+        .select('interests')
+        .eq('id', profile.id)
+        .single();
+      
+      if (data?.interests) {
+        setProfileInterests(data.interests);
+      }
+    };
+    loadProfileInterests();
+  }, [profile?.id, profile?.interests]);
 
   // profile_image와 photos 배열을 모두 합쳐서 사진 목록 생성
   const profilePhotos = (() => {
@@ -149,7 +175,7 @@ export default function ProfileDetailPage() {
     drinking: profile?.drinking || ''
   };
 
-  const interests = profile?.interests || [];
+  // profileInterests는 state에서 관리 (DB에서 직접 로드)
 
   const handleLikeClick = () => {
     if (!authUser?.id || !profile?.id) {
@@ -387,12 +413,9 @@ export default function ProfileDetailPage() {
     setShowMBTIModal(true);
   };
 
-  // 성별에 따른 테마 색상
-  const isFemale = profile?.gender === 'female' || profile?.gender === '여자';
-  const themeGradient = isFemale 
-    ? 'from-rose-500 via-pink-500 to-fuchsia-500' 
-    : 'from-cyan-500 via-blue-500 to-indigo-500';
-  const themeColor = isFemale ? 'rose' : 'cyan';
+  // 테마 색상 (항상 푸른 계열)
+  const themeGradient = 'from-cyan-500 via-blue-500 to-indigo-500';
+  const themeColor = 'cyan';
 
   return (
     <div className={`min-h-screen bg-slate-50 ${showLoginModal ? 'overflow-hidden' : ''}`}>
@@ -528,17 +551,17 @@ export default function ProfileDetailPage() {
           </button>
 
           {/* 관심사 */}
-          {interests.length > 0 && (
+          {profileInterests.length > 0 && (
             <div className="bg-white rounded-3xl p-6 shadow-sm">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center text-lg">
-                <i className={`ri-heart-3-line mr-2 text-${themeColor}-500`}></i>
+                <i className="ri-sparkle-line mr-2 text-cyan-500"></i>
                 관심사
               </h3>
               <div className="flex flex-wrap gap-2">
-                {interests.map((interest, index) => (
+                {profileInterests.map((interest, index) => (
                   <span 
                     key={index} 
-                    className={`bg-${themeColor}-50 text-${themeColor}-600 px-4 py-2.5 rounded-full text-sm font-medium border border-${themeColor}-100`}
+                    className="bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-700 px-4 py-2.5 rounded-full text-sm font-medium border border-cyan-100 shadow-sm"
                   >
                     {interest}
                   </span>

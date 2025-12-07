@@ -5,6 +5,7 @@ import { MBTI_TYPES } from '../../constants/mbti';
 import { logger } from '../../utils/logger';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
+import { INTEREST_CATEGORIES, INTEREST_CATEGORY_NAMES, INTEREST_CATEGORY_ICONS, POPULAR_INTERESTS } from '../../constants/interests';
 
 export default function SignupProfilePage() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function SignupProfilePage() {
     profile_image: ''
   });
 
-  const [newInterest, setNewInterest] = useState('');
+  const [showInterestModal, setShowInterestModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -73,20 +74,28 @@ export default function SignupProfilePage() {
   }, [location]);
 
 
-  const handleAddInterest = () => {
-    if (newInterest.trim() && !formData.interests.includes(newInterest)) {
+  // 관심사 토글 (선택/해제)
+  const handleToggleInterest = (interest: string) => {
+    if (formData.interests.includes(interest)) {
       setFormData(prev => ({
         ...prev,
-        interests: [...prev.interests, newInterest]
+        interests: prev.interests.filter(item => item !== interest)
       }));
-      setNewInterest('');
+    } else if (formData.interests.length < 10) {
+      setFormData(prev => ({
+        ...prev,
+        interests: [...prev.interests, interest]
+      }));
+    } else {
+      alert('관심사는 최대 10개까지 선택 가능합니다.');
     }
   };
 
-  const handleRemoveInterest = (index: number) => {
+  // 관심사 제거
+  const handleRemoveInterest = (interest: string) => {
     setFormData(prev => ({
       ...prev,
-      interests: prev.interests.filter((_, i) => i !== index)
+      interests: prev.interests.filter(item => item !== interest)
     }));
   };
 
@@ -457,41 +466,37 @@ export default function SignupProfilePage() {
           {/* 관심사 */}
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-2">
-              관심사
+              관심사 <span className="text-gray-400 text-xs">(최대 10개)</span>
             </label>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddInterest()}
-                placeholder="관심사 입력"
-                maxLength={20}
-                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500"
-              />
-              <button
-                onClick={handleAddInterest}
-                className="px-4 py-3 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 transition-colors cursor-pointer whitespace-nowrap font-semibold"
-              >
-                추가
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {formData.interests.map((interest, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 bg-cyan-100 text-cyan-800 px-3 py-2 rounded-full text-sm"
+            
+            {/* 선택된 관심사 표시 */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {formData.interests.map((interest) => (
+                <span
+                  key={interest}
+                  className="bg-cyan-100 text-cyan-700 px-3 py-1.5 rounded-full text-sm flex items-center gap-1"
                 >
                   {interest}
                   <button
-                    onClick={() => handleRemoveInterest(index)}
-                    className="text-cyan-600 hover:text-cyan-800 cursor-pointer"
+                    type="button"
+                    onClick={() => handleRemoveInterest(interest)}
+                    className="hover:text-red-500 transition-colors ml-1"
                   >
                     ×
                   </button>
-                </div>
+                </span>
               ))}
             </div>
+            
+            {/* 관심사 선택 버튼 */}
+            <button
+              type="button"
+              onClick={() => setShowInterestModal(true)}
+              className="w-full px-4 py-3 border-2 border-dashed border-cyan-300 rounded-xl text-cyan-600 hover:bg-cyan-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <i className="ri-add-line"></i>
+              관심사 선택하기 ({formData.interests.length}/10)
+            </button>
           </div>
 
           {/* 자기소개 */}
@@ -572,6 +577,126 @@ export default function SignupProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* 관심사 선택 모달 */}
+      {showInterestModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full max-w-lg max-h-[85vh] rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col animate-slide-up">
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
+              <h3 className="text-lg font-bold text-gray-800">관심사 선택</h3>
+              <button
+                type="button"
+                onClick={() => setShowInterestModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+
+            {/* 선택된 관심사 미리보기 */}
+            <div className="px-6 py-3 bg-cyan-50 border-b">
+              <p className="text-sm text-cyan-700 mb-2">
+                선택됨: <span className="font-bold">{formData.interests.length}/10</span>
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {formData.interests.length === 0 ? (
+                  <span className="text-sm text-gray-400">아래에서 관심사를 선택해주세요</span>
+                ) : (
+                  formData.interests.map((interest) => (
+                    <span
+                      key={interest}
+                      className="bg-cyan-500 text-white px-2.5 py-1 rounded-full text-xs font-medium"
+                    >
+                      {interest}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 관심사 목록 */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {/* 인기 관심사 */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-500 mb-3 flex items-center">
+                  <i className="ri-fire-line mr-1 text-orange-500"></i>
+                  인기 관심사
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {POPULAR_INTERESTS.map((interest) => (
+                    <button
+                      key={interest}
+                      type="button"
+                      onClick={() => handleToggleInterest(interest)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                        formData.interests.includes(interest)
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {interest}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 카테고리별 관심사 */}
+              {INTEREST_CATEGORY_NAMES.map((category) => (
+                <div key={category} className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-500 mb-3 flex items-center">
+                    <i className={`${INTEREST_CATEGORY_ICONS[category]} mr-1 text-cyan-500`}></i>
+                    {category}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {INTEREST_CATEGORIES[category].map((interest) => (
+                      <button
+                        key={interest}
+                        type="button"
+                        onClick={() => handleToggleInterest(interest)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                          formData.interests.includes(interest)
+                            ? 'bg-cyan-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 확인 버튼 */}
+            <div className="px-6 py-4 border-t bg-white">
+              <button
+                type="button"
+                onClick={() => setShowInterestModal(false)}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-3 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all cursor-pointer"
+              >
+                선택 완료 ({formData.interests.length}개)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slide-up {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
