@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
+import { sendMatchRequestNotification, sendMatchAcceptNotification } from '../../services/ssodaaSmsService';
 import { analyzeMBTICompatibility, getCompatibilityColor, getCompatibilityEmoji, type MBTICompatibility } from '../../services/mbtiCompatibility';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
 import { logger } from '../../utils/logger';
@@ -275,6 +276,41 @@ export default function ProfileDetailPage() {
         ]);
 
         await sendMatchSuccessPush(toUserId, authUser.name || '누군가', chatRoom?.id);
+
+        // 상호 매칭 SMS 알림 발송
+        try {
+          // 수신자에게 SMS 발송
+          const { data: toUserData } = await supabase
+            .from('users')
+            .select('phone_number')
+            .eq('id', toUserId)
+            .single();
+
+          if (toUserData?.phone_number) {
+            await sendMatchAcceptNotification(
+              toUserData.phone_number,
+              authUser.name || '누군가'
+            );
+          }
+
+          // 요청자에게도 SMS 발송
+          const { data: fromUserData } = await supabase
+            .from('users')
+            .select('phone_number')
+            .eq('id', fromUserId)
+            .single();
+
+          if (fromUserData?.phone_number) {
+            await sendMatchAcceptNotification(
+              fromUserData.phone_number,
+              profile.name
+            );
+          }
+        } catch (smsError) {
+          logger.error('매칭 성사 SMS 발송 실패', smsError);
+          // SMS 발송 실패는 무시하고 계속 진행
+        }
+
         setIsLikeAnimating(false);
         setShowMatchModal(true);
       } else {
@@ -288,6 +324,26 @@ export default function ProfileDetailPage() {
         });
 
         await sendMatchRequestPush(toUserId, authUser.name || '누군가', fromUserId);
+
+        // 매칭 요청 SMS 알림 발송
+        try {
+          const { data: toUserData } = await supabase
+            .from('users')
+            .select('phone_number')
+            .eq('id', toUserId)
+            .single();
+
+          if (toUserData?.phone_number) {
+            await sendMatchRequestNotification(
+              toUserData.phone_number,
+              authUser.name || '누군가'
+            );
+          }
+        } catch (smsError) {
+          logger.error('매칭 요청 SMS 발송 실패', smsError);
+          // SMS 발송 실패는 무시하고 계속 진행
+        }
+
         setIsLikeAnimating(false);
         setShowLikeToast(true);
         setTimeout(() => {
