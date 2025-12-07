@@ -41,6 +41,9 @@ export default function SignupProfilePage() {
 
   // 회원가입 후 전달된 사용자 정보 로드
   useEffect(() => {
+    // 페이지 진입 시 스크롤 맨 위로
+    window.scrollTo(0, 0);
+    
     const phoneNumber = (location.state as any)?.phoneNumber;
     if (phoneNumber) {
       const loadUserData = async () => {

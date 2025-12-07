@@ -1,23 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createUserProfile } from '../../services/phoneAuth';
 import { supabase } from '../../lib/supabase';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
 
 interface LocationState {
-  firebaseUid: string;
   phoneNumber: string;
+  verified?: boolean; // SMS 인증 완료 여부
+  firebaseUid?: string; // Firebase 사용 시 (선택)
 }
 
+/**
+ * 회원가입 페이지
+ * SMS 인증 후 전달받은 전화번호로 사용자 프로필 생성
+ */
 export default function SignupPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
 
-  // state가 없으면 로그인 페이지로 리다이렉트
-  if (!state || !state.firebaseUid || !state.phoneNumber) {
-    navigate('/login');
+  // state가 없거나 전화번호가 없으면 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!state || !state.phoneNumber) {
+      navigate('/login');
+    }
+    // 페이지 진입 시 스크롤 맨 위로
+    window.scrollTo(0, 0);
+  }, [state, navigate]);
+
+  if (!state || !state.phoneNumber) {
     return null;
   }
 
@@ -191,27 +202,35 @@ export default function SignupPage() {
       // 사진을 배열로 저장
       const photosArray = imageUrl ? [imageUrl] : [];
 
-      const { data, error } = await createUserProfile(
-        state.firebaseUid,
-        state.phoneNumber,
-        {
+      // 전화번호 정리 (숫자만)
+      const cleanPhone = state.phoneNumber.replace(/[^\d]/g, '');
+
+      // Supabase에 사용자 직접 생성
+      const { data, error } = await supabase
+        .from('users')
+        .insert({
+          phone_number: cleanPhone,
+          firebase_uid: state.firebaseUid || null, // Firebase 사용 시만 저장
           name: formData.name.trim(),
-          age: formData.age ? parseInt(formData.age) : undefined,
+          age: formData.age ? parseInt(formData.age) : null,
           gender: formData.gender,
-          location: formData.location.trim() || undefined,
-          bio: formData.bio.trim() || undefined,
-          mbti: formData.mbti || undefined,
-          school: formData.school.trim() || undefined,
-          height: formData.height || undefined,
-          body_type: formData.bodyType || undefined,
-          style: formData.style || undefined,
-          religion: formData.religion || undefined,
-          smoking: formData.smoking || undefined,
-          drinking: formData.drinking || undefined,
-          interests: interests.length > 0 ? interests : undefined,
-          photos: photosArray
-        }
-      );
+          location: formData.location.trim() || null,
+          bio: formData.bio.trim() || null,
+          mbti: formData.mbti || null,
+          school: formData.school.trim() || null,
+          height: formData.height || null,
+          body_type: formData.bodyType || null,
+          style: formData.style || null,
+          religion: formData.religion || null,
+          smoking: formData.smoking || null,
+          drinking: formData.drinking || null,
+          interests: interests.length > 0 ? interests : null,
+          profile_image: imageUrl || null,
+          photos: photosArray,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
       if (error) {
         alert('회원가입에 실패했습니다. 다시 시도해주세요.');
