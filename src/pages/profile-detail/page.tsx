@@ -599,7 +599,7 @@ export default function ProfileDetailPage() {
 
           {/* 하트 버튼 (페이지 내부) */}
           {!isOwnProfile && (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-1">
               <button
                 onClick={handleLikeClick}
                 disabled={isLikeAnimating}
