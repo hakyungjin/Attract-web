@@ -628,77 +628,63 @@ export default function ProfileDetailPage() {
       {/* 코인 확인 모달 */}
       {showCoinConfirmModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center animate-scale-in">
-            <div className={`w-20 h-20 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl`}>
-              <i className="ri-heart-fill text-white text-4xl"></i>
-            </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">하트를 보낼까요?</h3>
-            <p className="text-slate-600 mb-2">
-              <span className="font-bold">{profile.name}</span>님에게<br />
-              마음을 전하려면 자석 <span className={`font-bold text-${themeColor}-500`}>{MATCH_COST}개</span>가 필요해요
-            </p>
-            <div className={`bg-${themeColor}-50 rounded-2xl p-4 mb-4`}>
-              <p className={`text-sm text-${themeColor}-700 flex items-center justify-center`}>
-                <i className="ri-refresh-line mr-2"></i>
-                거절 시 자석이 환불됩니다
-              </p>
-            </div>
-            <p className="text-slate-500 mb-6">
-              내 자석: <span className={`font-bold ${userCoins < MATCH_COST ? 'text-red-500' : 'text-slate-800'}`}>{userCoins}개</span>
-            </p>
-            
+          <div className="bg-white rounded-3xl p-6 max-w-xs w-full text-center animate-scale-in">
             {userCoins >= MATCH_COST ? (
               // 코인 충분할 때
-              <div className="space-y-3">
-                <button
-                  onClick={handleLike}
-                  className={`w-full bg-gradient-to-r ${themeGradient} text-white py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all cursor-pointer shadow-lg`}
-                >
-                  💕 하트 보내기
-                </button>
-                <button
-                  onClick={() => setShowCoinConfirmModal(false)}
-                  className="w-full text-slate-500 py-3 font-medium hover:text-slate-700 transition-colors cursor-pointer"
-                >
-                  다음에 할게요
-                </button>
-              </div>
+              <>
+                <div className={`w-16 h-16 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+                  <i className="ri-heart-fill text-white text-3xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">하트 보내기</h3>
+                <p className="text-slate-500 text-sm mb-2">
+                  자석 {MATCH_COST}개로 {profile.name}님에게<br />마음을 전해보세요
+                </p>
+                <p className="text-cyan-600 text-xs mb-5">
+                  <i className="ri-refresh-line mr-1"></i>거절 시 자석이 환불됩니다
+                </p>
+                <div className="space-y-2">
+                  <button
+                    onClick={handleLike}
+                    className={`w-full bg-gradient-to-r ${themeGradient} text-white py-3.5 rounded-2xl font-bold hover:opacity-90 transition-all cursor-pointer`}
+                  >
+                    💕 보내기
+                  </button>
+                  <button
+                    onClick={() => setShowCoinConfirmModal(false)}
+                    className="w-full text-slate-400 py-2 text-sm hover:text-slate-600 cursor-pointer"
+                  >
+                    취소
+                  </button>
+                </div>
+              </>
             ) : (
-              // 코인 부족할 때 - 결제 유도 UI
-              <div className="space-y-4">
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
-                  <div className="flex items-center justify-center mb-2">
-                    <i className="ri-coin-line text-2xl text-amber-500 mr-2"></i>
-                    <span className="font-bold text-amber-700">자석이 부족해요!</span>
-                  </div>
-                  <p className="text-sm text-amber-600 text-center">
-                    {MATCH_COST - userCoins}개만 더 있으면 하트를 보낼 수 있어요
-                  </p>
+              // 코인 부족할 때
+              <>
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="ri-coin-line text-slate-400 text-3xl"></i>
                 </div>
-                
-                <button
-                  onClick={() => {
-                    setShowCoinConfirmModal(false);
-                    navigate('/coin-shop');
-                  }}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-amber-500/30 flex items-center justify-center"
-                >
-                  <i className="ri-flashlight-line mr-2 text-xl"></i>
-                  지금 충전하기
-                </button>
-                
-                <div className="flex items-center justify-center text-xs text-slate-400">
-                  <i className="ri-gift-line mr-1"></i>
-                  첫 충전 시 보너스 코인 지급!
+                <h3 className="text-xl font-bold text-slate-800 mb-2">자석이 부족해요</h3>
+                <p className="text-slate-500 text-sm mb-5">
+                  현재 {userCoins}개 / 필요 {MATCH_COST}개
+                </p>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      setShowCoinConfirmModal(false);
+                      navigate('/coin-shop');
+                    }}
+                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-3.5 rounded-2xl font-bold hover:opacity-90 transition-all cursor-pointer"
+                  >
+                    충전하기
+                  </button>
+                  <button
+                    onClick={() => setShowCoinConfirmModal(false)}
+                    className="w-full text-slate-400 py-2 text-sm hover:text-slate-600 cursor-pointer"
+                  >
+                    닫기
+                  </button>
                 </div>
-                
-                <button
-                  onClick={() => setShowCoinConfirmModal(false)}
-                  className="w-full text-slate-500 py-2 font-medium hover:text-slate-700 transition-colors cursor-pointer text-sm"
-                >
-                  다음에 할게요
-                </button>
-              </div>
+              </>
             )}
           </div>
         </div>

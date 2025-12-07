@@ -103,7 +103,8 @@ export default function CreatePostPage() {
       if (error) throw error;
 
       alert('게시물이 작성되었습니다!');
-      navigate('/');
+      // 커뮤니티 탭 새로고침을 위해 state 전달
+      navigate('/', { state: { refreshCommunity: true, activeTab: 'community' } });
     } catch (error: any) {
       console.error('게시물 작성 실패:', error);
       alert(`게시물 작성에 실패했습니다: ${error.message}`);

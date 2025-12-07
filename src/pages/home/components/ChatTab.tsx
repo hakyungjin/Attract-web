@@ -15,6 +15,8 @@ interface ChatRoom {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  isLeft: boolean; // 누군가 나갔는지
+  leftByMe: boolean; // 내가 나갔는지
 }
 
 /**
@@ -102,15 +104,24 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
   }, [selectedRoom]);
 
   /**
-   * 채팅방 목록 로드 및 실시간 구독 설정
+   * 채팅방 목록 로드 (최초 1회)
+   */
+  useEffect(() => {
+    if (!authUser?.id) return;
+    loadChatRooms();
+  }, [authUser?.id]);
+
+  /**
+   * 실시간 구독 설정 (메시지 & 채팅방)
    */
   useEffect(() => {
     if (!authUser?.id) return;
     
-    loadChatRooms();
+    const userId = String(authUser.id);
     
-    const messageSubscription = supabase
-      .channel('chat-messages')
+    // 메시지 실시간 구독
+    const messageChannel = supabase
+      .channel(`messages-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -118,19 +129,20 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
           schema: 'public',
           table: 'messages'
         },
-        (payload) => {
-          console.log('📨 새 메시지 수신:', payload);
-          loadChatRooms();
+        (payload: any) => {
+          console.log('📨 새 메시지 수신:', payload.new);
           
-          if (selectedRoom && payload.new.room_id === selectedRoom.roomId) {
-            loadMessages(selectedRoom.roomId);
-          }
+          // 채팅방 목록 새로고침 (마지막 메시지 업데이트)
+          loadChatRooms();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 메시지 구독 상태:', status);
+      });
 
-    const roomSubscription = supabase
-      .channel('chat-rooms')
+    // 채팅방 변경 구독
+    const roomChannel = supabase
+      .channel(`rooms-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -146,10 +158,80 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
       .subscribe();
 
     return () => {
-      messageSubscription.unsubscribe();
-      roomSubscription.unsubscribe();
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(roomChannel);
     };
-  }, [authUser?.id, selectedRoom]);
+  }, [authUser?.id]);
+
+  /**
+   * 현재 선택된 채팅방의 메시지 실시간 구독 + 폴링
+   */
+  useEffect(() => {
+    if (!selectedRoom || !authUser?.id) return;
+
+    const roomId = selectedRoom.roomId;
+    const userId = String(authUser.id);
+    
+    // 현재 방의 메시지 실시간 구독 (필터 없이 전체 구독 후 클라이언트에서 필터링)
+    const currentRoomChannel = supabase
+      .channel(`room-${roomId}-${Date.now()}`) // 고유 채널명
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload: any) => {
+          const newMsg = payload.new;
+          
+          // 현재 방의 메시지인지 확인
+          if (newMsg.room_id !== roomId) return;
+          
+          console.log('💬 현재 방 새 메시지:', newMsg);
+          
+          // 새 메시지를 직접 추가 (더 빠른 반응)
+          setMessages(prev => {
+            // 중복 체크
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            
+            return [...prev, {
+              id: newMsg.id,
+              senderId: newMsg.sender_id,
+              content: newMsg.content,
+              timestamp: new Date(newMsg.created_at).toLocaleTimeString('ko-KR', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              }),
+              isRead: newMsg.is_read
+            }];
+          });
+
+          // 읽음 처리 (내가 받은 메시지인 경우)
+          if (newMsg.recipient_id === userId) {
+            supabase
+              .from('messages')
+              .update({ is_read: true })
+              .eq('id', newMsg.id)
+              .then(() => console.log('✅ 읽음 처리 완료'));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`📡 방 ${roomId} 구독 상태:`, status);
+      });
+
+    // 폴링 백업 (3초마다 새 메시지 확인) - 실시간 구독 실패 대비
+    const pollInterval = setInterval(() => {
+      loadMessages(roomId);
+    }, 3000);
+
+    return () => {
+      supabase.removeChannel(currentRoomChannel);
+      clearInterval(pollInterval);
+    };
+  }, [selectedRoom?.roomId, authUser?.id]);
 
   /**
    * 채팅방 목록 로드
@@ -172,10 +254,10 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
           last_message_at,
           last_message_sender_id,
           is_active,
+          left_by,
           created_at
         `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-        .eq('is_active', true)
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (error) {
@@ -204,34 +286,48 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
       );
 
       const chatRoomList: ChatRoom[] = await Promise.all(
-        rooms.map(async (room) => {
-          const partnerId = room.user1_id === userId ? room.user2_id : room.user1_id;
-          const partner = partnerMap.get(partnerId);
+        rooms
+          .filter((room: any) => {
+            // 내가 나간 방은 목록에서 제외
+            if (room.left_by === userId) return false;
+            return true;
+          })
+          .map(async (room: any) => {
+            const partnerId = room.user1_id === userId ? room.user2_id : room.user1_id;
+            const partner = partnerMap.get(partnerId);
 
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('room_id', room.id)
-            .eq('recipient_id', authUser.id)
-            .eq('is_read', false);
+            const { count: unreadCount } = await supabase
+              .from('messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('room_id', room.id)
+              .eq('recipient_id', authUser.id)
+              .eq('is_read', false);
 
-          return {
-            roomId: room.id,
-            partnerId: partnerId,
-            partnerName: partner?.name || '사용자',
-            partnerAvatar: partner?.profile_image || getDefaultAvatar(partner?.gender),
-            partnerGender: partner?.gender,
-            lastMessage: room.last_message || '대화를 시작해보세요!',
-            lastMessageTime: room.last_message_at 
-              ? new Date(room.last_message_at).toLocaleTimeString('ko-KR', { 
-                  hour: 'numeric', 
-                  minute: '2-digit', 
-                  hour12: true 
-                })
-              : '방금 전',
-            unreadCount: unreadCount || 0
-          };
-        })
+            // 상대방이 나갔는지 확인
+            const isLeft = !room.is_active || !!room.left_by;
+            const leftByMe = room.left_by === userId;
+
+            return {
+              roomId: room.id,
+              partnerId: partnerId,
+              partnerName: partner?.name || '사용자',
+              partnerAvatar: partner?.profile_image || getDefaultAvatar(partner?.gender),
+              partnerGender: partner?.gender,
+              lastMessage: isLeft && !leftByMe 
+                ? '상대방이 채팅방을 나갔습니다.' 
+                : (room.last_message || '대화를 시작해보세요!'),
+              lastMessageTime: room.last_message_at 
+                ? new Date(room.last_message_at).toLocaleTimeString('ko-KR', { 
+                    hour: 'numeric', 
+                    minute: '2-digit', 
+                    hour12: true 
+                  })
+                : '방금 전',
+              unreadCount: unreadCount || 0,
+              isLeft,
+              leftByMe
+            };
+          })
       );
 
       setChatRooms(chatRoomList);
@@ -330,24 +426,43 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
   };
 
   /**
-   * 채팅방 나가기 (삭제)
+   * 채팅방 나가기 (상대방에게 알림 후 비활성화)
    */
   const handleLeaveRoom = async () => {
-    if (!selectedRoom) return;
+    if (!selectedRoom || !authUser?.id) return;
 
     setIsLeaving(true);
     try {
+      const userId = String(authUser.id);
+      const myName = authUser.name || '상대방';
+
+      // 1. 시스템 메시지 추가 (상대방이 볼 수 있도록)
       await supabase
         .from('messages')
-        .delete()
-        .eq('room_id', selectedRoom.roomId);
+        .insert({
+          room_id: selectedRoom.roomId,
+          sender_id: 'system', // 시스템 메시지
+          recipient_id: selectedRoom.partnerId,
+          content: `${myName}님이 채팅방을 나갔습니다.`,
+          is_read: false
+        });
 
+      // 2. 채팅방의 나간 사용자 기록 (left_by 필드 사용)
       const { error } = await supabase
         .from('chat_rooms')
-        .delete()
+        .update({ 
+          left_by: userId,
+          is_active: false 
+        })
         .eq('id', selectedRoom.roomId);
 
-      if (error) throw error;
+      if (error) {
+        // left_by 컬럼이 없으면 그냥 비활성화만
+        await supabase
+          .from('chat_rooms')
+          .update({ is_active: false })
+          .eq('id', selectedRoom.roomId);
+      }
 
       setChatRooms(prev => prev.filter(room => room.roomId !== selectedRoom.roomId));
       setSelectedRoom(null);
@@ -478,6 +593,14 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
             </div>
           ) : (
             messages.map((message) => (
+              // 시스템 메시지 (나가기 알림 등)
+              message.senderId === 'system' ? (
+                <div key={message.id} className="flex justify-center my-4">
+                  <div className="bg-slate-200 text-slate-600 px-4 py-2 rounded-full text-xs">
+                    {message.content}
+                  </div>
+                </div>
+              ) : (
               <div
                 key={message.id}
                 className={`flex ${message.senderId === authUser?.id ? 'justify-end' : 'justify-start'}`}
@@ -527,6 +650,7 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
                   </div>
                 </div>
               </div>
+              )
             ))
           )}
           <div ref={messagesEndRef} />
@@ -537,28 +661,35 @@ export default function ChatTab({ onChatViewChange }: ChatTabProps) {
           className="px-4 pt-3 bg-white border-t border-slate-100 flex-shrink-0"
           style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 12px))' }}
         >
-          <div className="flex items-center space-x-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="메시지를 입력하세요..."
-              className="flex-1 px-4 py-2.5 bg-slate-100 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all text-sm"
-              maxLength={500}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
-                newMessage.trim()
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-105 shadow-md'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <i className="ri-send-plane-fill text-base"></i>
-            </button>
-          </div>
+          {selectedRoom.isLeft ? (
+            // 상대방이 나간 경우 입력 비활성화
+            <div className="text-center py-2">
+              <p className="text-slate-400 text-sm">상대방이 채팅방을 나가서 메시지를 보낼 수 없습니다.</p>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="메시지를 입력하세요..."
+                className="flex-1 px-4 py-2.5 bg-slate-100 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all text-sm"
+                maxLength={500}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim()}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
+                  newMessage.trim()
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-105 shadow-md'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <i className="ri-send-plane-fill text-base"></i>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 방 나가기 확인 모달 */}

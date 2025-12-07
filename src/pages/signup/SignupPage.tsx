@@ -69,8 +69,8 @@ export default function SignupPage() {
     }));
   };
 
-  // 이미지 파일 선택
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 이미지 파일 선택 및 즉시 업로드
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -94,31 +94,27 @@ export default function SignupPage() {
       setPreviewUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
-  };
 
-  // 이미지 업로드
-  const uploadImage = async (): Promise<string | null> => {
-    if (!selectedFile) return null;
-
+    // 즉시 업로드 시작
     setUploading(true);
-
     try {
-      // 파일명 생성 (타임스탬프 + 랜덤)
-      const fileExt = selectedFile.name.split('.').pop();
+      const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Supabase Storage에 업로드
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('avatars')
-        .upload(filePath, selectedFile, {
+        .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
 
       if (error) {
         console.error('이미지 업로드 실패:', error);
-        throw error;
+        alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+        setSelectedFile(null);
+        setPreviewUrl('');
+        return;
       }
 
       // 공개 URL 가져오기
@@ -127,11 +123,17 @@ export default function SignupPage() {
         .getPublicUrl(filePath);
 
       console.log('이미지 업로드 성공:', publicUrl);
-      return publicUrl;
+      
+      // formData에 업로드된 URL 저장
+      setFormData(prev => ({
+        ...prev,
+        profileImage: publicUrl
+      }));
     } catch (error) {
       console.error('이미지 업로드 오류:', error);
       alert('이미지 업로드에 실패했습니다.');
-      return null;
+      setSelectedFile(null);
+      setPreviewUrl('');
     } finally {
       setUploading(false);
     }
@@ -176,32 +178,22 @@ export default function SignupPage() {
       return;
     }
 
-    if (!selectedFile && !formData.profileImage) {
-      alert('프로필 사진을 최소 1장 이상 업로드해주세요.');
+    // 이미지가 업로드 중이면 대기
+    if (uploading) {
+      alert('이미지 업로드 중입니다. 잠시만 기다려주세요.');
+      return;
+    }
+
+    // 이미지 URL 확인 (이미 업로드된 상태)
+    if (!formData.profileImage) {
+      alert('프로필 사진을 업로드해주세요.');
       return;
     }
 
     setLoading(true);
 
     try {
-      // 이미지 업로드 (선택된 파일이 있는 경우)
-      let imageUrl = formData.profileImage;
-      if (selectedFile) {
-        const uploadedUrl = await uploadImage();
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
-          alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (!imageUrl) {
-        alert('프로필 사진을 업로드해주세요.');
-        setLoading(false);
-        return;
-      }
+      const imageUrl = formData.profileImage;
 
       // 사진을 배열로 저장
       const photosArray = imageUrl ? [imageUrl] : [];
@@ -296,19 +288,37 @@ export default function SignupPage() {
 
               {/* 미리보기 */}
               {previewUrl && (
-                <div className="mb-3 relative">
-                  <img
-                    src={previewUrl}
-                    alt="미리보기"
-                    className="w-32 h-32 object-cover rounded-xl mx-auto border-2 border-cyan-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
-                    className="absolute top-0 right-1/2 translate-x-16 -translate-y-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-all"
-                  >
-                    ✕
-                  </button>
+                <div className="mb-3 relative inline-block mx-auto w-full flex justify-center">
+                  <div className="relative">
+                    <img
+                      src={previewUrl}
+                      alt="미리보기"
+                      className={`w-32 h-32 object-cover rounded-xl border-2 ${uploading ? 'border-gray-300 opacity-50' : 'border-cyan-200'}`}
+                    />
+                    {/* 업로드 중 오버레이 */}
+                    {uploading && (
+                      <div className="absolute inset-0 bg-black/40 rounded-xl flex flex-col items-center justify-center">
+                        <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <span className="text-white text-xs font-medium">업로드 중...</span>
+                      </div>
+                    )}
+                    {/* 업로드 완료 체크 */}
+                    {!uploading && formData.profileImage && (
+                      <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
+                        <i className="ri-check-line text-sm"></i>
+                      </div>
+                    )}
+                    {/* 삭제 버튼 */}
+                    {!uploading && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
+                      >
+                        <i className="ri-close-line text-sm"></i>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 

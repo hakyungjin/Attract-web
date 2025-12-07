@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
-import KakaoAdFit, { DummyAdBanner } from '../../../components/ads/KakaoAdFit';
+import GoogleAdBanner from '../../../components/ads/GoogleAdBanner';
 
-// 카카오 애드핏 광고 단위 ID
-// 환경 변수가 없으면 기본값 사용
-const KAKAO_AD_UNIT_1 = import.meta.env.VITE_KAKAO_AD_UNIT_1 || 'DAN-xzcTogwnUXAFXJ7t';
-const KAKAO_AD_UNIT_2 = import.meta.env.VITE_KAKAO_AD_UNIT_2 || 'DAN-VPAvNk4a33lBM3D8';
+// 구글 애드센스 광고 슬롯 ID
+const GOOGLE_AD_SLOT_1 = '4117488761'; // 광고 영역 1
+const GOOGLE_AD_SLOT_2 = '3292040990'; // 광고 영역 2
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
@@ -220,21 +219,33 @@ export default function ProfileTab() {
           </div>
         </div>
 
-        {/* 광고 배너 1 - 카카오 애드핏 */}
+        {/* 광고 배너 1 - 구글 애드센스 (컴팩트) */}
         <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
-          {KAKAO_AD_UNIT_1 ? (
-            <KakaoAdFit unit={KAKAO_AD_UNIT_1} width={320} height={100} className="mx-auto" />
+          {GOOGLE_AD_SLOT_1 ? (
+            <GoogleAdBanner 
+              adSlot={GOOGLE_AD_SLOT_1} 
+              className="mx-auto max-w-[320px]" 
+              compact={true}
+            />
           ) : (
-            <DummyAdBanner width={320} height={100} text="광고 영역 1" className="mx-auto" />
+            <div className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-2xl p-4 text-center mx-auto max-w-[320px]">
+              <p className="text-slate-400 text-sm">광고 영역 1</p>
+            </div>
           )}
         </div>
 
-        {/* 광고 배너 2 - 카카오 애드핏 */}
+        {/* 광고 배너 2 - 구글 애드센스 (컴팩트) */}
         <div className="animate-slide-up" style={{ animationDelay: '0.25s' }}>
-          {KAKAO_AD_UNIT_2 ? (
-            <KakaoAdFit unit={KAKAO_AD_UNIT_2} width={320} height={100} className="mx-auto" />
+          {GOOGLE_AD_SLOT_2 ? (
+            <GoogleAdBanner 
+              adSlot={GOOGLE_AD_SLOT_2} 
+              className="mx-auto max-w-[320px]" 
+              compact={true}
+            />
           ) : (
-            <DummyAdBanner width={320} height={100} text="광고 영역 2" className="mx-auto" />
+            <div className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-2xl p-4 text-center mx-auto max-w-[320px]">
+              <p className="text-slate-400 text-sm">광고 영역 2</p>
+            </div>
           )}
         </div>
 

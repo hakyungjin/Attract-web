@@ -13,6 +13,7 @@ export default function LoginPage() {
   const { signInPhone, signUpPhone } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false); // 로그인 중 전체 화면 로딩
   const [formData, setFormData] = useState({
     phoneNumber: '',
     password: '',
@@ -180,19 +181,25 @@ export default function LoginPage() {
 
       if (error) {
         alert(`로그인 실패: ${error.message}`);
+        setLoading(false);  // 로딩 상태 해제
         return;
       }
 
       // 로그인 성공
+      setLoading(false);
+      
       // 프로필이 완성되지 않으면 프로필 완성 페이지로 리다이렉트
       if (!profileCompleted) {
         navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
       } else {
-        navigate('/');
+        // 로그인 중 화면 표시 후 홈으로 이동
+        setIsLoggingIn(true);
+        setTimeout(() => {
+          navigate('/');
+        }, 1500); // 1.5초 후 이동
       }
     } catch (error: any) {
       alert(`로그인 오류: ${error.message}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -280,6 +287,31 @@ export default function LoginPage() {
     setCanResend(false);
     setAgreeTerms(false);
   };
+
+  // 로그인 중 전체 화면 로딩
+  if (isLoggingIn) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
+        <div className="text-center">
+          {/* 로고 */}
+          <div className="w-24 h-24 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-3xl flex items-center justify-center shadow-lg mx-auto mb-8">
+            <img
+              src="/image/icon.png"
+              alt="Attract Logo"
+              className="w-20 h-20 object-contain"
+            />
+          </div>
+          
+          {/* 로딩 스피너 */}
+          <div className="w-10 h-10 border-4 border-cyan-100 border-t-cyan-500 rounded-full animate-spin mx-auto mb-6"></div>
+          
+          {/* 텍스트 */}
+          <h2 className="text-xl font-bold text-slate-800 mb-1">로그인 중</h2>
+          <p className="text-slate-400 text-sm">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-sky-50 to-blue-50 flex items-center justify-center p-4">

@@ -134,6 +134,7 @@ export default function CommunityTab() {
           *,
           post_comments (
             id,
+            user_id,
             author_name,
             avatar_url,
             content,
@@ -164,12 +165,12 @@ export default function CommunityTab() {
         // 게시글 작성자 ID 목록 수집
         const userIds = [...new Set(data.map((post: any) => post.user_id).filter(Boolean))];
         
-        // 작성자 정보 일괄 조회
+        // 작성자 정보 일괄 조회 (프로필 상세 페이지에 필요한 모든 필드 포함)
         let usersMap: { [key: string]: any } = {};
         if (userIds.length > 0) {
           const { data: usersData } = await supabase
             .from('users')
-            .select('id, name, avatar_url, profile_image, age, location, gender, bio, school, job')
+            .select('id, name, avatar_url, profile_image, age, location, gender, bio, school, job, mbti, height, body_type, religion, smoking, drinking, interests, photos')
             .in('id', userIds);
           
           if (usersData) {
@@ -194,6 +195,7 @@ export default function CommunityTab() {
             likes: post.likes,
             comments: post.post_comments?.map((comment: any) => ({
               id: comment.id,
+              userId: comment.user_id,
               author: comment.author_name,
               avatar: comment.avatar_url || 'https://via.placeholder.com/100',
               content: comment.content,
@@ -212,23 +214,41 @@ export default function CommunityTab() {
             authorData: author ? {
               id: author.id,
               name: author.name || '익명',
-              avatar_url: author.avatar_url || author.profile_image,
+              avatar_url: author.avatar_url,
+              profile_image: author.profile_image,
               age: author.age,
               location: author.location,
               gender: author.gender,
               bio: author.bio,
               school: author.school,
-              job: author.job
+              job: author.job,
+              mbti: author.mbti,
+              height: author.height,
+              body_type: author.body_type,
+              religion: author.religion,
+              smoking: author.smoking,
+              drinking: author.drinking,
+              interests: author.interests || [],
+              photos: author.photos || []
             } : {
               id: post.user_id,
               name: post.author_name || '익명',
               avatar_url: post.avatar_url,
+              profile_image: null,
               age: post.age,
               location: post.location,
-              gender: post.gender,
-              bio: post.bio,
-              school: post.school,
-              job: post.job
+              gender: null,
+              bio: null,
+              school: null,
+              job: post.job,
+              mbti: null,
+              height: null,
+              body_type: null,
+              religion: null,
+              smoking: null,
+              drinking: null,
+              interests: [],
+              photos: []
             }
           };
         });
@@ -393,25 +413,11 @@ export default function CommunityTab() {
       if (error) throw error;
 
       if (data) {
-        const newPostObj: Post = {
-          id: data.id,
-          author: data.title,
-          avatar: data.avatar_url,
-          content: data.content,
-          image: data.image_url,
-          likes: 0,
-          comments: [],
-          timeAgo: '방금 전',
-          isLiked: false,
-          age: data.age,
-          location: data.location,
-          job: data.job,
-          views: 0,
-          category: data.category
-        };
-        setPosts([newPostObj, ...posts]);
+        // 게시글 작성 완료 후 전체 목록 새로고침
         setNewPost('');
         setShowNewPost(false);
+        // 캐시 무효화하고 새로 로드
+        await loadPosts();
       }
     } catch (error) {
       console.error('게시글 작성 오류:', error);

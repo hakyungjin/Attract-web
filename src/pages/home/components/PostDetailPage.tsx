@@ -12,6 +12,7 @@ interface Comment {
   timeAgo: string;
   likes: number;
   isLiked: boolean;
+  userId?: string; // 댓글 작성자 ID
 }
 
 interface Post {
@@ -46,6 +47,32 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [newComment, setNewComment] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // 모바일 키보드 높이 감지
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const keyboardH = windowHeight - viewportHeight;
+        setKeyboardHeight(keyboardH > 0 ? keyboardH : 0);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -65,6 +92,16 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
       if (error) throw error;
 
       if (data) {
+        // photos 배열 구성
+        let photos: string[] = [];
+        if (data.photos && data.photos.length > 0) {
+          photos = data.photos;
+        } else if (data.profile_image) {
+          photos = [data.profile_image];
+        } else if (data.avatar_url) {
+          photos = [data.avatar_url];
+        }
+
         navigate('/profile-detail', {
           state: {
             profile: {
@@ -74,9 +111,10 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
               gender: data.gender,
               location: data.location,
               school: data.school,
+              job: data.job,
               mbti: data.mbti,
               bio: data.bio,
-              photos: data.profile_image ? [data.profile_image] : [],
+              photos: photos,
               interests: data.interests || [],
               height: data.height,
               bodyType: data.body_type,
@@ -155,14 +193,20 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
     }
 
     try {
-      const commentData = {
+      // user_id는 uuid 타입이므로 null로 처리하거나 제외
+      // author_name과 avatar_url로 사용자 식별
+      const commentData: Record<string, any> = {
         post_id: currentPost.id,
-        user_id: authUser.id,
         author_name: authUser.name || '익명',
-        avatar_url: authUser.profile_image || '',
+        avatar_url: (authUser as any).profile_image || '',
         content: newComment,
         likes: 0
       };
+
+      // user_id가 valid uuid인 경우에만 추가
+      if (authUser.id && typeof authUser.id === 'string' && authUser.id.includes('-')) {
+        commentData.user_id = authUser.id;
+      }
 
       const { data, error } = await supabase
         .from('post_comments')
@@ -170,13 +214,17 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('댓글 작성 에러:', error);
+        throw error;
+      }
 
       if (data) {
         const newCommentObj: Comment = {
           id: data.id,
+          userId: data.user_id || authUser?.id,
           author: data.author_name,
-          avatar: data.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20profile%20avatar%2C%20friendly%20expression%2C%20professional%20portrait%20photography%2C%20soft%20natural%20lighting%2C%20clean%20white%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=myavatar&orientation=squarish',
+          avatar: data.avatar_url || (authUser as any)?.profile_image || 'https://via.placeholder.com/100',
           content: data.content,
           timeAgo: '방금 전',
           likes: 0,
@@ -267,7 +315,16 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
                 
                 // authorData가 있으면 사용, 없으면 userId로 프로필 조회
                 if (currentPost.authorData) {
-                  const avatarUrl = currentPost.authorData.avatar_url || currentPost.authorData.profile_image;
+                  // photos 배열 구성: photos가 있으면 사용, 없으면 profile_image나 avatar_url 사용
+                  let photos: string[] = [];
+                  if (currentPost.authorData.photos && currentPost.authorData.photos.length > 0) {
+                    photos = currentPost.authorData.photos;
+                  } else if (currentPost.authorData.profile_image) {
+                    photos = [currentPost.authorData.profile_image];
+                  } else if (currentPost.authorData.avatar_url) {
+                    photos = [currentPost.authorData.avatar_url];
+                  }
+
                   navigate('/profile-detail', { 
                     state: { 
                       profile: {
@@ -277,9 +334,10 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
                         gender: currentPost.authorData.gender,
                         location: currentPost.authorData.location,
                         school: currentPost.authorData.school,
+                        job: currentPost.authorData.job,
                         mbti: currentPost.authorData.mbti,
                         bio: currentPost.authorData.bio,
-                        photos: avatarUrl ? [avatarUrl] : [],
+                        photos: photos,
                         interests: currentPost.authorData.interests || [],
                         height: currentPost.authorData.height,
                         bodyType: currentPost.authorData.body_type,
@@ -358,11 +416,35 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
                 <img
                   src={comment.avatar}
                   alt={comment.author}
-                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => {
+                    // 내 댓글이면 내 프로필로
+                    if (comment.userId === authUser?.id) {
+                      navigate('/my-profile');
+                      return;
+                    }
+                    // 댓글 작성자 프로필로 이동
+                    if (comment.userId) {
+                      loadAndNavigateToProfile(comment.userId);
+                    }
+                  }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-bold text-gray-900">{comment.author}</span>
+                    <span 
+                      className="text-sm font-bold text-gray-900 cursor-pointer hover:underline"
+                      onClick={() => {
+                        if (comment.userId === authUser?.id) {
+                          navigate('/my-profile');
+                          return;
+                        }
+                        if (comment.userId) {
+                          loadAndNavigateToProfile(comment.userId);
+                        }
+                      }}
+                    >
+                      {comment.author}
+                    </span>
                     <span className="text-xs text-gray-400">{comment.timeAgo}</span>
                   </div>
                   <p className="text-sm text-gray-700 leading-relaxed break-words">{comment.content}</p>
@@ -380,13 +462,17 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
         )}
       </div>
 
-      {/* Input Bar */}
+      {/* Input Bar - 키보드 위에 고정 */}
       <div 
-        className="fixed left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-3 z-40"
-        style={{ bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}
+        className={`fixed left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-3 z-40 transition-all duration-200 ${isInputFocused ? 'shadow-lg' : ''}`}
+        style={{ 
+          bottom: keyboardHeight > 0 
+            ? `${keyboardHeight}px` 
+            : 'calc(80px + env(safe-area-inset-bottom, 0px))'
+        }}
       >
         <img
-          src={authUser?.profile_image || 'https://via.placeholder.com/100'}
+          src={(authUser as any)?.profile_image || 'https://via.placeholder.com/100'}
           alt="내 프로필"
           className="w-8 h-8 rounded-full object-cover border border-gray-100 flex-shrink-0"
         />
@@ -395,13 +481,17 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             onKeyPress={handleKeyPress}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => {
+              setTimeout(() => setIsInputFocused(false), 100);
+            }}
             placeholder="댓글을 입력하세요..."
-            className="w-full bg-gray-100 rounded-full pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 transition-shadow"
+            className="w-full bg-gray-100 rounded-full pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all"
           />
           <button
             onClick={handleSubmitComment}
             disabled={!newComment.trim()}
-            className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${newComment.trim() ? 'text-primary-500 hover:bg-gray-200' : 'text-gray-300'}`}
+            className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${newComment.trim() ? 'text-cyan-500 hover:bg-cyan-50' : 'text-gray-300'}`}
           >
             <i className="ri-send-plane-fill text-lg"></i>
           </button>
