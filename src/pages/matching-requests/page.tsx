@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendMatchAcceptNotification } from '../../services/ssodaaSmsService';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
 import { logger } from '../../utils/logger';
 
@@ -310,6 +311,26 @@ export default function MatchingRequestsPage() {
         } else {
           logger.info('채팅방 생성 완료', { chatRoom });
         }
+      }
+
+      // 매칭 수락 SMS 알림 발송
+      try {
+        // 요청 보낸 사람에게 SMS 발송
+        const { data: otherUserData } = await supabase
+          .from('users')
+          .select('phone_number')
+          .eq('id', otherUserId)
+          .single();
+
+        if (otherUserData?.phone_number) {
+          await sendMatchAcceptNotification(
+            otherUserData.phone_number,
+            authUser.name || '누군가'
+          );
+        }
+      } catch (smsError) {
+        logger.error('매칭 수락 SMS 발송 실패', smsError);
+        // SMS 발송 실패는 무시하고 계속 진행
       }
 
       // 채팅방 시작 이벤트
