@@ -214,8 +214,8 @@ export default function CoinShopPage() {
               key={pkg.id}
               onClick={() => handlePurchase(pkg)}
               className={`w-full flex items-center justify-between p-5 rounded-2xl border-2 transition-all cursor-pointer ${
-                pkg.popular 
-                  ? 'border-pink-500 bg-pink-50' 
+                pkg.popular
+                  ? 'border-pink-500 bg-pink-50'
                   : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
@@ -252,6 +252,91 @@ export default function CoinShopPage() {
               </div>
             </button>
           ))}
+        </div>
+
+        {/* 서비스 제공일 및 환불 규정 */}
+        <div className="mt-8 bg-gray-50 rounded-2xl p-5">
+          <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center">
+            <i className="ri-information-line text-cyan-500 mr-2"></i>
+            서비스 이용 안내
+          </h3>
+
+          <div className="space-y-4">
+            {/* 서비스 제공일 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">📅 서비스 제공일</h4>
+              <ul className="text-xs text-gray-600 space-y-1 ml-4">
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>결제 완료 즉시 자석이 충전됩니다</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>충전된 자석은 유효기간 없이 사용 가능합니다</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* 교환 규정 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">🔄 교환 규정</h4>
+              <ul className="text-xs text-gray-600 space-y-1 ml-4">
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>디지털 콘텐츠 특성상 교환이 불가능합니다</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>다른 패키지로 변경을 원하시는 경우 환불 후 재구매 가능합니다</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* 환불 규정 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">💰 환불 규정</h4>
+              <ul className="text-xs text-gray-600 space-y-1 ml-4">
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span className="font-semibold text-pink-600">결제 후 7일 이내, 미사용 시 100% 환불 가능</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>부분 사용한 경우 사용한 만큼 차감 후 환불</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>보너스 자석은 환불 금액에서 제외됩니다</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>환불 요청은 [설정] → [고객센터] → [환불 신청]에서 가능합니다</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>환불은 영업일 기준 3~5일 소요됩니다</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* 주의사항 */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+              <h4 className="text-xs font-semibold text-yellow-800 mb-2 flex items-center">
+                <i className="ri-alert-line mr-1"></i>
+                주의사항
+              </h4>
+              <ul className="text-xs text-yellow-700 space-y-1 ml-4">
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>자석 구매 시 [전자상거래법]에 따라 청약철회가 가능합니다</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>결제 오류 발생 시 고객센터로 문의해주세요</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
