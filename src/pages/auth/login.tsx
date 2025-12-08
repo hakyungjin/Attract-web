@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginWithPhone } from '../../services/authService';
+import { COMPANY_INFO } from '../../constants/companyInfo';
 
 export default function LoginAuthPage() {
   const navigate = useNavigate();
@@ -154,6 +155,19 @@ export default function LoginAuthPage() {
             고객센터
           </button>
         </p>
+
+        {/* 회사 정보 */}
+        <div className="mt-8 text-center">
+          <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-100">
+            <h3 className="text-lg font-bold text-primary-600 mb-3">{COMPANY_INFO.brandName}</h3>
+            <div className="space-y-1 text-xs text-gray-600">
+              <p className="font-semibold">{COMPANY_INFO.companyFullName}</p>
+              <p>대표자 : {COMPANY_INFO.ceo}</p>
+              <p>법인명 : {COMPANY_INFO.companyShortName}</p>
+              <p>사업자등록번호 : {COMPANY_INFO.businessNumber}</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
