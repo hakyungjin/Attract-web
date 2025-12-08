@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
-import GoogleAdBanner from '../../../components/ads/GoogleAdBanner';
-
-// 구글 애드센스 광고 슬롯 ID
-const GOOGLE_AD_SLOT_1 = '4117488761'; // 광고 영역 1
-const GOOGLE_AD_SLOT_2 = '3292040990'; // 광고 영역 2
+// 구글 애드센스 - 승인 후 활성화
+// import GoogleAdBanner from '../../../components/ads/GoogleAdBanner';
+// const GOOGLE_AD_SLOT_1 = '4117488761'; // 광고 영역 1
+// const GOOGLE_AD_SLOT_2 = '3292040990'; // 광고 영역 2
 
 // 기본 프로필 이미지 헬퍼 함수
 const getDefaultAvatar = (gender?: string) => {
@@ -219,35 +218,16 @@ export default function ProfileTab() {
           </div>
         </div>
 
-        {/* 광고 배너 1 - 구글 애드센스 (컴팩트) */}
+        {/* 광고 배너 - AdSense 승인 후 활성화 */}
+        {/* 
         <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
-          {GOOGLE_AD_SLOT_1 ? (
-            <GoogleAdBanner 
-              adSlot={GOOGLE_AD_SLOT_1} 
-              className="mx-auto max-w-[320px]" 
-              compact={true}
-            />
-          ) : (
-            <div className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-2xl p-4 text-center mx-auto max-w-[320px]">
-              <p className="text-slate-400 text-sm">광고 영역 1</p>
-            </div>
-          )}
+          <GoogleAdBanner 
+            adSlot={GOOGLE_AD_SLOT_1} 
+            className="mx-auto max-w-[320px]" 
+            compact={true}
+          />
         </div>
-
-        {/* 광고 배너 2 - 구글 애드센스 (컴팩트) */}
-        <div className="animate-slide-up" style={{ animationDelay: '0.25s' }}>
-          {GOOGLE_AD_SLOT_2 ? (
-            <GoogleAdBanner 
-              adSlot={GOOGLE_AD_SLOT_2} 
-              className="mx-auto max-w-[320px]" 
-              compact={true}
-            />
-          ) : (
-            <div className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-2xl p-4 text-center mx-auto max-w-[320px]">
-              <p className="text-slate-400 text-sm">광고 영역 2</p>
-            </div>
-          )}
-        </div>
+        */}
 
         {/* 메뉴 */}
         <div className="bg-white rounded-[2rem] shadow-lg shadow-primary-500/5 p-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>

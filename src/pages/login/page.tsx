@@ -447,41 +447,39 @@ export default function LoginPage() {
 
               {/* 인증번호 입력 */}
               {verificationStep === 'verify' && (
-                <div className="bg-cyan-50 rounded-xl p-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-cyan-700 mb-2">
-                      인증번호 입력
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                        className="flex-1 px-4 py-3 border border-cyan-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center tracking-widest text-lg"
-                        placeholder="000000"
-                        maxLength={6}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleVerifyCode}
-                        disabled={verificationCode.length !== 6}
-                        className="px-4 py-3 bg-cyan-500 text-white rounded-xl font-medium hover:bg-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm"
-                      >
-                        확인
-                      </button>
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    인증번호 *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center tracking-widest text-sm"
+                      placeholder="000000"
+                      maxLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={verificationCode.length !== 6}
+                      className="px-4 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm text-gray-700"
+                    >
+                      확인
+                    </button>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <p className={timer > 0 ? 'text-cyan-600' : 'text-red-500'}>
+                  <div className="flex items-center justify-between text-xs mt-2 text-gray-500">
+                    <p className={timer > 0 ? 'text-gray-500' : 'text-red-500'}>
                       {timer > 0 ? `남은 시간: ${formatTime(timer)}` : '인증번호가 만료되었습니다'}
                     </p>
                     <button
                       type="button"
                       onClick={handleResendCode}
                       disabled={!canResend || sendingCode}
-                      className="text-cyan-600 hover:text-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="text-cyan-500 hover:text-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       재전송
                     </button>
@@ -588,6 +586,15 @@ export default function LoginPage() {
               고객센터
             </button>
           </p>
+        </div>
+
+        {/* 사업자 정보 */}
+        <div className="text-center mt-8 pt-6 border-t border-gray-200 text-xs text-gray-400 space-y-1">
+          <p>Attract (어트랙트)</p>
+          <p>대표: 홍길동 | 사업자등록번호: 576-18-02378</p>
+          <p>주소: 서울특별시 강서구 마곡중앙1로 71</p>
+          <p>이메일: support@attract.com | 전화: 02-1234-5678</p>
+          <p className="mt-2">© 2024 Attract. All rights reserved.</p>
         </div>
       </div>
 
