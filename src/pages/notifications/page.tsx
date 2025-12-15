@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Notification {
@@ -33,11 +33,8 @@ export default function NotificationsPage() {
 
       console.log('알림 로드 시작:', authUser.id);
 
-      // Supabase에서 알림 데이터 로드 (RLS가 user_id 필터링)
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Firebase에서 알림 데이터 로드
+      const { notifications: data, error } = await firebase.notifications.getUserNotifications(authUser.id);
 
       if (error) {
         console.error('알림 로드 오류:', error);
@@ -48,8 +45,14 @@ export default function NotificationsPage() {
 
       console.log('로드된 알림:', data);
 
-      // 데이터 변환
-      const formattedNotifications = (data || []).map(notification => ({
+      // 데이터 변환 및 최신순 정렬
+      const sortedData = (data || []).sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+
+      const formattedNotifications = sortedData.map(notification => ({
         id: notification.id,
         type: notification.type as 'like' | 'match' | 'message' | 'community',
         message: notification.message || notification.content || '',

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface HeaderProps {
@@ -31,14 +31,12 @@ export default function Header({ coins = 0 }: HeaderProps) {
         return;
       }
 
-      // RLS 정책이 자동으로 user_id를 필터링하므로 user_id 필터는 추가하지 않음
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('read', false);
+      // Firebase에서 읽지 않은 알림 조회
+      const { notifications, error } = await firebase.notifications.getUserNotifications(authUser.id);
 
-      if (!error && count !== null) {
-        setUnreadCount(count);
+      if (!error && notifications) {
+        const unreadNotifications = notifications.filter(n => !n.read);
+        setUnreadCount(unreadNotifications.length);
       }
     } catch (error) {
       console.error('알림 개수 로드 실패:', error);
