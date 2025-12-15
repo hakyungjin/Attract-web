@@ -256,35 +256,31 @@ export default function ProfileDetailPage() {
           logger.error('채팅방 생성 실패', chatError);
         }
 
-        await supabase.from('notifications').insert([
-          {
-            user_id: toUserId,
-            type: 'match_success',
-            title: '매칭 성사! 💕',
-            message: `${authUser.name || '누군가'}님과 매칭되었습니다!`,
-            data: { matched_user_id: fromUserId, chat_room_id: chatRoom?.id },
-            read: false
-          },
-          {
-            user_id: fromUserId,
-            type: 'match_success',
-            title: '매칭 성사! 💕',
-            message: `${profile.name}님과 매칭되었습니다!`,
-            data: { matched_user_id: toUserId, chat_room_id: chatRoom?.id },
-            read: false
-          }
-        ]);
+        // Firebase 알림 생성 (두 명의 사용자에게)
+        await firebase.notifications.createNotification({
+          user_id: toUserId,
+          type: 'match',
+          message: `${authUser.name || '누군가'}님과 매칭되었습니다!`,
+          content: `매칭 성사! 💕`,
+          read: false,
+          created_at: new Date().toISOString()
+        });
+
+        await firebase.notifications.createNotification({
+          user_id: fromUserId,
+          type: 'match',
+          message: `${profile.name}님과 매칭되었습니다!`,
+          content: `매칭 성사! 💕`,
+          read: false,
+          created_at: new Date().toISOString()
+        });
 
         await sendMatchSuccessPush(toUserId, authUser.name || '누군가', chatRoom?.id);
 
         // 상호 매칭 SMS 알림 발송
         try {
           // 수신자에게 SMS 발송
-          const { data: toUserData } = await supabase
-            .from('users')
-            .select('phone_number')
-            .eq('id', toUserId)
-            .single();
+          const { user: toUserData } = await firebase.users.getUserById(toUserId);
 
           if (toUserData?.phone_number) {
             await sendMatchAcceptNotification(
@@ -294,11 +290,7 @@ export default function ProfileDetailPage() {
           }
 
           // 요청자에게도 SMS 발송
-          const { data: fromUserData } = await supabase
-            .from('users')
-            .select('phone_number')
-            .eq('id', fromUserId)
-            .single();
+          const { user: fromUserData } = await firebase.users.getUserById(fromUserId);
 
           if (fromUserData?.phone_number) {
             await sendMatchAcceptNotification(
@@ -314,13 +306,13 @@ export default function ProfileDetailPage() {
         setIsLikeAnimating(false);
         setShowMatchModal(true);
       } else {
-        await supabase.from('notifications').insert({
+        await firebase.notifications.createNotification({
           user_id: toUserId,
-          type: 'match_request',
-          title: '새로운 매칭 요청',
+          type: 'like',
           message: `${authUser.name || '누군가'}님이 매칭을 요청했습니다`,
-          data: { from_user_id: fromUserId, from_user_name: authUser.name },
-          read: false
+          content: '새로운 매칭 요청',
+          read: false,
+          created_at: new Date().toISOString()
         });
 
         await sendMatchRequestPush(toUserId, authUser.name || '누군가', fromUserId);
