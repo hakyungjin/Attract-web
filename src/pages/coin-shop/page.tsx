@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
 import { kakaoPayReady, redirectToKakaoPay } from '../../services/kakaoPayService';
 
@@ -35,13 +35,10 @@ export default function CoinShopPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 코인 패키지 가져오기
-        const { data: packages, error: packagesError } = await supabase
-          .from('coin_packages')
-          .select('*')
-          .order('display_order', { ascending: true });
+        // 코인 패키지 가져오기 - Firebase 사용
+        const { packages, error: packagesError } = await firebase.coins.getCoinPackages();
 
-        if (packagesError) {
+        if (packagesError || !packages || packages.length === 0) {
           console.error('코인 패키지 로드 실패:', packagesError);
           // 기본 패키지 사용
           setCoinPackages([
@@ -52,7 +49,7 @@ export default function CoinShopPage() {
             { id: 'mega', coins: 1000, price: 75000, bonus: 250 },
             { id: 'ultra', coins: 2000, price: 140000, bonus: 600 },
           ]);
-        } else if (packages && packages.length > 0) {
+        } else {
           // 데이터베이스에서 가져온 패키지 변환
           const formattedPackages = packages.map((pkg: any) => ({
             id: pkg.id.toString(),
@@ -67,13 +64,9 @@ export default function CoinShopPage() {
           setCoinPackages(formattedPackages);
         }
 
-        // 사용자 코인 가져오기
+        // 사용자 코인 가져오기 - Firebase 사용
         if (user?.id) {
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('coins')
-            .eq('id', user.id)
-            .single();
+          const { user: userData, error: userError } = await firebase.users.getUserById(user.id);
 
           if (!userError && userData) {
             setUserCoins(userData.coins || 0);
