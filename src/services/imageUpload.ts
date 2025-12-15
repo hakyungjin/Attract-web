@@ -1,4 +1,5 @@
-import { supabase } from '../lib/supabase';
+import { storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 /**
  * 이미지 업로드 함수
@@ -20,25 +21,14 @@ export const uploadImage = async (
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
     // 파일 경로 생성
-    const filePath = folder ? `${folder}/${fileName}` : fileName;
+    const filePath = folder ? `${bucket}/${folder}/${fileName}` : `${bucket}/${fileName}`;
 
-    // Supabase Storage에 업로드
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (error) {
-      console.error('이미지 업로드 실패:', error);
-      throw new Error(`이미지 업로드 실패: ${error.message}`);
-    }
+    // Firebase Storage에 업로드
+    const storageRef = ref(storage, filePath);
+    await uploadBytes(storageRef, file);
 
     // 공개 URL 생성
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
+    const publicUrl = await getDownloadURL(storageRef);
 
     return publicUrl;
   } catch (error) {
@@ -57,17 +47,17 @@ export const deleteImage = async (
   bucket: string = 'avatars'
 ): Promise<void> => {
   try {
-    // URL에서 파일 경로 추출
-    const path = url.split('/').slice(-1)[0];
-
-    const { error } = await supabase.storage
-      .from(bucket)
-      .remove([path]);
-
-    if (error) {
-      console.error('이미지 삭제 실패:', error);
-      throw new Error(`이미지 삭제 실패: ${error.message}`);
+    // URL에서 파일 경로 추출 (Firebase Storage URL에서 파일 경로 파싱)
+    // Firebase URL 형식: https://firebasestorage.googleapis.com/.../o/{path}?alt=media...
+    const urlParts = url.split('/o/');
+    if (urlParts.length < 2) {
+      throw new Error('Invalid Firebase Storage URL');
     }
+    const pathWithToken = urlParts[1].split('?')[0];
+    const path = decodeURIComponent(pathWithToken);
+
+    const storageRef = ref(storage, path);
+    await deleteObject(storageRef);
   } catch (error) {
     console.error('deleteImage error:', error);
     throw error;
