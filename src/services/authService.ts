@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { firebase } from '../lib/firebaseService';
 import { hashPassword } from './passwordService';
 
 export interface LoginResult {
@@ -8,7 +8,7 @@ export interface LoginResult {
 }
 
 /**
- * 전화번호와 비밀번호로 로그인
+ * 전화번호와 비밀번호로 로그인 (Firebase)
  * @param phoneNumber - 전화번호
  * @param password - 비밀번호
  * @returns 로그인 결과
@@ -22,11 +22,7 @@ export const loginWithPhone = async (
     const cleanedPhone = phoneNumber.replace(/[^\d]/g, '');
 
     // 사용자 찾기
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('phone_number', cleanedPhone)
-      .single();
+    const { user, error } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
 
     if (error || !user) {
       console.error('사용자 조회 실패:', error);
@@ -37,7 +33,7 @@ export const loginWithPhone = async (
     }
 
     // 비밀번호 확인
-    if (!user.password_hash) {
+    if (!user.password) {
       return {
         success: false,
         error: '비밀번호가 설정되지 않았습니다.'
@@ -47,7 +43,7 @@ export const loginWithPhone = async (
     // SHA-256으로 입력받은 비밀번호를 해시
     const hashedInput = await hashPassword(password);
 
-    if (user.password_hash !== hashedInput) {
+    if (user.password !== hashedInput) {
       return {
         success: false,
         error: '비밀번호가 일치하지 않습니다.'
@@ -55,13 +51,12 @@ export const loginWithPhone = async (
     }
 
     // 마지막 로그인 시간 업데이트
-    await supabase
-      .from('users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', user.id);
+    await firebase.users.updateUser(user.id, {
+      updated_at: new Date().toISOString()
+    });
 
     // 로그인 성공 - 민감한 정보 제거
-    const { password_hash: _, ...userWithoutPassword } = user;
+    const { password: _, ...userWithoutPassword } = user;
     return {
       success: true,
       user: userWithoutPassword
@@ -76,7 +71,7 @@ export const loginWithPhone = async (
 };
 
 /**
- * 회원가입 시 비밀번호 저장
+ * 회원가입 시 비밀번호 저장 (Firebase)
  * @param phoneNumber - 전화번호
  * @param password - 비밀번호
  */
@@ -86,11 +81,20 @@ export const updateUserPassword = async (
 ): Promise<boolean> => {
   try {
     const hashedPassword = await hashPassword(password);
+    const cleanedPhone = phoneNumber.replace(/[^\d]/g, '');
 
-    const { error } = await supabase
-      .from('users')
-      .update({ password_hash: hashedPassword })
-      .eq('phone_number', phoneNumber);
+    // 사용자 찾기
+    const { user, error: findError } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
+
+    if (findError || !user) {
+      console.error('사용자 조회 실패:', findError);
+      return false;
+    }
+
+    // 비밀번호 업데이트
+    const { error } = await firebase.users.updateUser(user.id, {
+      password: hashedPassword
+    });
 
     if (error) {
       console.error('비밀번호 저장 실패:', error);

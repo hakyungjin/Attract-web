@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createUserProfile } from '../../services/phoneAuth';
-import { supabase } from '../../lib/supabase';
+import { storage } from '../../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
 
@@ -96,23 +97,12 @@ export default function SignupPage() {
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Supabase Storage에 업로드
-      const { data, error } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) {
-        console.error('이미지 업로드 실패:', error);
-        throw error;
-      }
+      // Firebase Storage에 업로드
+      const storageRef = ref(storage, filePath);
+      await uploadBytes(storageRef, selectedFile);
 
       // 공개 URL 가져오기
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      const publicUrl = await getDownloadURL(storageRef);
 
       console.log('이미지 업로드 성공:', publicUrl);
       return publicUrl;

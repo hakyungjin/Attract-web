@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+import { firebase } from '../lib/firebaseService';
 import { hashPassword } from '../services/passwordService';
 
 interface AuthUser {
@@ -49,13 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // 전화번호에서 '-' 제거
       const cleanPhoneNumber = phoneNumber.replace(/-/g, '');
-      
+
       // 전화번호로 사용자 조회
-      const { data: users, error: queryError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone_number', cleanPhoneNumber)
-        .single();
+      const { user: users, error: queryError } = await firebase.users.findUserByPhoneNumber(cleanPhoneNumber);
 
       if (queryError || !users) {
         return { error: { message: '사용자를 찾을 수 없습니다.' } };
@@ -68,10 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 마지막 로그인 시간 업데이트
-      await supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', users.id);
+      await firebase.users.updateUser(users.id, {
+        last_login: new Date().toISOString()
+      });
 
       const authUser: AuthUser = {
         id: users.id,
@@ -106,13 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // 전화번호에서 '-' 제거
       const cleanPhoneNumber = phoneNumber.replace(/-/g, '');
-      
+
       // 중복 확인
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('phone_number', cleanPhoneNumber)
-        .single();
+      const { user: existingUser } = await firebase.users.findUserByPhoneNumber(cleanPhoneNumber);
 
       if (existingUser) {
         return { error: { message: '이미 가입된 전화번호입니다.' } };
@@ -120,21 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 새 사용자 생성
       const hashedPassword = await hashPassword(password);
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          phone_number: cleanPhoneNumber,
-          password_hash: hashedPassword,
-          name: userData.name,
-          age: userData.age || null,
-          gender: userData.gender || 'male',
-          location: userData.location || null,
-          school: userData.school || null,
-          job: userData.job || null,
-          bio: userData.bio || null,
-        })
-        .select()
-        .single();
+      const { user: newUser, error: insertError } = await firebase.users.createUser({
+        phone_number: cleanPhoneNumber,
+        password_hash: hashedPassword,
+        name: userData.name,
+        age: userData.age || null,
+        gender: userData.gender || 'male',
+        location: userData.location || null,
+        school: userData.school || null,
+        job: userData.job || null,
+        bio: userData.bio || null,
+      });
 
       if (insertError || !newUser) {
         return { error: insertError || { message: '가입에 실패했습니다.' } };

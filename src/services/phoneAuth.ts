@@ -4,7 +4,7 @@ import {
 } from 'firebase/auth';
 import type { ConfirmationResult } from 'firebase/auth';
 import { firebaseAuth } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { firebase } from '../lib/firebaseService';
 
 // reCAPTCHA verifier 인스턴스
 let recaptchaVerifier: RecaptchaVerifier | null = null;
@@ -99,32 +99,27 @@ export const verifyCode = async (
 };
 
 /**
- * Supabase에서 사용자 존재 여부 확인
+ * Firestore에서 사용자 존재 여부 확인
  * firebase_uid로 먼저 확인하고, 없으면 전화번호로 확인 (유령 회원 대응)
  */
 const checkUserExists = async (firebaseUid: string, phoneNumber?: string) => {
   try {
-    console.log('🔍 Supabase 쿼리 시작:', {
+    console.log('🔍 Firestore 쿼리 시작:', {
       firebaseUid,
-      phoneNumber,
-      supabaseClient: supabase ? '✅ 존재' : '❌ 없음'
+      phoneNumber
     });
 
     // 1. firebase_uid로 사용자 확인
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('firebase_uid', firebaseUid)
-      .single();
+    const { user: existingUser, error: checkError } = await firebase.users.findUserByFirebaseUid(firebaseUid);
 
     console.log('🔍 firebase_uid 쿼리 결과:', {
       hasData: !!existingUser,
-      error: checkError ? checkError.message : null,
-      errorCode: checkError ? checkError.code : null
+      error: checkError ? checkError.message : null
     });
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      throw checkError;
+    if (checkError && !existingUser) {
+      // 에러가 있지만 계속 진행 (사용자가 없을 수 있음)
+      console.log('firebase_uid로 사용자를 찾을 수 없음, 전화번호로 확인 시도');
     }
 
     // firebase_uid로 찾았으면 기존 사용자
@@ -148,27 +143,21 @@ const checkUserExists = async (firebaseUid: string, phoneNumber?: string) => {
       console.log('🔍 원본 전화번호:', phoneNumber);
       console.log('🔍 변환된 전화번호:', cleanedPhone);
 
-      const { data: ghostUser, error: ghostError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone_number', cleanedPhone)
-        .is('firebase_uid', null)
-        .maybeSingle(); // single 대신 maybeSingle 사용 (0개 또는 1개 허용)
+      const { user: ghostUser } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
 
       console.log('🔍 전화번호 쿼리 결과:', {
         hasData: !!ghostUser,
-        error: ghostError ? ghostError.message : null,
         searchedPhone: cleanedPhone
       });
 
-      if (ghostUser) {
+      // 전화번호로 찾았지만 firebase_uid가 없는 경우 (유령 회원)
+      if (ghostUser && !ghostUser.firebase_uid) {
         console.log('👻 유령 회원 발견! firebase_uid 업데이트 중...');
 
         // 유령 회원에 firebase_uid 연결
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ firebase_uid: firebaseUid })
-          .eq('id', ghostUser.id);
+        const { error: updateError } = await firebase.users.updateUser(ghostUser.id, {
+          firebase_uid: firebaseUid
+        });
 
         if (updateError) {
           console.error('firebase_uid 업데이트 실패:', updateError);
@@ -224,38 +213,34 @@ export const createUserProfile = async (
 
     console.log('회원가입 전화번호 저장:', cleanedPhone);
 
-    const { data, error} = await supabase
-      .from('users')
-      .insert({
-        firebase_uid: firebaseUid,
-        phone_number: cleanedPhone,
-        name: userData.name,
-        age: userData.age,
-        gender: userData.gender,
-        location: userData.location,
-        bio: userData.bio,
-        mbti: userData.mbti,
-        school: userData.school,
-        height: userData.height,
-        body_type: userData.body_type,
-        style: userData.style,
-        religion: userData.religion,
-        smoking: userData.smoking,
-        drinking: userData.drinking,
-        interests: userData.interests,
-        photos: userData.photos,
-        password: userData.password || null, // 비밀번호 추가
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    const { user: data, error } = await firebase.users.createUser({
+      firebase_uid: firebaseUid,
+      phone_number: cleanedPhone,
+      name: userData.name,
+      age: userData.age,
+      gender: userData.gender,
+      location: userData.location,
+      bio: userData.bio,
+      mbti: userData.mbti,
+      school: userData.school,
+      height: userData.height,
+      body_type: userData.body_type,
+      style: userData.style,
+      religion: userData.religion,
+      smoking: userData.smoking,
+      drinking: userData.drinking,
+      interests: userData.interests,
+      photos: userData.photos,
+      password: userData.password || null, // 비밀번호 추가
+      created_at: new Date().toISOString()
+    });
 
     if (error) {
       console.error('사용자 생성 실패:', error);
       throw error;
     }
 
-    console.log('Supabase에 새 사용자 생성됨:', data);
+    console.log('Firestore에 새 사용자 생성됨:', data);
     return { data, error: null };
   } catch (error: any) {
     console.error('createUserProfile 실패:', error);

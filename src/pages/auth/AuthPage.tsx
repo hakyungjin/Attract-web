@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { userService } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { COMPANY_INFO } from '../../constants/companyInfo';
 
 export default function AuthPage() {
@@ -40,8 +40,8 @@ export default function AuthPage() {
 
       console.log('검색할 전화번호:', cleanedPhone);
 
-      // 전화번호로 사용자 찾기 - userService 사용
-      const { user, error } = await userService.findUserByPhoneNumber(cleanedPhone);
+      // 전화번호로 사용자 찾기 - firebase 사용
+      const { user, error } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
 
       if (error || !user) {
         alert('등록되지 않은 전화번호입니다.');

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
+import { storage } from '../../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { hashPassword } from '../../services/passwordService';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
@@ -102,18 +104,12 @@ export default function QuickSignupPage() {
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      const { error } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      // Firebase Storage에 업로드
+      const storageRef = ref(storage, filePath);
+      await uploadBytes(storageRef, selectedFile);
 
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      // 공개 URL 가져오기
+      const publicUrl = await getDownloadURL(storageRef);
 
       return publicUrl;
     } catch (error) {
@@ -163,11 +159,7 @@ export default function QuickSignupPage() {
 
       // 전화번호 중복 확인
       const cleanedPhone = formData.phoneNumber.replace(/[^\d]/g, '');
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('phone_number', cleanedPhone)
-        .maybeSingle();
+      const { user: existingUser } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
 
       if (existingUser) {
         alert('이미 등록된 전화번호입니다.');
@@ -179,32 +171,28 @@ export default function QuickSignupPage() {
       const hashedPassword = await hashPassword(formData.password);
 
       // 회원 생성 (is_ghost = true로 유령 회원 표시)
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          phone_number: cleanedPhone,
-          password_hash: hashedPassword,
-          name: formData.name.trim(),
-          age: formData.age ? parseInt(formData.age) : null,
-          gender: formData.gender,
-          location: formData.location.trim() || null,
-          bio: formData.bio.trim() || null,
-          mbti: formData.mbti.toUpperCase() || null,
-          school: formData.school.trim() || null,
-          height: formData.height || null,
-          body_type: formData.bodyType || null,
-          style: formData.style || null,
-          religion: formData.religion || null,
-          smoking: formData.smoking || null,
-          drinking: formData.drinking || null,
-          interests: interests.length > 0 ? interests : null,
-          profile_image: imageUrl,
-          is_ghost: true,
-          profile_completed: true,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const { user: data, error } = await firebase.users.createUser({
+        phone_number: cleanedPhone,
+        password_hash: hashedPassword,
+        name: formData.name.trim(),
+        age: formData.age ? parseInt(formData.age) : null,
+        gender: formData.gender,
+        location: formData.location.trim() || null,
+        bio: formData.bio.trim() || null,
+        mbti: formData.mbti.toUpperCase() || null,
+        school: formData.school.trim() || null,
+        height: formData.height || null,
+        body_type: formData.bodyType || null,
+        style: formData.style || null,
+        religion: formData.religion || null,
+        smoking: formData.smoking || null,
+        drinking: formData.drinking || null,
+        interests: interests.length > 0 ? interests : null,
+        profile_image: imageUrl,
+        is_ghost: true,
+        profile_completed: true,
+        created_at: new Date().toISOString()
+      });
 
       if (error) {
         console.error('회원가입 실패:', error);
