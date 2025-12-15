@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
 
@@ -54,13 +54,9 @@ export default function MyProfilePage() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        const { user: data, error } = await firebase.users.getUserById(userId);
 
-        if (error) {
+        if (error || !data) {
           console.error('프로필 로드 실패:', error);
           return;
         }
