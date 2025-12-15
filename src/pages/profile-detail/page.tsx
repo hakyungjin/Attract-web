@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
-import { sendMatchRequestNotification, sendMatchAcceptNotification } from '../../services/ssodaaSmsService';
 import { analyzeMBTICompatibility, getCompatibilityColor, getCompatibilityEmoji, type MBTICompatibility } from '../../services/mbtiCompatibility';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
 import { logger } from '../../utils/logger';
@@ -303,39 +302,11 @@ export default function ProfileDetailPage() {
 
         await sendMatchSuccessPush(toUserId, authUser.name || '누군가', chatRoom?.id);
 
-        // 상호 매칭 SMS 알림 발송
-        try {
-          // 수신자에게 SMS 발송
-          const { data: toUserData } = await supabase
-            .from('users')
-            .select('phone_number')
-            .eq('id', toUserId)
-            .single();
+        // Analytics: 매칭 성사 이벤트
+        const { logMatchSuccess } = await import('../../services/analytics');
+        logMatchSuccess();
 
-          if (toUserData?.phone_number) {
-            await sendMatchAcceptNotification(
-              toUserData.phone_number,
-              authUser.name || '누군가'
-            );
-          }
-
-          // 요청자에게도 SMS 발송
-          const { data: fromUserData } = await supabase
-            .from('users')
-            .select('phone_number')
-            .eq('id', fromUserId)
-            .single();
-
-          if (fromUserData?.phone_number) {
-            await sendMatchAcceptNotification(
-              fromUserData.phone_number,
-              profile.name
-            );
-          }
-        } catch (smsError) {
-          logger.error('매칭 성사 SMS 발송 실패', smsError);
-          // SMS 발송 실패는 무시하고 계속 진행
-        }
+        // NOTE: SSODAA(SMS) 알림은 B안(Firebase PhoneAuth 통일) 전환으로 일단 비활성화됨.
 
         setIsLikeAnimating(false);
         setShowMatchModal(true);
@@ -351,24 +322,11 @@ export default function ProfileDetailPage() {
 
         await sendMatchRequestPush(toUserId, authUser.name || '누군가', fromUserId);
 
-        // 매칭 요청 SMS 알림 발송
-        try {
-          const { data: toUserData } = await supabase
-            .from('users')
-            .select('phone_number')
-            .eq('id', toUserId)
-            .single();
+        // Analytics: 매칭 요청 이벤트
+        const { logMatchRequest } = await import('../../services/analytics');
+        logMatchRequest();
 
-          if (toUserData?.phone_number) {
-            await sendMatchRequestNotification(
-              toUserData.phone_number,
-              authUser.name || '누군가'
-            );
-          }
-        } catch (smsError) {
-          logger.error('매칭 요청 SMS 발송 실패', smsError);
-          // SMS 발송 실패는 무시하고 계속 진행
-        }
+        // NOTE: SSODAA(SMS) 알림은 B안(Firebase PhoneAuth 통일) 전환으로 일단 비활성화됨.
 
         setIsLikeAnimating(false);
         setShowLikeToast(true);
@@ -394,7 +352,7 @@ export default function ProfileDetailPage() {
       }
     });
     window.dispatchEvent(event);
-    navigate('/');
+    navigate('/home');
   };
 
   const handleMBTICompatibility = () => {

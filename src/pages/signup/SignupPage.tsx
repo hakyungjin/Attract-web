@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { uploadImage } from '../../services/imageUpload';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
 import { INTEREST_CATEGORIES, INTEREST_CATEGORY_NAMES, INTEREST_CATEGORY_ICONS, POPULAR_INTERESTS } from '../../constants/interests';
@@ -98,29 +99,8 @@ export default function SignupPage() {
     // 즉시 업로드 시작
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { error } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) {
-        console.error('이미지 업로드 실패:', error);
-        alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
-        setSelectedFile(null);
-        setPreviewUrl('');
-        return;
-      }
-
-      // 공개 URL 가져오기
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      // Firebase Storage에 업로드
+      const publicUrl = await uploadImage(file, 'avatars');
 
       console.log('이미지 업로드 성공:', publicUrl);
       
@@ -241,7 +221,7 @@ export default function SignupPage() {
       }
 
       alert('회원가입이 완료되었습니다!');
-      navigate('/', { replace: true });
+      navigate('/home', { replace: true });
     } catch (error) {
       alert('회원가입 중 오류가 발생했습니다.');
       console.error(error);

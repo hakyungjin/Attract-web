@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
 import type { Analytics } from 'firebase/analytics';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,6 +16,7 @@ const firebaseConfig = {
 
 // Firebase 초기화
 const app = initializeApp(firebaseConfig);
+export const firebaseApp = app;
 
 // Auth 인스턴스 생성
 export const firebaseAuth = getAuth(app);
@@ -24,6 +26,9 @@ export let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
   analytics = getAnalytics(app);
 }
+
+// Storage 인스턴스 생성
+export const firebaseStorage = getStorage(app);
 
 // 한국어 설정
 firebaseAuth.languageCode = 'ko';

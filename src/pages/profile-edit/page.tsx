@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
+import { uploadImage } from '../../services/imageUpload';
 import { MBTI_TYPES } from '../../constants/mbti';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
@@ -221,6 +222,11 @@ export default function ProfileEditPage() {
       }
 
       logger.info('저장된 데이터:', profileData);
+      
+      // Analytics: 프로필 수정 이벤트
+      const { logProfileUpdate } = await import('../../services/analytics');
+      logProfileUpdate();
+      
       setShowSaveAlert(true);
 
     } catch (error) {
@@ -252,36 +258,8 @@ export default function ProfileEditPage() {
     setIsUploading(true);
 
     try {
-      // 파일명 생성 (타임스탬프 + 랜덤 문자열)
-      const fileName = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Supabase Storage에 업로드 - profile-images 버킷 사용
-      const { error: uploadError, data } = await supabase.storage
-        .from('profile-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        let errorMsg = uploadError.message || '이미지 업로드에 실패했습니다.';
-        
-        // Bucket not found 오류 처리
-        if (errorMsg.includes('Bucket not found')) {
-          errorMsg = '⚠️ Supabase Storage가 제대로 설정되지 않았습니다.\n관리자에게 문의해주세요.\n\n기술 정보: "user-profiles" bucket이 없습니다.';
-        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-          errorMsg = '⚠️ 인증 오류: Supabase 설정을 확인해주세요.';
-        }
-        
-        logger.error('업로드 에러 상세:', uploadError);
-        throw new Error(errorMsg);
-      }
-
-      logger.info('업로드 성공:', data);
-
-      // 공개 URL 생성 - Supabase 기본 형식
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
+      // Firebase Storage에 업로드
+      const publicUrl = await uploadImage(file, 'profile-images');
       
       logger.info('생성된 공개 URL:', { url: publicUrl });
       setUploadedImageUrl(publicUrl);
@@ -455,26 +433,10 @@ export default function ProfileEditPage() {
                       // 파일명 생성 (profile-images 버킷 사용 - 대표 사진과 동일)
                       const fileName = `photo_${authUser?.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                       
-                      const { error: uploadError, data } = await supabase.storage
-                        .from('profile-images')
-                        .upload(fileName, file, {
-                          cacheControl: '3600',
-                          upsert: false
-                        });
+                      // Firebase Storage에 업로드
+                      const publicUrl = await uploadImage(file, 'profile-images');
                       
-                      if (uploadError) {
-                        let errorMsg = uploadError.message || '이미지 업로드에 실패했습니다.';
-                        if (errorMsg.includes('Bucket not found')) {
-                          errorMsg = '⚠️ Supabase Storage가 설정되지 않았습니다.\n관리자에게 문의해주세요.';
-                        }
-                        throw new Error(errorMsg);
-                      }
-
-                      logger.info('갤러리 사진 업로드 성공:', data);
-                      
-                      // 공개 URL 생성
-                      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-                      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
+                      logger.info('갤러리 사진 업로드 성공:', { url: publicUrl });
                       
                       setFormData(prev => ({
                         ...prev,

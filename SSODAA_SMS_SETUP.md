@@ -92,6 +92,9 @@ VITE_SSODAA_TOKEN_KEY=your_ssodaa_token_key_here
 VITE_SSODAA_SENDER=01012345678
 ```
 
+> 참고: 현재 Attract는 **Firebase Cloud Functions에서 쏘다 API를 호출**하도록 구성되어 있습니다.  
+> 따라서 운영에서는 아래의 **Firebase 시크릿 설정**이 필수입니다. (`VITE_...`는 프론트 번들에 포함될 수 있어 운영에서는 사용하지 않는 것을 권장)
+
 ### 2. 값 설정
 
 1. **VITE_SSODAA_API_KEY**: [API 토큰 관리]에서 발급받은 `api_key`
@@ -105,6 +108,47 @@ VITE_SSODAA_API_KEY=sk_test_1234567890abcdefghijklmnop
 VITE_SSODAA_TOKEN_KEY=tk_live_abcdefghijklmnopqrstuvwxyz
 VITE_SSODAA_SENDER=01012345678
 ```
+
+### 3. Firebase Cloud Functions 시크릿 설정 (운영 필수)
+
+프로젝트 루트에서 아래 명령을 실행해 시크릿을 등록하세요:
+
+```bash
+firebase functions:secrets:set SSODAA_API_KEY
+firebase functions:secrets:set SSODAA_TOKEN_KEY
+firebase functions:secrets:set SSODAA_SENDER
+```
+
+#### 시크릿 설정이 안 될 때 (자주 나오는 원인)
+
+- **Firebase CLI 로그인/프로젝트 선택**:
+  - `firebase login`
+  - `firebase use --add` (프로젝트가 맞는지 확인)
+- **권한 문제**: 해당 Google 계정이 프로젝트에 **Owner/Editor** 권한이 없으면 실패합니다.
+- **결제(Blaze) 미설정**: Functions v2 + Secret Manager를 쓰는 경우 **Blaze 플랜/결제 연결이 필요**한 케이스가 있습니다.
+- **CLI 구버전**:
+  - `npm i -g firebase-tools@latest`
+  - 또는 `npx firebase-tools@latest functions:secrets:set SSODAA_API_KEY`
+
+#### 시크릿 대신 “서버 환경변수(process.env)”로도 동작하게 해둠
+
+현재 Functions 코드는 시크릿이 막혔을 때를 대비해서, 런타임에 다음 환경변수로도 폴백하도록 되어 있습니다:
+
+- `SSODAA_API_KEY`
+- `SSODAA_TOKEN_KEY`
+- `SSODAA_SENDER`
+
+그 다음 Functions 배포:
+
+```bash
+npm run deploy:functions
+```
+
+### 4. 인증번호 문자(템플릿) 커스터마이징
+
+인증문자 형식은 `functions/src/index.ts`의 아래 상수를 수정하면 됩니다:
+
+- `OTP_SMS_TEMPLATE` (예: `"[Attract] 인증번호는 [{code}]입니다. 3분 내에 입력해주세요."`)
 
 ---
 
@@ -121,7 +165,7 @@ import { sendVerificationSMS, verifyCode } from '../services/ssodaaSmsService';
 const success = await sendVerificationSMS('01012345678');
 
 // 사용자가 입력한 인증번호 확인
-const isValid = verifyCode('01012345678', '123456');
+const isValid = await verifyCode('01012345678', '123456');
 ```
 
 **메시지 예시**:

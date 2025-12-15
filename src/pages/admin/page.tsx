@@ -473,7 +473,7 @@ export default function AdminPage() {
         </button>
         <h1 className="font-bold text-gray-800">관리자</h1>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           className="w-10 h-10 flex items-center justify-center"
         >
           <i className="ri-home-line text-xl text-gray-600"></i>
@@ -554,7 +554,7 @@ export default function AdminPage() {
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="w-full flex items-center space-x-3 px-4 py-3 text-gray-600 rounded-xl"
           >
             <i className="ri-logout-box-line text-xl"></i>

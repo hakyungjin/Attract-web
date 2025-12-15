@@ -1,9 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
-import {
-  sendMatchRequestNotification,
-  sendMatchAcceptNotification,
-} from './ssodaaSmsService';
+
 
 /**
  * 24시간 이상 pending 상태인 매칭 요청을 자동 삭제

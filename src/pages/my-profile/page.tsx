@@ -155,7 +155,7 @@ export default function MyProfilePage() {
         <div className="text-center">
           <p className="text-gray-600 mb-4">프로필을 불러올 수 없습니다</p>
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="bg-cyan-500 text-white px-6 py-2 rounded-full"
           >
             홈으로

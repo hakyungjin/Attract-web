@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { hashPassword } from '../../services/passwordService';
+import { uploadImage } from '../../services/imageUpload';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
 
@@ -94,27 +95,12 @@ export default function QuickSignupPage() {
   };
 
   // 이미지 업로드
-  const uploadImage = async (): Promise<string | null> => {
+  const uploadImageFile = async (): Promise<string | null> => {
     if (!selectedFile) return null;
 
     try {
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { error } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
+      // Firebase Storage에 업로드
+      const publicUrl = await uploadImage(selectedFile, 'avatars');
       return publicUrl;
     } catch (error) {
       console.error('이미지 업로드 오류:', error);
@@ -154,7 +140,7 @@ export default function QuickSignupPage() {
 
     try {
       // 이미지 업로드
-      const imageUrl = await uploadImage();
+      const imageUrl = await uploadImageFile();
       if (!imageUrl) {
         alert('이미지 업로드에 실패했습니다.');
         setLoading(false);
@@ -454,8 +440,8 @@ export default function QuickSignupPage() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">관심사</label>
               <div className="flex gap-1 mb-1">
-                <input type="text" value={newInterest} onChange={e => setNewInterest(e.target.value)} onKeyPress={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddInterest(); }}} placeholder="관심사 입력 후 추가" className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                <button type="button" onClick={handleAddInterest} className="px-3 py-1.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600">추가</button>
+                <input type="text" value={newInterest} onChange={e => setNewInterest(e.target.value)} onKeyPress={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddInterest(); }}} placeholder="관심사 추가" className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <button type="button" onClick={handleAddInterest} className="flex-shrink-0 px-3 py-1.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600">추가</button>
               </div>
               {interests.length > 0 && (
                 <div className="flex flex-wrap gap-1">

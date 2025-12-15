@@ -7,6 +7,8 @@ import { Suspense, useEffect } from "react";
 import { cleanupExpiredMatchingRequests } from "./services/matchingService";
 import { initPushNotifications } from "./services/pushNotification";
 import { ToastProvider, useToast, setGlobalToast } from "./components/base/Toast";
+import ScrollToTop from "./components/ScrollToTop";
+import { App as CapacitorApp } from "@capacitor/app";
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -64,10 +66,76 @@ function AppContent() {
   );
 }
 
+// 뒤로가기 두 번 누르면 앱 종료를 위한 타임스탬프
+let lastBackPress = 0;
+let exitToast: HTMLDivElement | null = null;
+
+// 종료 안내 토스트 표시
+const showExitToast = () => {
+  // 기존 토스트 제거
+  if (exitToast) {
+    exitToast.remove();
+  }
+  
+  exitToast = document.createElement('div');
+  exitToast.innerHTML = '한 번 더 누르면 앱이 종료됩니다';
+  exitToast.style.cssText = `
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
+  `;
+  document.body.appendChild(exitToast);
+  
+  // 2초 후 자동 제거
+  setTimeout(() => {
+    if (exitToast) {
+      exitToast.remove();
+      exitToast = null;
+    }
+  }, 2000);
+};
+
 function App() {
+  // 네이티브 앱 뒤로가기 버튼 핸들러
+  useEffect(() => {
+    const backButtonHandler = CapacitorApp.addListener('backButton', () => {
+      // 홈 화면인지 확인 (/, /home, 또는 히스토리가 1 이하)
+      const isHomePage = window.location.pathname === '/' || 
+                         window.location.pathname === '/home' ||
+                         window.location.pathname === '/login';
+      
+      if (isHomePage || window.history.length <= 1) {
+        // 2초 내에 두 번 누르면 앱 종료
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          CapacitorApp.exitApp();
+        } else {
+          lastBackPress = now;
+          showExitToast();
+        }
+      } else {
+        // 이전 화면으로 이동
+        window.history.back();
+      }
+    });
+
+    return () => {
+      backButtonHandler.then(handler => handler.remove());
+    };
+  }, []);
+
   return (
     <I18nextProvider i18n={i18n}>
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider>
           <ToastProvider>
             <AppContent />

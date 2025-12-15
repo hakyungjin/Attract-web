@@ -1,13 +1,29 @@
 {
   "hosting": {
-    
     "public": "out",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "/ads.txt",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          },
+          {
+            "key": "Content-Type",
+            "value": "text/plain; charset=utf-8"
+          }
+        ]
+      }
+    ],
     "rewrites": [
+      { "source": "/account-deletion", "destination": "/account-deletion.html" },
       {
         "source": "**",
         "destination": "/index.html"

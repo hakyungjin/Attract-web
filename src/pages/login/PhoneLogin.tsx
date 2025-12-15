@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import {
-  sendVerificationSMS,
-  verifyCode as verifySsodaaCode,
-  sendVerificationSMSTest
-} from '../../services/ssodaaSmsService';
+import type { ConfirmationResult } from 'firebase/auth';
+import { clearRecaptcha, sendVerificationCode, verifyCode } from '../../services/phoneAuth';
 
 /**
  * 휴대폰 번호 로그인 페이지 (쏘다 SMS 인증)
@@ -23,9 +20,7 @@ export default function PhoneLoginPage() {
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(180); // 3분
   const [canResend, setCanResend] = useState(false);
-  
-  // 개발 모드 여부 (테스트용)
-  const isDevelopment = import.meta.env.DEV;
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   // 타이머
   useEffect(() => {
@@ -87,29 +82,13 @@ export default function PhoneLoginPage() {
     setLoading(true);
 
     try {
-      let success: boolean;
-      
-      if (isDevelopment) {
-        // 개발 모드: 콘솔에 인증번호 출력 (실제 SMS 미발송)
-        const testCode = await sendVerificationSMSTest(phoneNumber);
-        console.log(`🔐 테스트 인증번호: ${testCode}`);
-        success = true;
-      } else {
-        // 운영 모드: 실제 SMS 발송
-        success = await sendVerificationSMS(phoneNumber);
-      }
+      const result = await sendVerificationCode(phoneNumber);
+      setConfirmationResult(result);
 
-      if (success) {
-        setStep('verify');
-        setTimer(180);
-        setCanResend(false);
-        alert(isDevelopment 
-          ? '개발 모드: 콘솔에서 인증번호를 확인하세요.' 
-          : '인증번호가 전송되었습니다.'
-        );
-      } else {
-        alert('인증번호 발송에 실패했습니다. 다시 시도해주세요.');
-      }
+      setStep('verify');
+      setTimer(180);
+      setCanResend(false);
+      alert('인증번호가 전송되었습니다.');
     } catch (error: any) {
       console.error('SMS 발송 오류:', error);
       alert(error.message || 'SMS 발송에 실패했습니다.');
@@ -126,24 +105,14 @@ export default function PhoneLoginPage() {
 
     setLoading(true);
     try {
-      let success: boolean;
-      
-      if (isDevelopment) {
-        const testCode = await sendVerificationSMSTest(phoneNumber);
-        console.log(`🔐 재발송 테스트 인증번호: ${testCode}`);
-        success = true;
-      } else {
-        success = await sendVerificationSMS(phoneNumber);
-      }
+      // reCAPTCHA 토큰 만료/재시도 케이스 대비
+      clearRecaptcha();
+      const result = await sendVerificationCode(phoneNumber);
+      setConfirmationResult(result);
 
-      if (success) {
-        setTimer(180);
-        setCanResend(false);
-        alert(isDevelopment 
-          ? '개발 모드: 콘솔에서 인증번호를 확인하세요.' 
-          : '인증번호가 재전송되었습니다.'
-        );
-      }
+      setTimer(180);
+      setCanResend(false);
+      alert('인증번호가 재전송되었습니다.');
     } catch (error: any) {
       alert(error.message || 'SMS 발송에 실패했습니다.');
     } finally {
@@ -165,44 +134,38 @@ export default function PhoneLoginPage() {
     setLoading(true);
 
     try {
-      // 쏘다 SMS 인증번호 확인
-      const isValid = verifySsodaaCode(phoneNumber, verificationCode);
-
-      if (!isValid) {
-        alert('인증번호가 일치하지 않거나 만료되었습니다.');
-        setLoading(false);
+      if (!confirmationResult) {
+        alert('인증번호를 먼저 요청해주세요.');
         return;
       }
 
-      // Supabase에서 사용자 조회
-      const cleanPhone = phoneNumber.replace(/-/g, '');
-      const { data: existingUser, error: queryError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone_number', cleanPhone)
-        .maybeSingle();
+      const { user, isNewUser, userData, error } = await verifyCode(
+        confirmationResult,
+        verificationCode,
+        phoneNumber
+      );
 
-      if (queryError && queryError.code !== 'PGRST116') {
-        console.error('사용자 조회 오류:', queryError);
-        throw new Error('사용자 정보를 확인하는데 실패했습니다.');
+      if (error || !user) {
+        alert(error?.message || '인증번호가 일치하지 않거나 만료되었습니다.');
+        return;
       }
 
-      if (existingUser) {
-        // 기존 사용자 - 로그인 성공
-        console.log('✅ 로그인 성공:', existingUser);
-        localStorage.setItem('user', JSON.stringify(existingUser));
-        alert('로그인 성공!');
-        navigate('/');
-      } else {
-        // 신규 사용자 - 회원가입 페이지로 이동
+      if (isNewUser || !userData) {
         alert('신규 사용자입니다. 회원가입을 진행해주세요.');
         navigate('/signup', {
           state: {
-            phoneNumber: phoneNumber,
-            verified: true // 인증 완료 상태 전달
-          }
+            phoneNumber,
+            verified: true,
+            firebaseUid: user.uid,
+          },
         });
+        return;
       }
+
+      console.log('✅ 로그인 성공:', userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      alert('로그인 성공!');
+      navigate('/home');
     } catch (error: any) {
       console.error('인증 오류:', error);
       alert(error.message || '인증에 실패했습니다.');
@@ -215,10 +178,12 @@ export default function PhoneLoginPage() {
    * 전화번호 수정 (인증번호 화면에서 뒤로가기)
    */
   const handleEditPhone = () => {
+    clearRecaptcha();
     setStep('phone');
     setVerificationCode('');
     setTimer(180);
     setCanResend(false);
+    setConfirmationResult(null);
   };
 
   /**
@@ -256,14 +221,6 @@ export default function PhoneLoginPage() {
             {step === 'phone' ? '휴대폰 번호 로그인' : '인증번호 확인'}
           </h2>
 
-          {/* 개발 모드 표시 */}
-          {isDevelopment && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
-              <p className="text-xs text-yellow-700 text-center">
-                🛠️ 개발 모드: 인증번호가 콘솔에 출력됩니다
-              </p>
-            </div>
-          )}
 
           {/* 전화번호 입력 */}
           {step === 'phone' && (
@@ -351,6 +308,9 @@ export default function PhoneLoginPage() {
             </form>
           )}
         </div>
+
+        {/* Firebase PhoneAuth - invisible reCAPTCHA container */}
+        <div id="recaptcha-container" />
 
         {/* 하단 링크 */}
         <div className="text-center mt-6 text-sm text-gray-600">

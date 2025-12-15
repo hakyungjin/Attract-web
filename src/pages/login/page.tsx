@@ -2,11 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  sendVerificationSMS,
-  verifyCode as verifySsodaaCode,
-  sendVerificationSMSTest
-} from '../../services/ssodaaSmsService';
+import type { ConfirmationResult } from 'firebase/auth';
+import { clearRecaptcha, sendVerificationCode, verifyCode } from '../../services/phoneAuth';
+import { logPageView } from '../../services/analytics';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -29,6 +27,8 @@ export default function LoginPage() {
   const [timer, setTimer] = useState(180);
   const [canResend, setCanResend] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [verifiedFirebaseUid, setVerifiedFirebaseUid] = useState<string | null>(null);
   
   // 약관 모달 상태
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -72,6 +72,9 @@ export default function LoginPage() {
     if (verificationStep !== 'input') {
       setVerificationStep('input');
       setVerificationCode('');
+      setConfirmationResult(null);
+      setVerifiedFirebaseUid(null);
+      clearRecaptcha();
     }
   };
 
@@ -100,29 +103,18 @@ export default function LoginPage() {
     setSendingCode(true);
 
     try {
-      let success: boolean;
-      
-      if (isDevelopment) {
-        // 개발 모드: 콘솔에 인증번호 출력
-        const testCode = await sendVerificationSMSTest(formData.phoneNumber);
-        console.log(`🔐 테스트 인증번호: ${testCode}`);
-        success = true;
-      } else {
-        // 운영 모드: 실제 SMS 발송
-        success = await sendVerificationSMS(formData.phoneNumber);
-      }
+      // Firebase Console에서 테스트 전화번호를 등록해두면 DEV에서도 실제 SMS 없이 테스트 가능
+      const result = await sendVerificationCode(formData.phoneNumber);
+      setConfirmationResult(result);
 
-      if (success) {
-        setVerificationStep('verify');
-        setTimer(180);
-        setCanResend(false);
-        alert(isDevelopment 
-          ? '개발 모드: 콘솔에서 인증번호를 확인하세요.' 
+      setVerificationStep('verify');
+      setTimer(180);
+      setCanResend(false);
+      alert(
+        isDevelopment
+          ? '개발 모드: Firebase Console의 테스트 전화번호/코드를 사용해 테스트하세요.'
           : '인증번호가 전송되었습니다.'
-        );
-      } else {
-        alert('인증번호 발송에 실패했습니다.');
-      }
+      );
     } catch (error: any) {
       console.error('SMS 발송 오류:', error);
       alert(error.message || 'SMS 발송에 실패했습니다.');
@@ -142,19 +134,37 @@ export default function LoginPage() {
   /**
    * 인증번호 확인
    */
-  const handleVerifyCode = () => {
+  const handleVerifyCode = async () => {
     if (verificationCode.length !== 6) {
       alert('인증번호 6자리를 입력해주세요.');
       return;
     }
 
-    const isValid = verifySsodaaCode(formData.phoneNumber, verificationCode);
+    setLoading(true);
+    try {
+      if (!confirmationResult) {
+        alert('인증번호를 먼저 요청해주세요.');
+        return;
+      }
 
-    if (isValid) {
+      const { user, error } = await verifyCode(
+        confirmationResult,
+        verificationCode,
+        formData.phoneNumber
+      );
+
+      if (error || !user) {
+        alert(error?.message || '인증번호가 일치하지 않거나 만료되었습니다.');
+        return;
+      }
+
+      setVerifiedFirebaseUid(user.uid);
       setVerificationStep('verified');
       alert('전화번호 인증이 완료되었습니다!');
-    } else {
-      alert('인증번호가 일치하지 않거나 만료되었습니다.');
+    } catch (error) {
+      alert('인증 확인 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -195,7 +205,7 @@ export default function LoginPage() {
         // 로그인 중 화면 표시 후 홈으로 이동
         setIsLoggingIn(true);
         setTimeout(() => {
-          navigate('/');
+          navigate('/home');
         }, 1500); // 1.5초 후 이동
       }
     } catch (error: any) {
@@ -262,6 +272,7 @@ export default function LoginPage() {
         name: formData.name,
         age: parseInt(formData.age),
         gender: formData.gender,
+        firebaseUid: verifiedFirebaseUid || undefined,
       });
 
       if (error) {
@@ -286,6 +297,9 @@ export default function LoginPage() {
     setTimer(180);
     setCanResend(false);
     setAgreeTerms(false);
+    setConfirmationResult(null);
+    setVerifiedFirebaseUid(null);
+    clearRecaptcha();
   };
 
   // 로그인 중 전체 화면 로딩
@@ -578,6 +592,9 @@ export default function LoginPage() {
 
         </div>
 
+        {/* Firebase PhoneAuth - invisible reCAPTCHA container */}
+        <div id="recaptcha-container" />
+
         {/* 하단 링크 */}
         <div className="text-center mt-6 text-sm text-gray-600">
           <p>
@@ -591,9 +608,9 @@ export default function LoginPage() {
         {/* 사업자 정보 */}
         <div className="text-center mt-8 pt-6 border-t border-gray-200 text-xs text-gray-400 space-y-1">
           <p>Attract (어트랙트)</p>
-          <p>대표: 홍길동 | 사업자등록번호: 576-18-02378</p>
+          <p>대표: 최윤석 | 사업자등록번호: 576-18-02378</p>
           <p>주소: 서울특별시 강서구 마곡중앙1로 71</p>
-          <p>이메일: support@attract.com | 전화: 02-1234-5678</p>
+          <p>이메일: cys7204086@naver.com| 전화: 010-3150-4086</p>
           <p className="mt-2">© 2024 Attract. All rights reserved.</p>
         </div>
       </div>

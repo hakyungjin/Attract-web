@@ -59,7 +59,7 @@ export default function AuthPage() {
         alert('로그인 성공!');
 
         setLoading(false);
-        navigate('/', { replace: true });
+        navigate('/home', { replace: true });
       } else {
         alert('비밀번호가 일치하지 않습니다.');
         setLoading(false);

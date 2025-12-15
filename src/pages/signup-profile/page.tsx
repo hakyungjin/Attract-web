@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { uploadImage } from '../../services/imageUpload';
 import { MBTI_TYPES } from '../../constants/mbti';
 import { logger } from '../../utils/logger';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
@@ -120,36 +121,10 @@ export default function SignupProfilePage() {
 
     setIsUploading(true);
     try {
-      const fileName = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      logger.info('업로드 시작', { fileName });
+      logger.info('업로드 시작', { fileName: file.name });
 
-      const { error: uploadError, data } = await supabase.storage
-        .from('profile-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      logger.info('업로드 결과', { error: uploadError, data });
-
-      if (uploadError) {
-        let errorMsg = uploadError.message || '알 수 없는 오류';
-
-        // Bucket not found 오류 처리
-        if (errorMsg.includes('Bucket not found')) {
-          errorMsg = '⚠️ Supabase Storage가 제대로 설정되지 않았습니다.\n관리자에게 문의해주세요.\n\n기술 정보: "user-profiles" bucket이 없습니다.';
-        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-          errorMsg = '⚠️ 인증 오류: Supabase 설정을 확인해주세요.';
-        }
-
-        alert('이미지 업로드 실패: ' + errorMsg);
-        logger.error('업로드 에러 상세', uploadError);
-        return;
-      }
-
-      // 공개 URL 생성 - Supabase 기본 형식
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
+      // Firebase Storage에 업로드
+      const publicUrl = await uploadImage(file, 'profile-images');
 
       logger.info('생성된 공개 URL', { publicUrl });
       setUploadedImageUrl(publicUrl);
@@ -204,8 +179,12 @@ export default function SignupProfilePage() {
         return;
       }
 
+      // Analytics: 프로필 완성 이벤트
+      const { logProfileComplete } = await import('../../services/analytics');
+      logProfileComplete();
+
       alert('프로필이 완성되었습니다!');
-      navigate('/');
+      navigate('/home');
     } catch (error: any) {
       alert('저장 중 오류: ' + error.message);
     } finally {
@@ -562,7 +541,7 @@ export default function SignupProfilePage() {
           {/* 버튼 */}
           <div className="flex gap-3 pt-6">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/home')}
               className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer font-semibold"
             >
               나중에

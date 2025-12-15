@@ -8,6 +8,8 @@ interface GoogleAdBannerProps {
   className?: string;
   maxHeight?: number;       // 최대 높이 (px)
   compact?: boolean;        // 컴팩트 모드
+  /** 콘텐츠가 로드되었는지 여부 - false면 광고 표시 안 함 (AdSense 정책 준수) */
+  isContentLoaded?: boolean;
 }
 
 /**
@@ -27,12 +29,16 @@ export default function GoogleAdBanner({
   style,
   className = '',
   maxHeight,
-  compact = false
+  compact = false,
+  isContentLoaded = true  // 기본값 true (기존 코드 호환)
 }: GoogleAdBannerProps) {
   const adRef = useRef<HTMLModElement>(null);
   const isAdLoaded = useRef(false);
 
   useEffect(() => {
+    // 콘텐츠가 로드되지 않았으면 광고도 로드하지 않음 (AdSense 정책 준수)
+    if (!isContentLoaded) return;
+    
     // 이미 로드된 경우 스킵
     if (isAdLoaded.current) return;
 
@@ -44,7 +50,12 @@ export default function GoogleAdBanner({
     } catch (error) {
       console.error('AdSense 로드 오류:', error);
     }
-  }, []);
+  }, [isContentLoaded]);
+  
+  // 콘텐츠가 로드되지 않았으면 광고 표시 안 함 (AdSense 정책: 콘텐츠 없는 화면에 광고 금지)
+  if (!isContentLoaded) {
+    return null;
+  }
 
   // 컴팩트 모드일 경우 높이 제한
   const containerStyle: React.CSSProperties = {

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { sendMatchAcceptNotification } from '../../services/ssodaaSmsService';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
 import { logger } from '../../utils/logger';
 
@@ -314,24 +313,8 @@ export default function MatchingRequestsPage() {
       }
 
       // 매칭 수락 SMS 알림 발송
-      try {
-        // 요청 보낸 사람에게 SMS 발송
-        const { data: otherUserData } = await supabase
-          .from('users')
-          .select('phone_number')
-          .eq('id', otherUserId)
-          .single();
-
-        if (otherUserData?.phone_number) {
-          await sendMatchAcceptNotification(
-            otherUserData.phone_number,
-            authUser.name || '누군가'
-          );
-        }
-      } catch (smsError) {
-        logger.error('매칭 수락 SMS 발송 실패', smsError);
-        // SMS 발송 실패는 무시하고 계속 진행
-      }
+      // NOTE: SSODAA(SMS) 알림은 B안(Firebase PhoneAuth 통일) 전환으로 일단 비활성화됨.
+      // 필요 시 푸시/인앱 알림으로 대체하세요.
 
       // 채팅방 시작 이벤트
       const event = new CustomEvent('openChat', {
@@ -349,7 +332,7 @@ export default function MatchingRequestsPage() {
 
       // 채팅 탭으로 이동
       setTimeout(() => {
-        navigate('/');
+        navigate('/home');
       }, 500);
     } catch (error) {
       logger.error('요청 수락 실패', error);

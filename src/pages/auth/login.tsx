@@ -42,7 +42,7 @@ export default function LoginAuthPage() {
       // 로그인 성공 - localStorage에 저장
       localStorage.setItem('user', JSON.stringify(result.user));
       alert('로그인 되었습니다!');
-      navigate('/');
+      navigate('/home');
     } catch (error: any) {
       console.error('로그인 오류:', error);
       alert('로그인 중 오류가 발생했습니다.');

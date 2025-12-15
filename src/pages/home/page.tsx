@@ -9,14 +9,18 @@ import CommunityTab from './components/CommunityTab';
 import ChatTab from './components/ChatTab';
 import ProfileTab from './components/ProfileTab';
 
+// 전역 캐시 - Home 초기 데이터 로딩 상태
+let hasInitialDataLoaded = false;
+let cachedCoins = 0;
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('matching');
-  const [coins, setCoins] = useState(0);
+  const [coins, setCoins] = useState(cachedCoins);
   const [isInChatView, setIsInChatView] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState(true); // 데이터 로딩 상태
+  const [isDataLoading, setIsDataLoading] = useState(!hasInitialDataLoaded); // 이미 로드했으면 false
   const [communityKey, setCommunityKey] = useState(0); // 커뮤니티 새로고침용 key
 
   /**
@@ -64,6 +68,12 @@ export default function Home() {
     const loadInitialData = async () => {
       if (loading) return; // auth 로딩 중이면 대기
       
+      // 이미 로드한 적 있으면 스킵 (뒤로가기 시 재로딩 방지)
+      if (hasInitialDataLoaded) {
+        setIsDataLoading(false);
+        return;
+      }
+      
       const localUser = localStorage.getItem('user');
       const userId = user?.id || (localUser ? JSON.parse(localUser).id : null);
       
@@ -90,11 +100,16 @@ export default function Home() {
         ]);
 
         if (userDataResult.data) {
-          setCoins(userDataResult.data.coins || 0);
+          const coinValue = userDataResult.data.coins || 0;
+          setCoins(coinValue);
+          cachedCoins = coinValue; // 캐시에 저장
         }
 
         // 최소 로딩 시간 보장 (너무 빠르면 깜빡임)
         await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 로드 완료 표시
+        hasInitialDataLoaded = true;
         
       } catch (error) {
         console.error('데이터 로딩 오류:', error);

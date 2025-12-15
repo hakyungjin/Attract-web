@@ -1,10 +1,11 @@
-import { supabase } from '../lib/supabase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { firebaseStorage } from '../lib/firebase';
 
 /**
- * 이미지 업로드 함수
+ * 이미지 업로드 함수 (Firebase Storage)
  * @param file - 업로드할 파일
- * @param bucket - 저장할 버킷 이름 (avatars, posts, etc.)
- * @param folder - 버킷 내 폴더 경로 (선택사항)
+ * @param bucket - 저장할 폴더 경로 (avatars, posts, etc.)
+ * @param folder - 폴더 내 하위 경로 (선택사항)
  * @returns 업로드된 이미지의 공개 URL
  */
 export const uploadImage = async (
@@ -20,57 +21,62 @@ export const uploadImage = async (
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
     // 파일 경로 생성
-    const filePath = folder ? `${folder}/${fileName}` : fileName;
+    const filePath = folder ? `${bucket}/${folder}/${fileName}` : `${bucket}/${fileName}`;
 
-    // Supabase Storage에 업로드
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    // Firebase Storage 참조 생성
+    const storageRef = ref(firebaseStorage, filePath);
 
-    if (error) {
-      console.error('이미지 업로드 실패:', error);
-      throw new Error(`이미지 업로드 실패: ${error.message}`);
-    }
+    // 파일 업로드
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: file.type,
+      cacheControl: 'public, max-age=3600'
+    });
 
-    // 공개 URL 생성
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
+    // 다운로드 URL 가져오기
+    const downloadURL = await getDownloadURL(snapshot.ref);
 
-    return publicUrl;
-  } catch (error) {
-    console.error('uploadImage error:', error);
-    throw error;
+    // Analytics: 이미지 업로드 이벤트
+    const imageType = bucket === 'avatars' || bucket === 'profile-images' ? 'avatar' : bucket === 'posts' ? 'post' : 'gallery';
+    logImageUpload(imageType);
+
+    return downloadURL;
+  } catch (error: any) {
+    console.error('이미지 업로드 실패:', error);
+    throw new Error(`이미지 업로드 실패: ${error.message || '알 수 없는 오류'}`);
   }
 };
 
 /**
- * 이미지 삭제 함수
+ * 이미지 삭제 함수 (Firebase Storage)
  * @param url - 삭제할 이미지 URL
- * @param bucket - 버킷 이름
+ * @param bucket - 버킷 이름 (사용하지 않음, URL에서 추출)
  */
 export const deleteImage = async (
   url: string,
   bucket: string = 'avatars'
 ): Promise<void> => {
   try {
-    // URL에서 파일 경로 추출
-    const path = url.split('/').slice(-1)[0];
-
-    const { error } = await supabase.storage
-      .from(bucket)
-      .remove([path]);
-
-    if (error) {
-      console.error('이미지 삭제 실패:', error);
-      throw new Error(`이미지 삭제 실패: ${error.message}`);
+    // Firebase Storage URL에서 파일 경로 추출
+    // URL 형식: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media
+    const urlObj = new URL(url);
+    const pathMatch = urlObj.pathname.match(/\/o\/(.+)\?/);
+    
+    if (!pathMatch) {
+      throw new Error('유효하지 않은 Firebase Storage URL입니다.');
     }
-  } catch (error) {
-    console.error('deleteImage error:', error);
-    throw error;
+
+    // URL 디코딩된 경로
+    const filePath = decodeURIComponent(pathMatch[1]);
+
+    // Firebase Storage 참조 생성
+    const storageRef = ref(firebaseStorage, filePath);
+
+    // 파일 삭제 (deleteObject는 firebase/storage에서 import 필요)
+    const { deleteObject } = await import('firebase/storage');
+    await deleteObject(storageRef);
+  } catch (error: any) {
+    console.error('이미지 삭제 실패:', error);
+    throw new Error(`이미지 삭제 실패: ${error.message || '알 수 없는 오류'}`);
   }
 };
 

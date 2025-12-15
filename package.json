@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && firebase deploy --only hosting --project attract--web",
+    "deploy:all": "vite build && firebase deploy --project attract--web",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
     "android:build": "vite build && npx cap sync android",
@@ -18,6 +19,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
+    "@capacitor/app": "^7.1.1",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.4.4",

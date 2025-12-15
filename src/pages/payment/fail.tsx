@@ -62,7 +62,7 @@ export default function PaymentFailPage() {
             다시 시도하기
           </button>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="w-full bg-white text-gray-900 py-4 rounded-xl font-bold text-lg border-2 border-gray-200 hover:bg-gray-50 transition-all cursor-pointer"
           >
             홈으로 돌아가기

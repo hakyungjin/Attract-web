@@ -24,9 +24,14 @@ const SupportPage = lazy(() => import("../pages/support/page"));
 const PolicyDetailPage = lazy(() => import("../pages/policy/page"));
 
 const routes: RouteObject[] = [
-  // 🔒 로그인 필요한 페이지들
+  // 기본 진입: 바로 로그인 화면
   {
     path: "/",
+    element: <LoginPage />,
+  },
+  // 🔒 로그인 필요한 페이지들
+  {
+    path: "/home",
     element: <ProtectedRoute><Home /></ProtectedRoute>,
   },
   {

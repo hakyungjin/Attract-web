@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
-import { MatchingGridSkeleton } from '../../../components/base/Skeleton';
 import LazyImage from '../../../components/base/LazyImage';
 
 interface Profile {
@@ -34,6 +33,14 @@ let cachedProfiles: { male: Profile[], female: Profile[] } = { male: [], female:
 let lastLoadTime: { male: number, female: number } = { male: 0, female: 0 };
 const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
 
+// 캐시 유효성 체크 함수
+const getCachedData = (gender: 'male' | 'female') => {
+  const now = Date.now();
+  const cacheValid = cachedProfiles[gender].length > 0 && 
+                     (now - lastLoadTime[gender] < CACHE_DURATION);
+  return cacheValid ? cachedProfiles[gender] : null;
+};
+
 export default function MatchingTab() {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
@@ -41,12 +48,16 @@ export default function MatchingTab() {
   const [showFilter, setShowFilter] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true); // 초기화 중 상태
+  const [isLoading, setIsLoading] = useState(false); // 실제 로딩 상태
+  const [isRefreshing, setIsRefreshing] = useState(false); // Pull to Refresh 상태
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const PROFILES_PER_PAGE = 20;
   const isLoadingRef = useRef(false); // 중복 로드 방지
+  const touchStartY = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   // 임시 필터 상태 (적용 버튼 누르기 전까지 유지)
   const [tempGender, setTempGender] = useState<string>('');
@@ -97,19 +108,51 @@ export default function MatchingTab() {
     if (!selectedGender) return;
     
     const genderKey = selectedGender as 'male' | 'female';
-    const now = Date.now();
-    const cacheValid = cachedProfiles[genderKey].length > 0 && 
-                       (now - lastLoadTime[genderKey] < CACHE_DURATION);
+    const cached = getCachedData(genderKey);
     
-    if (cacheValid) {
-      // 캐시된 데이터 사용
-      setProfiles(cachedProfiles[genderKey]);
+    if (cached) {
+      // 캐시된 데이터 즉시 사용 (로딩 없음!)
+      setProfiles(cached);
       setIsLoading(false);
+      setIsInitializing(false);
     } else if (!isLoadingRef.current) {
       // 캐시가 없거나 만료됨 - 새로 로드
+      setIsLoading(true);
       loadProfiles();
     }
   }, [selectedGender]);
+
+  // Pull to Refresh 핸들러
+  const handleRefresh = async () => {
+    if (isRefreshing || isLoadingRef.current) return;
+    
+    setIsRefreshing(true);
+    // 캐시 무효화
+    if (selectedGender === 'male' || selectedGender === 'female') {
+      cachedProfiles[selectedGender] = [];
+      lastLoadTime[selectedGender] = 0;
+    }
+    await loadProfiles();
+    setIsRefreshing(false);
+  };
+
+  // 터치 이벤트 핸들러 (Pull to Refresh)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isRefreshing) return;
+    
+    const scrollTop = scrollContainerRef.current?.scrollTop || window.scrollY;
+    const touchY = e.touches[0].clientY;
+    const pullDistance = touchY - touchStartY.current;
+    
+    // 스크롤이 맨 위이고, 아래로 70px 이상 당기면 새로고침
+    if (scrollTop <= 0 && pullDistance > 70) {
+      handleRefresh();
+    }
+  };
 
   const loadProfiles = async (loadMore = false) => {
     if (!selectedGender) return;
@@ -222,6 +265,7 @@ export default function MatchingTab() {
       }
     } finally {
       setIsLoading(false);
+      setIsInitializing(false);
       isLoadingRef.current = false;
     }
   };
@@ -245,21 +289,26 @@ export default function MatchingTab() {
     navigate('/profile-detail', { state: { profile: mappedProfile } });
   };
 
-  // 로딩 상태 - 스켈레톤 UI
-  if (isLoading) {
+  // 로딩 상태 - 데이터 불러오는 중 화면 (캐시 없이 처음 로딩할 때만)
+  if (isInitializing && isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 pt-4">
-        <div className="flex items-center justify-between mb-4 px-3">
-          <div className="h-7 w-16 bg-slate-200 rounded animate-pulse"></div>
-          <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="text-center">
+          {/* 로딩 스피너 */}
+          <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin mx-auto mb-6"></div>
+          
+          {/* 텍스트 */}
+          <h2 className="text-lg font-bold text-slate-700 mb-2">
+            데이터 불러오는 중
+          </h2>
+          <p className="text-slate-400 text-sm">잠시만 기다려주세요</p>
         </div>
-        <MatchingGridSkeleton />
       </div>
     );
   }
 
-  // 데이터 없음
-  if (filteredProfiles.length === 0) {
+  // 데이터 없음 (초기화 완료 후에만 표시)
+  if (!isInitializing && filteredProfiles.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4 px-4">
         <i className="ri-search-line text-6xl text-slate-300"></i>
@@ -269,12 +318,33 @@ export default function MatchingTab() {
   }
 
   return (
-    <div className="px-3 pt-2 pb-4 min-h-screen">
+    <div 
+      className="px-3 pt-2 pb-4 min-h-screen"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      ref={scrollContainerRef}
+    >
+      {/* Pull to Refresh 인디케이터 */}
+      {isRefreshing && (
+        <div className="flex items-center justify-center py-4 -mt-2 mb-2">
+          <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin"></div>
+          <span className="ml-2 text-sm text-slate-500">새로고침 중...</span>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-bold text-slate-800">매칭</h2>
 
         <div className="flex items-center space-x-2">
+          {/* 새로고침 버튼 */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:shadow-lg transition-all hover:scale-105 group disabled:opacity-50"
+          >
+            <i className={`ri-refresh-line text-slate-400 group-hover:text-primary-500 text-lg transition-colors ${isRefreshing ? 'animate-spin' : ''}`}></i>
+          </button>
           <button
             onClick={() => {
               setTempGender(selectedGender);

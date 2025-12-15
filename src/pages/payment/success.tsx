@@ -230,7 +230,7 @@ export default function PaymentSuccessPage() {
         {/* 버튼 */}
         <div className="w-full max-w-md space-y-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 transition-all cursor-pointer"
           >
             홈으로 돌아가기

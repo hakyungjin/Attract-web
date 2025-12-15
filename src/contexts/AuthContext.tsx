@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { hashPassword } from '../services/passwordService';
+import { logLogin, logSignUp } from '../services/analytics';
 
 interface AuthUser {
   id: string;
@@ -22,6 +23,7 @@ interface AuthContextType {
     school?: string;
     job?: string;
     bio?: string;
+    firebaseUid?: string;
   }) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
@@ -83,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(authUser);
       localStorage.setItem('auth_user', JSON.stringify(authUser));
 
+      // Analytics: 로그인 이벤트
+      logLogin('phone');
+
       // profile_completed 상태 반환
       return { error: null, profileCompleted: users.profile_completed || false };
     } catch (error: any) {
@@ -101,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       school?: string;
       job?: string;
       bio?: string;
+      firebaseUid?: string;
     }
   ) => {
     try {
@@ -125,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .insert({
           phone_number: cleanPhoneNumber,
           password_hash: hashedPassword,
+          firebase_uid: userData.firebaseUid || null,
           name: userData.name,
           age: userData.age || null,
           gender: userData.gender || 'male',
@@ -149,6 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(authUser);
       localStorage.setItem('auth_user', JSON.stringify(authUser));
+
+      // Analytics: 회원가입 이벤트
+      logSignUp('phone');
 
       return { error: null };
     } catch (error: any) {

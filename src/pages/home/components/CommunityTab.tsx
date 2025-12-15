@@ -590,7 +590,8 @@ export default function CommunityTab() {
       {/* 글쓰기 버튼 */}
       <button
         onClick={() => navigate('/post/create')}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-500/40 flex items-center justify-center hover:from-primary-600 hover:to-primary-700 hover:scale-110 transition-all cursor-pointer z-30 group"
+        className="fixed w-14 h-14 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-500/40 flex items-center justify-center hover:from-primary-600 hover:to-primary-700 hover:scale-110 transition-all cursor-pointer z-30 group"
+        style={{ bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))', right: '24px' }}
       >
         <i className="ri-add-line text-2xl group-hover:rotate-90 transition-transform duration-300"></i>
       </button>

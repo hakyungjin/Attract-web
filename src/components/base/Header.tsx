@@ -61,7 +61,7 @@ export default function Header({ coins = 0 }: HeaderProps) {
       <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[400px] glass z-50 transition-all duration-300" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between px-4 py-1 h-14">
           {/* 로고 */}
-          <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
+          <div className="flex items-center cursor-pointer" onClick={() => navigate('/home')}>
             <h1 className="flex items-center space-x-1 group">
               <div className="relative transform transition-transform group-hover:scale-110 duration-300 -my-2">
                 <img 
@@ -132,7 +132,7 @@ export default function Header({ coins = 0 }: HeaderProps) {
                   label: '마이페이지',
                   action: () => {
                     setShowMenu(false);
-                    navigate('/');
+                    navigate('/home');
                     // 프로필 탭으로 전환하는 이벤트 발생
                     setTimeout(() => {
                       const event = new CustomEvent('switchTab', { detail: { tab: 'profile' } });
