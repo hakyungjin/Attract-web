@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
+import { uploadImage } from '../../services/imageUpload';
 import { MBTI_TYPES } from '../../constants/mbti';
 import { logger } from '../../utils/logger';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
@@ -44,11 +45,7 @@ export default function SignupProfilePage() {
     const phoneNumber = (location.state as any)?.phoneNumber;
     if (phoneNumber) {
       const loadUserData = async () => {
-        const { data: user } = await supabase
-          .from('users')
-          .select('*')
-          .eq('phone_number', phoneNumber)
-          .single();
+        const { user } = await firebase.users.findUserByPhoneNumber(phoneNumber);
 
         if (user) {
           setFormData(prev => ({
@@ -108,36 +105,10 @@ export default function SignupProfilePage() {
 
     setIsUploading(true);
     try {
-      const fileName = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      logger.info('업로드 시작', { fileName });
+      logger.info('Firebase Storage 업로드 시작');
 
-      const { error: uploadError, data } = await supabase.storage
-        .from('profile-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      logger.info('업로드 결과', { error: uploadError, data });
-
-      if (uploadError) {
-        let errorMsg = uploadError.message || '알 수 없는 오류';
-
-        // Bucket not found 오류 처리
-        if (errorMsg.includes('Bucket not found')) {
-          errorMsg = '⚠️ Supabase Storage가 제대로 설정되지 않았습니다.\n관리자에게 문의해주세요.\n\n기술 정보: "user-profiles" bucket이 없습니다.';
-        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-          errorMsg = '⚠️ 인증 오류: Supabase 설정을 확인해주세요.';
-        }
-
-        alert('이미지 업로드 실패: ' + errorMsg);
-        logger.error('업로드 에러 상세', uploadError);
-        return;
-      }
-
-      // 공개 URL 생성 - Supabase 기본 형식
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/profile-images/${fileName}`;
+      // Firebase Storage에 업로드 (imageUpload 서비스 사용)
+      const publicUrl = await uploadImage(file, 'avatars');
 
       logger.info('생성된 공개 URL', { publicUrl });
       setUploadedImageUrl(publicUrl);
@@ -145,7 +116,7 @@ export default function SignupProfilePage() {
     } catch (error: any) {
       logger.error('업로드 중 오류', error);
       alert('업로드 중 오류: ' + error.message);
-    } finally{
+    } finally {
       setIsUploading(false);
     }
   };
@@ -166,25 +137,31 @@ export default function SignupProfilePage() {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          mbti: formData.mbti,
-          location: formData.location,
-          bio: formData.bio,
-          school: formData.school,
-          job: formData.job,
-          height: formData.height,
-          body_type: formData.body_type,
-          style: formData.style,
-          religion: formData.religion,
-          smoking: formData.smoking,
-          drinking: formData.drinking,
-          interests: formData.interests,
-          profile_image: uploadedImageUrl || formData.profile_image,
-          profile_completed: true, // 프로필 완성 표시
-        })
-        .eq('phone_number', formData.phone_number);
+      // 먼저 사용자 찾기
+      const { user } = await firebase.users.findUserByPhoneNumber(formData.phone_number);
+
+      if (!user) {
+        alert('사용자를 찾을 수 없습니다.');
+        return;
+      }
+
+      // Firebase에서 업데이트
+      const { error } = await firebase.users.updateUser(user.id, {
+        mbti: formData.mbti,
+        location: formData.location,
+        bio: formData.bio,
+        school: formData.school,
+        job: formData.job,
+        height: formData.height,
+        body_type: formData.body_type,
+        style: formData.style,
+        religion: formData.religion,
+        smoking: formData.smoking,
+        drinking: formData.drinking,
+        interests: formData.interests,
+        profile_image: uploadedImageUrl || formData.profile_image,
+        avatar_url: uploadedImageUrl || formData.profile_image,
+      });
 
       if (error) {
         alert('프로필 저장 실패: ' + error.message);
