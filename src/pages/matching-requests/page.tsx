@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchAcceptNotification } from '../../services/ssodaaSmsService';
 import { getDefaultAvatar } from '../../utils/avatarUtils';
@@ -69,35 +69,25 @@ export default function MatchingRequestsPage() {
 
     for (const req of expiredRequests) {
       try {
-        // 상태를 expired로 변경
-        await supabase
-          .from('matching_requests')
-          .update({ status: 'expired' })
-          .eq('id', req.id);
+        // 상태를 expired로 변경 - Firebase 사용
+        await firebase.matching.updateMatchingRequestStatus(req.id, 'expired');
 
         // 요청 보낸 사람에게 코인 환불
         const senderId = type === 'received' ? req.from_user_id : req.from_user_id;
-        const { data: senderData } = await supabase
-          .from('users')
-          .select('coins')
-          .eq('id', senderId)
-          .single();
 
-        if (senderData) {
-          await supabase
-            .from('users')
-            .update({ coins: (senderData.coins || 0) + MATCH_COST })
-            .eq('id', senderId);
+        // 코인 증가 - Firebase 사용
+        await firebase.users.incrementCoins(senderId, MATCH_COST);
 
-          // 환불 알림 전송
-          await supabase.from('notifications').insert({
-            user_id: senderId,
-            type: 'refund',
-            title: '자석 환불 💎',
-            message: `매칭 요청이 24시간 초과로 자동 만료되어 자석 ${MATCH_COST}개가 환불되었습니다.`,
-            data: {},
-            read: false
-          });
+        // 환불 알림 전송 - Firebase 사용
+        await firebase.notifications.createNotification({
+          user_id: senderId,
+          type: 'refund',
+          title: '자석 환불 💎',
+          message: `매칭 요청이 24시간 초과로 자동 만료되어 자석 ${MATCH_COST}개가 환불되었습니다.`,
+          data: {},
+          read: false,
+          created_at: new Date().toISOString()
+        });
         }
 
         logger.info(`만료된 요청 처리 완료: ${req.id}`);
@@ -116,20 +106,11 @@ export default function MatchingRequestsPage() {
     try {
       const currentUserId = String(authUser.id);
 
-      // 1. 받은 요청 조회 (pending만)
-      const { data: receivedData, error: receivedError } = await supabase
-        .from('matching_requests')
-        .select('id, from_user_id, status, created_at')
-        .eq('to_user_id', currentUserId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      // 1. 받은 요청 조회 (pending만) - Firebase 사용
+      const { requests: receivedData, error: receivedError } = await firebase.matching.getReceivedRequests(currentUserId, 'pending');
 
-      // 2. 보낸 요청 조회 (모든 상태)
-      const { data: sentData, error: sentError } = await supabase
-        .from('matching_requests')
-        .select('id, to_user_id, from_user_id, status, created_at')
-        .eq('from_user_id', currentUserId)
-        .order('created_at', { ascending: false });
+      // 2. 보낸 요청 조회 (모든 상태) - Firebase 사용
+      const { requests: sentData, error: sentError } = await firebase.matching.getSentRequests(currentUserId);
 
       if (receivedError || sentError) {
         logger.error('매칭 요청 조회 실패', receivedError || sentError);
@@ -160,21 +141,17 @@ export default function MatchingRequestsPage() {
       const toUserIds = sentData?.map(s => s.to_user_id) || [];
       const allUserIds = [...new Set([...fromUserIds, ...toUserIds])];
 
-      // 4. 한 번의 쿼리로 모든 사용자 정보 조회
+      // 4. Firebase에서 사용자 정보 조회 (각 사용자를 개별적으로 조회)
       let usersMap: Record<string, any> = {};
       if (allUserIds.length > 0) {
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, name, age, gender, location, school, mbti, bio, profile_image')
-          .in('id', allUserIds);
-
-        if (usersError) {
-          logger.error('사용자 정보 조회 실패', usersError);
-        } else if (usersData) {
-          usersMap = Object.fromEntries(
-            usersData.map(user => [user.id, user])
-          );
-        }
+        await Promise.all(
+          allUserIds.map(async (userId) => {
+            const { user, error } = await firebase.users.getUserById(userId);
+            if (!error && user) {
+              usersMap[userId] = user;
+            }
+          })
+        );
       }
 
       // 5. 받은 요청 데이터 매핑

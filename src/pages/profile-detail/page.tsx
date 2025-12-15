@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendMatchRequestPush, sendMatchSuccessPush } from '../../services/fcmService';
 import { sendMatchRequestNotification, sendMatchAcceptNotification } from '../../services/ssodaaSmsService';
