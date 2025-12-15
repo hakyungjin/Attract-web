@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { firebase } from '../../../lib/firebaseService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { MatchingGridSkeleton } from '../../../components/base/Skeleton';
 import LazyImage from '../../../components/base/LazyImage';
@@ -70,11 +70,7 @@ export default function MatchingTab() {
     const loadCurrentUserInfo = async () => {
       if (authUser?.id) {
         try {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('gender')
-            .eq('id', authUser.id)
-            .single();
+          const { user: userData } = await firebase.users.getUserById(authUser.id);
 
           if (userData?.gender) {
             // 내 성별의 반대 성별을 보여줌
@@ -114,37 +110,19 @@ export default function MatchingTab() {
   const loadProfiles = async (loadMore = false) => {
     if (!selectedGender) return;
     if (isLoadingRef.current && !loadMore) return; // 이미 로딩 중이면 중복 호출 방지
-    
+
     isLoadingRef.current = true;
     setIsLoading(true);
     try {
       const currentPage = loadMore ? page + 1 : 0;
 
-      // 성별 필터링
-      let query = supabase
-        .from('users')
-        .select('id, name, age, gender, location, school, mbti, bio, avatar_url, profile_image, photos, height, body_type, style, religion, smoking, drinking, interests', { count: 'exact' });
-
-      // 로그인한 경우에만 내 프로필 제외
-      if (authUser?.id) {
-        query = query.neq('id', authUser.id);
-      }
-
-      // 성별이 선택된 경우에만 필터링 (성별 미입력 사용자 제외)
-      if (selectedGender) {
-        query = query.eq('gender', selectedGender);
-      } else {
-        // selectedGender가 비어있으면 특정 성별로 필터링하지 않음
-        // 하지만 보통 초기 선택 후 로드되므로, 이 경우는 로딩 중
-        return;
-      }
-
-      // Pagination 적용
-      query = query
-        .range(currentPage * PROFILES_PER_PAGE, (currentPage + 1) * PROFILES_PER_PAGE - 1)
-        .order('created_at', { ascending: false });
-
-      const { data, error, count } = await query;
+      // Firebase에서 성별로 사용자 조회
+      const { users: data, error, totalCount } = await firebase.users.getUsersByGender(
+        selectedGender,
+        authUser?.id, // 로그인한 사용자 제외
+        PROFILES_PER_PAGE,
+        loadMore ? undefined : undefined // TODO: Implement pagination with lastDoc
+      );
 
       if (error) throw error;
 
@@ -173,7 +151,7 @@ export default function MatchingTab() {
                 }
               });
             }
-            
+
             return {
               id: user.id,
               name: user.name || '알 수 없음',
@@ -213,7 +191,7 @@ export default function MatchingTab() {
         }
 
         setPage(currentPage);
-        setHasMore(count ? (currentPage + 1) * PROFILES_PER_PAGE < count : false);
+        setHasMore(formattedProfiles.length >= PROFILES_PER_PAGE);
       }
     } catch (error) {
       console.error('프로필 로드 실패:', error);

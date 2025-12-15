@@ -301,6 +301,49 @@ export const userService = {
       return { users: [], error };
     }
   },
+
+  /**
+   * 성별로 사용자 조회 (페이지네이션, 특정 사용자 제외)
+   */
+  async getUsersByGender(
+    gender: string,
+    excludeUserId?: string,
+    limitCount = 20,
+    lastDoc?: any
+  ): Promise<{ users: User[]; error: any; lastDoc?: any; totalCount: number }> {
+    try {
+      const usersRef = collection(db, 'users');
+      const constraints: QueryConstraint[] = [
+        where('gender', '==', gender),
+        orderBy('created_at', 'desc'),
+        limit(limitCount)
+      ];
+
+      if (lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+
+      const q = query(usersRef, ...constraints);
+      const snapshot = await getDocs(q);
+
+      let users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+
+      // 특정 사용자 제외
+      if (excludeUserId) {
+        users = users.filter(user => user.id !== excludeUserId);
+      }
+
+      const newLastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+      // 전체 개수는 반환된 사용자 수로 근사 (정확한 count는 Firestore에서 비용이 많이 듦)
+      const totalCount = users.length;
+
+      return { users, error: null, lastDoc: newLastDoc, totalCount };
+    } catch (error: any) {
+      logger.error('성별별 사용자 목록 조회 실패:', error);
+      return { users: [], error, totalCount: 0 };
+    }
+  },
 };
 
 // ==================== Matching Requests ====================

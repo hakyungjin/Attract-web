@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { firebase } from '../../../lib/firebaseService';
 import { useAuth } from '../../../contexts/AuthContext';
 import KakaoAdFit, { DummyAdBanner } from '../../../components/ads/KakaoAdFit';
 
@@ -48,12 +48,8 @@ export default function ProfileTab() {
         return;
       }
 
-      // Supabase에서 최신 사용자 데이터 로드
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+      // Firebase에서 최신 사용자 데이터 로드
+      const { user: userData, error } = await firebase.users.getUserById(authUser.id);
 
       if (error) {
         console.error('프로필 로드 실패:', error);
@@ -85,22 +81,14 @@ export default function ProfileTab() {
       if (!authUser?.id) return;
 
       // 받은 매칭 요청 개수
-      const { count: receivedCount } = await supabase
-        .from('matching_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('to_user_id', authUser.id)
-        .eq('status', 'pending');
+      const { requests: receivedRequests } = await firebase.matching.getReceivedRequests(authUser.id, 'pending');
 
       // 보낸 매칭 요청 개수
-      const { count: sentCount } = await supabase
-        .from('matching_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('from_user_id', authUser.id)
-        .eq('status', 'pending');
+      const { requests: sentRequests } = await firebase.matching.getSentRequests(authUser.id, 'pending');
 
       setMatchingStats({
-        received: receivedCount || 0,
-        sent: sentCount || 0
+        received: receivedRequests.length || 0,
+        sent: sentRequests.length || 0
       });
     } catch (error) {
       console.error('매칭 통계 로드 실패:', error);
