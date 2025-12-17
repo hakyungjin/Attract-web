@@ -1,6 +1,14 @@
+/**
+ * 채팅 탭 컴포넌트
+ *
+ * TODO: Firestore 실시간 리스너 구현 필요
+ * - onSnapshot을 사용한 메시지 실시간 업데이트
+ * - 채팅방 목록 실시간 업데이트
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { firebase } from '../../../lib/firebaseService';
 import { useAuth } from '../../../contexts/AuthContext';
 
 /**
