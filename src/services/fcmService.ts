@@ -1,4 +1,12 @@
-import { supabase } from '../lib/supabase';
+/**
+ * FCM 푸시 알림 서비스
+ *
+ * TODO: Firebase Cloud Functions 구현 필요
+ * - Firebase Cloud Functions에서 FCM API를 호출하는 함수 작성
+ * - 또는 서버에서 FCM Admin SDK 사용
+ *
+ * 참고: https://firebase.google.com/docs/cloud-messaging
+ */
 
 interface PushPayload {
   title: string;
@@ -7,26 +15,24 @@ interface PushPayload {
 }
 
 /**
- * Supabase Edge Function을 통해 푸시 알림 전송
+ * 푸시 알림 전송
+ *
+ * TODO: Firebase Cloud Functions 또는 백엔드 API로 구현 필요
+ * 현재는 로그만 출력하는 플레이스홀더
  */
 export const sendPushToUser = async (userId: string, payload: PushPayload) => {
   try {
-    const { data, error } = await supabase.functions.invoke('send-push', {
-      body: {
-        userId,
-        title: payload.title,
-        body: payload.body,
-        data: payload.data || {}
-      }
-    });
+    console.log('📤 푸시 알림 전송 요청:', { userId, payload });
 
-    if (error) {
-      console.error('푸시 전송 실패:', error);
-      return { success: false, error };
-    }
+    // TODO: Firebase Cloud Functions 호출
+    // const response = await fetch('YOUR_CLOUD_FUNCTION_URL/send-push', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ userId, ...payload })
+    // });
 
-    console.log('📤 푸시 전송 결과:', data);
-    return { success: true, result: data };
+    // 임시로 성공 반환
+    return { success: true, result: { message: 'Push notification queued' } };
   } catch (error) {
     console.error('푸시 전송 에러:', error);
     return { success: false, error };

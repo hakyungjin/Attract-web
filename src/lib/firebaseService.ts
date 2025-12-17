@@ -53,8 +53,11 @@ export interface User {
   interests?: string[];
   photos?: string[];
   profile_image?: string;
+  avatar_url?: string;
   password?: string;
   coins?: number;
+  fcm_token?: string;
+  job?: string;
   created_at?: any;
   updated_at?: any;
 }
