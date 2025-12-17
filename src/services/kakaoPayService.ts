@@ -7,7 +7,7 @@
  * VITE_KAKAO_PAY_SECRET_KEY_PROD=PRD06E3CE056EE301DAE0D4E482CB3B4F5017DE3 (운영)
  */
 
-import { supabase } from '../lib/supabase';
+import { createPayment, updatePaymentStatus, addCoins } from './paymentService';
 
 // 카카오페이 API 기본 설정
 const KAKAO_PAY_API_URL = 'https://open-api.kakaopay.com/online/v1/payment';
@@ -112,7 +112,7 @@ export const kakaoPayReady = async (
     }
 
     // 결제 정보 DB에 저장 (pending 상태)
-    await supabase.from('payments').insert({
+    await createPayment({
       user_id: userId,
       order_id: orderId,
       tid: data.tid,
@@ -173,34 +173,26 @@ export const kakaoPayApprove = async (
 
     if (!response.ok) {
       console.error('카카오페이 Approve 실패:', data);
-      
+
       // 결제 실패 상태 업데이트
-      await supabase
-        .from('payments')
-        .update({ status: 'failed' })
-        .eq('order_id', orderId);
-      
+      await updatePaymentStatus(orderId, 'failed');
+
       return { success: false, error: data.msg || '결제 승인에 실패했습니다.' };
     }
 
     // 결제 성공 - DB 업데이트
-    const { data: paymentData } = await supabase
-      .from('payments')
-      .update({ 
-        status: 'completed',
+    const paymentResult = await updatePaymentStatus(
+      orderId,
+      'completed',
+      {
         payment_key: data.aid,
         approved_at: data.approved_at,
-      })
-      .eq('order_id', orderId)
-      .select()
-      .single();
+      }
+    );
 
     // 사용자 코인 충전
-    if (paymentData) {
-      await supabase.rpc('add_coins', {
-        user_id: userId,
-        amount: paymentData.coins,
-      });
+    if (paymentResult.success && paymentResult.payment) {
+      await addCoins(userId, paymentResult.payment.coins);
     }
 
     // 세션 스토리지 정리

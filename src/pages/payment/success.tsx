@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { kakaoPayApprove } from '../../services/kakaoPayService';
+import { getUserCoins } from '../../services/userService';
 
 // Supabase Edge Function URL
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -33,18 +34,14 @@ export default function PaymentSuccessPage() {
           if (result.success && result.data) {
             // localStorage에서 패키지 정보 가져오기
             const coins = parseInt(localStorage.getItem('selectedCoins') || '0');
-            
+
             // 사용자 코인 조회
             const localUser = localStorage.getItem('user');
             let currentCoins = 0;
             if (localUser) {
               const userData = JSON.parse(localUser);
-              const { data: userCoins } = await supabase
-                .from('users')
-                .select('coins')
-                .eq('id', userData.id)
-                .single();
-              currentCoins = userCoins?.coins || 0;
+              const coinsResult = await getUserCoins(userData.id);
+              currentCoins = coinsResult.coins;
             }
 
             setPaymentInfo({

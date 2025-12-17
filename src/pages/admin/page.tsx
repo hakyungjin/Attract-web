@@ -1,21 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
-
-interface User {
-  id: string;
-  name: string;
-  phone_number: string;
-  age: number;
-  gender: string;
-  location: string;
-  school: string;
-  mbti: string;
-  profile_image: string;
-  coins: number;
-  created_at: string;
-  last_login: string;
-}
+import { getAllUsers, getUsersByIds, updateUserCoins, User } from '../../services/userService';
+import { getAllChatRooms, getMessagesByRoomId, getMessageCount, getChatRoomsCount, getTotalMessagesCount } from '../../services/chatService';
 
 interface ChatRoom {
   id: string;
@@ -75,34 +61,26 @@ export default function AdminPage() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const usersResult = await getAllUsers();
 
-      if (usersData) {
-        setUsers(usersData);
-        const totalCoins = usersData.reduce((sum, u) => sum + (u.coins || 0), 0);
+      if (usersResult.success) {
+        setUsers(usersResult.users);
+        const totalCoins = usersResult.users.reduce((sum, u) => sum + (u.coins || 0), 0);
         setStats(prev => ({
           ...prev,
-          totalUsers: usersData.length,
-          activeUsers: usersData.filter(u => u.last_login).length,
+          totalUsers: usersResult.users.length,
+          activeUsers: usersResult.users.filter(u => u.last_login).length,
           totalCoins
         }));
       }
 
-      const { count: roomCount } = await supabase
-        .from('chat_rooms')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: msgCount } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true });
+      const roomCountResult = await getChatRoomsCount();
+      const msgCountResult = await getTotalMessagesCount();
 
       setStats(prev => ({
         ...prev,
-        totalChatRooms: roomCount || 0,
-        totalMessages: msgCount || 0
+        totalChatRooms: roomCountResult.count,
+        totalMessages: msgCountResult.count
       }));
 
     } catch (error) {
@@ -115,35 +93,26 @@ export default function AdminPage() {
   const loadChatRooms = async () => {
     setLoading(true);
     try {
-      const { data: rooms, error } = await supabase
-        .from('chat_rooms')
-        .select('*')
-        .order('last_message_at', { ascending: false, nullsFirst: false });
+      const roomsResult = await getAllChatRooms();
 
-      if (error) throw error;
+      if (!roomsResult.success) throw new Error(roomsResult.error);
 
-      if (rooms && rooms.length > 0) {
+      if (roomsResult.chatRooms.length > 0) {
         const userIds = new Set<string>();
-        rooms.forEach(room => {
+        roomsResult.chatRooms.forEach(room => {
           userIds.add(room.user1_id);
           userIds.add(room.user2_id);
         });
 
-        const { data: usersInfo } = await supabase
-          .from('users')
-          .select('id, name, profile_image')
-          .in('id', Array.from(userIds));
+        const usersResult = await getUsersByIds(Array.from(userIds));
 
         const userMap = new Map(
-          (usersInfo || []).map(u => [u.id, u])
+          usersResult.users.map(u => [u.id, u])
         );
 
         const roomsWithInfo = await Promise.all(
-          rooms.map(async (room) => {
-            const { count } = await supabase
-              .from('messages')
-              .select('*', { count: 'exact', head: true })
-              .eq('room_id', room.id);
+          roomsResult.chatRooms.map(async (room) => {
+            const countResult = await getMessageCount(room.id);
 
             const user1 = userMap.get(room.user1_id);
             const user2 = userMap.get(room.user2_id);
@@ -154,7 +123,7 @@ export default function AdminPage() {
               user2_name: user2?.name || '알 수 없음',
               user1_avatar: user1?.profile_image,
               user2_avatar: user2?.profile_image,
-              message_count: count || 0
+              message_count: countResult.count
             };
           })
         );
@@ -173,27 +142,20 @@ export default function AdminPage() {
   const loadMessages = async (room: ChatRoom) => {
     setSelectedChatRoom(room);
     setLoadingMessages(true);
-    
+
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('room_id', room.id)
-        .order('created_at', { ascending: true });
+      const messagesResult = await getMessagesByRoomId(room.id);
 
-      if (error) throw error;
+      if (!messagesResult.success) throw new Error(messagesResult.error);
 
-      const senderIds = new Set((data || []).map(m => m.sender_id));
-      const { data: senders } = await supabase
-        .from('users')
-        .select('id, name')
-        .in('id', Array.from(senderIds));
+      const senderIds = new Set(messagesResult.messages.map(m => m.sender_id));
+      const sendersResult = await getUsersByIds(Array.from(senderIds));
 
       const senderMap = new Map(
-        (senders || []).map(s => [s.id, s.name])
+        sendersResult.users.map(s => [s.id, s.name])
       );
 
-      const messagesWithNames = (data || []).map(msg => ({
+      const messagesWithNames = messagesResult.messages.map(msg => ({
         ...msg,
         sender_name: senderMap.get(msg.sender_id) || '알 수 없음'
       }));
@@ -222,16 +184,13 @@ export default function AdminPage() {
 
     try {
       const newCoins = (selectedUser.coins || 0) + parseInt(coinAmount);
-      
-      const { error } = await supabase
-        .from('users')
-        .update({ coins: newCoins })
-        .eq('id', selectedUser.id);
 
-      if (error) throw error;
+      const result = await updateUserCoins(selectedUser.id, newCoins);
 
-      setUsers(prev => prev.map(user => 
-        user.id === selectedUser.id 
+      if (!result.success) throw new Error(result.error);
+
+      setUsers(prev => prev.map(user =>
+        user.id === selectedUser.id
           ? { ...user, coins: newCoins }
           : user
       ));

@@ -1,6 +1,6 @@
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
-import { supabase } from '../lib/supabase';
+import { updateFcmToken } from './userService';
 
 export const initPushNotifications = async (userId: string) => {
   // 웹에서는 푸시 알림 미지원
@@ -28,15 +28,12 @@ export const initPushNotifications = async (userId: string) => {
     // 토큰 수신 리스너
     PushNotifications.addListener('registration', async (token) => {
       console.log('📱 푸시 토큰:', token.value);
-      
-      // Supabase에 FCM 토큰 저장
-      const { error } = await supabase
-        .from('users')
-        .update({ fcm_token: token.value })
-        .eq('id', userId);
 
-      if (error) {
-        console.error('FCM 토큰 저장 실패:', error);
+      // FCM 토큰 저장
+      const result = await updateFcmToken(userId, token.value);
+
+      if (!result.success) {
+        console.error('FCM 토큰 저장 실패:', result.error);
       } else {
         console.log('✅ FCM 토큰 저장 완료');
       }
