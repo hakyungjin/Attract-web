@@ -1,12 +1,15 @@
+/**
+ * 결제 성공 페이지
+ *
+ * TODO: 토스 페이먼츠로 완전 마이그레이션 필요
+ * - 카카오페이 코드 제거
+ * - Firebase Functions로 결제 승인 처리
+ */
+
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
-import { kakaoPayApprove } from '../../services/kakaoPayService';
-
-// Supabase Edge Function URL
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/confirm-payment`;
 
 export default function PaymentSuccessPage() {
   const navigate = useNavigate();
