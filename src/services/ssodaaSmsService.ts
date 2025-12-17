@@ -1,14 +1,16 @@
 /**
  * 쏘다(Ssodaa) SMS API 서비스
  *
+ * 📚 API 문서: https://ssodaa.com/service/api/smsapi
+ *
  * 사용 전 준비사항:
  * 1. https://ssodaa.com 가입 및 로그인
- * 2. [API 토큰 관리]에서 token_key와 api_key 발급
- * 3. [발신번호 관리]에서 발신번호 등록 (인증 필수)
- * 4. .env 파일에 아래 값 추가:
+ * 2. [API 토큰 관리]에서 API_KEY와 TOKEN_KEY 발급
+ * 3. [발신번호 관리]에서 발신번호 등록 및 인증
+ * 4. .env 파일에 아래 환경 변수 추가:
  *    - VITE_SSODAA_API_KEY=발급받은_API_KEY
  *    - VITE_SSODAA_TOKEN_KEY=발급받은_TOKEN_KEY
- *    - VITE_SSODAA_SENDER=등록한_발신번호
+ *    - VITE_SSODAA_SENDER=등록한_발신번호 (예: 01012345678)
  */
 
 interface SsodaaSendSMSRequest {
