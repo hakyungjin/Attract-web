@@ -268,7 +268,7 @@ export const generateVerificationCode = (): string => {
 };
 
 /**
- * 인증번호 SMS 발송
+ * 인증번호 SMS 발송 (Firebase Cloud Functions 사용)
  *
  * @param phone - 수신 전화번호
  * @returns 발송 성공 여부
@@ -280,24 +280,39 @@ export const generateVerificationCode = (): string => {
  * }
  */
 export const sendVerificationSMS = async (phone: string): Promise<boolean> => {
-  const code = generateVerificationCode();
-  const message = `[Attract] 인증번호는 [${code}]입니다. 3분 내에 입력해주세요.`;
-
   try {
-    await sendSMS(phone, message);
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const { app } = await import('../lib/firebase');
+    
+    const functions = getFunctions(app);
+    const sendSMSFunction = httpsCallable(functions, 'sendVerificationSMS');
 
-    // 인증번호 저장 (3분 유효)
     const cleanPhone = phone.replace(/-/g, '').replace(/^\+82/, '0');
-    verificationCodes.set(cleanPhone, {
-      code,
-      expiresAt: Date.now() + 3 * 60 * 1000, // 3분
-      phone: cleanPhone,
-    });
+    const result = await sendSMSFunction({ phoneNumber: cleanPhone });
 
-    console.log('인증번호 발송 완료:', cleanPhone);
-    return true;
-  } catch (error) {
+    if (result.data && (result.data as any).success) {
+      console.log('인증번호 발송 완료:', cleanPhone);
+      return true;
+    } else {
+      console.error('인증번호 발송 실패:', result.data);
+      return false;
+    }
+  } catch (error: any) {
     console.error('인증번호 발송 실패:', error);
+    // Firebase Functions가 배포되지 않은 경우를 대비한 폴백
+    if (error.code === 'functions/not-found' || error.code === 'functions/unavailable') {
+      console.warn('Firebase Functions가 배포되지 않았습니다. 로컬 개발 모드로 전환합니다.');
+      // 로컬 개발용 폴백 (실제 SMS는 발송되지 않음)
+      const code = generateVerificationCode();
+      const cleanPhone = phone.replace(/-/g, '').replace(/^\+82/, '0');
+      verificationCodes.set(cleanPhone, {
+        code,
+        expiresAt: Date.now() + 3 * 60 * 1000,
+        phone: cleanPhone,
+      });
+      console.log('로컬 개발 모드: 인증번호', code, '(실제 SMS는 발송되지 않음)');
+      return true;
+    }
     return false;
   }
 };
@@ -315,31 +330,55 @@ export const sendVerificationSMS = async (phone: string): Promise<boolean> => {
  *   console.log('인증 성공');
  * }
  */
-export const verifyCode = (phone: string, inputCode: string): boolean => {
-  const cleanPhone = phone.replace(/-/g, '').replace(/^\+82/, '0');
-  const stored = verificationCodes.get(cleanPhone);
+export const verifyCode = async (phone: string, inputCode: string): Promise<boolean> => {
+  try {
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const { app } = await import('../lib/firebase');
+    
+    const functions = getFunctions(app);
+    const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
 
-  if (!stored) {
-    console.log('저장된 인증번호가 없습니다:', cleanPhone);
+    const cleanPhone = phone.replace(/-/g, '').replace(/^\+82/, '0');
+    const result = await verifyCodeFunction({ phoneNumber: cleanPhone, code: inputCode });
+
+    if (result.data && (result.data as any).success) {
+      console.log('인증 성공:', cleanPhone);
+      return true;
+    } else {
+      console.log('인증 실패:', result.data);
+      return false;
+    }
+  } catch (error: any) {
+    console.error('인증번호 확인 실패:', error);
+    // Firebase Functions가 배포되지 않은 경우를 대비한 폴백
+    if (error.code === 'functions/not-found' || error.code === 'functions/unavailable') {
+      console.warn('Firebase Functions가 배포되지 않았습니다. 로컬 개발 모드로 전환합니다.');
+      // 로컬 개발용 폴백
+      const cleanPhone = phone.replace(/-/g, '').replace(/^\+82/, '0');
+      const stored = verificationCodes.get(cleanPhone);
+
+      if (!stored) {
+        console.log('저장된 인증번호가 없습니다:', cleanPhone);
+        return false;
+      }
+
+      if (Date.now() > stored.expiresAt) {
+        verificationCodes.delete(cleanPhone);
+        console.log('인증번호가 만료되었습니다:', cleanPhone);
+        return false;
+      }
+
+      if (stored.code === inputCode) {
+        verificationCodes.delete(cleanPhone);
+        console.log('인증 성공 (로컬 모드):', cleanPhone);
+        return true;
+      }
+
+      console.log('인증번호가 일치하지 않습니다:', cleanPhone);
+      return false;
+    }
     return false;
   }
-
-  // 만료 확인
-  if (Date.now() > stored.expiresAt) {
-    verificationCodes.delete(cleanPhone);
-    console.log('인증번호가 만료되었습니다:', cleanPhone);
-    return false;
-  }
-
-  // 코드 일치 확인
-  if (stored.code === inputCode) {
-    verificationCodes.delete(cleanPhone); // 사용 후 삭제
-    console.log('인증 성공:', cleanPhone);
-    return true;
-  }
-
-  console.log('인증번호가 일치하지 않습니다:', cleanPhone);
-  return false;
 };
 
 /**

@@ -22,6 +22,8 @@ const SettingsPage = lazy(() => import("../pages/settings/page"));
 const FAQPage = lazy(() => import("../pages/faq/page"));
 const SupportPage = lazy(() => import("../pages/support/page"));
 const PolicyDetailPage = lazy(() => import("../pages/policy/page"));
+const SafetyPage = lazy(() => import("../pages/safety/page"));
+const DataDeletionPage = lazy(() => import("../pages/data-deletion/page"));
 
 const routes: RouteObject[] = [
   // 🔒 로그인 필요한 페이지들
@@ -98,6 +100,14 @@ const routes: RouteObject[] = [
   {
     path: "/policy/:type",
     element: <PolicyDetailPage />,
+  },
+  {
+    path: "/safety",
+    element: <SafetyPage />,
+  },
+  {
+    path: "/data-deletion",
+    element: <DataDeletionPage />,
   },
   {
     path: "*",

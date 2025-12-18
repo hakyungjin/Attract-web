@@ -19,7 +19,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // localStorage에서도 확인 (새로고침 시 useAuth가 아직 로드되지 않았을 수 있음)
-  const localUser = localStorage.getItem('user');
+  // AuthContext는 'auth_user' 키를 사용합니다
+  const localUser = localStorage.getItem('auth_user');
   
   // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
   if (!user && !localUser) {

@@ -105,14 +105,10 @@ export default function SettingsPage() {
                             </div>
                             <i className="ri-arrow-right-s-line text-xl text-gray-400"></i>
                         </button>
-                        <button onClick={() => {
-                            if (window.confirm('정말로 회원 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.')) {
-                                alert('회원 탈퇴 기능 준비중입니다. 고객센터로 문의해주세요.');
-                            }
-                        }} className="w-full flex items-center justify-between px-4 py-4 hover:bg-red-50 transition-colors cursor-pointer text-red-500">
+                        <button onClick={() => navigate('/data-deletion')} className="w-full flex items-center justify-between px-4 py-4 hover:bg-red-50 transition-colors cursor-pointer text-red-500">
                             <div className="flex items-center space-x-3">
                                 <i className="ri-delete-bin-line text-xl"></i>
-                                <span className="font-medium">회원 탈퇴</span>
+                                <span className="font-medium">개인정보 삭제 요청</span>
                             </div>
                             <i className="ri-arrow-right-s-line text-xl"></i>
                         </button>

@@ -10,7 +10,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -18,15 +17,10 @@ import {
   orderBy,
   limit,
   startAfter,
-  Timestamp,
   addDoc,
   serverTimestamp,
   increment,
-  arrayUnion,
-  arrayRemove,
-  type DocumentData,
   type QueryConstraint,
-  type WhereFilterOp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { logger } from '../utils/logger';
@@ -55,9 +49,12 @@ export interface User {
   profile_image?: string;
   avatar_url?: string;
   password?: string;
+  password_hash?: string;
   coins?: number;
   fcm_token?: string;
   job?: string;
+  is_ghost?: boolean;
+  profile_completed?: boolean;
   created_at?: any;
   updated_at?: any;
 }
@@ -118,7 +115,7 @@ export const userService = {
    */
   async findUserByPhoneNumber(phoneNumber: string): Promise<{ user: User | null; error: any }> {
     try {
-      logger.info('전화번호로 사용자 찾기:', phoneNumber);
+      logger.info('전화번호로 사용자 찾기:', { phoneNumber });
 
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('phone_number', '==', phoneNumber), limit(1));
@@ -131,7 +128,7 @@ export const userService = {
       const doc = snapshot.docs[0];
       const user = { id: doc.id, ...doc.data() } as User;
 
-      logger.info('사용자 찾기 성공:', user.id);
+      logger.info('사용자 찾기 성공:', { userId: user.id });
       return { user, error: null };
     } catch (error: any) {
       logger.error('사용자 찾기 실패:', error);
@@ -144,7 +141,7 @@ export const userService = {
    */
   async findUserByFirebaseUid(firebaseUid: string): Promise<{ user: User | null; error: any }> {
     try {
-      logger.info('Firebase UID로 사용자 찾기:', firebaseUid);
+      logger.info('Firebase UID로 사용자 찾기:', { firebaseUid });
 
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('firebase_uid', '==', firebaseUid), limit(1));
@@ -185,13 +182,25 @@ export const userService = {
   },
 
   /**
-   * 사용자 생성
+   * 사용자 생성 (Firebase SDK 사용 - POST 요청과 동일한 효과)
+   * @param userData - 생성할 사용자 데이터
+   * @returns 생성된 사용자 정보 또는 에러
    */
   async createUser(userData: Omit<User, 'id'>): Promise<{ user: User | null; error: any }> {
     try {
-      logger.info('사용자 생성:', userData.phone_number);
+      logger.info('사용자 생성 (Firebase SDK):', { phoneNumber: userData.phone_number });
 
+      // Firestore에 직접 문서 추가 (POST 요청과 동일한 효과)
+      logger.info('Firestore 컬렉션 참조 생성 중...');
       const usersRef = collection(db, 'users');
+      
+      logger.info('사용자 데이터 준비 중...', { 
+        hasName: !!userData.name,
+        hasPhone: !!userData.phone_number,
+        dataKeys: Object.keys(userData)
+      });
+
+      logger.info('Firestore에 문서 추가 시도 중...');
       const docRef = await addDoc(usersRef, {
         ...userData,
         coins: userData.coins || 0,
@@ -199,13 +208,19 @@ export const userService = {
         updated_at: serverTimestamp(),
       });
 
+      logger.info('문서 추가 완료, 문서 ID:', { documentId: docRef.id });
+
       const user = { id: docRef.id, ...userData } as User;
 
-      logger.info('사용자 생성 성공:', user.id);
+      logger.info('사용자 생성 성공 (Firebase SDK):', { userId: user.id });
       return { user, error: null };
     } catch (error: any) {
-      logger.error('사용자 생성 실패:', error);
-      return { user: null, error };
+      logger.error('사용자 생성 실패 (Firebase SDK):', { 
+        error: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      return { user: null, error: { message: error.message || '회원가입 중 오류가 발생했습니다.', code: error.code } };
     }
   },
 
@@ -220,7 +235,7 @@ export const userService = {
         updated_at: serverTimestamp(),
       });
 
-      logger.info('사용자 업데이트 성공:', userId);
+      logger.info('사용자 업데이트 성공:', { userId });
       return { error: null };
     } catch (error: any) {
       logger.error('사용자 업데이트 실패:', error);
@@ -236,7 +251,7 @@ export const userService = {
       const userRef = doc(db, 'users', userId);
       await deleteDoc(userRef);
 
-      logger.info('사용자 삭제 성공:', userId);
+      logger.info('사용자 삭제 성공:', { userId });
       return { error: null };
     } catch (error: any) {
       logger.error('사용자 삭제 실패:', error);
@@ -372,7 +387,7 @@ export const matchingService = {
         status: 'pending',
       } as MatchingRequest;
 
-      logger.info('매칭 요청 생성 성공:', request.id);
+      logger.info('매칭 요청 생성 성공:', { requestId: request.id });
       return { request, error: null };
     } catch (error: any) {
       logger.error('매칭 요청 생성 실패:', error);
@@ -452,7 +467,7 @@ export const matchingService = {
       const requestRef = doc(db, 'matching_requests', requestId);
       await deleteDoc(requestRef);
 
-      logger.info('매칭 요청 삭제 성공:', requestId);
+      logger.info('매칭 요청 삭제 성공:', { requestId });
       return { error: null };
     } catch (error: any) {
       logger.error('매칭 요청 삭제 실패:', error);
@@ -482,7 +497,7 @@ export const chatService = {
         user2_id: user2Id,
       } as ChatRoom;
 
-      logger.info('채팅방 생성 성공:', chatRoom.id);
+      logger.info('채팅방 생성 성공:', { chatRoomId: chatRoom.id });
       return { chatRoom, error: null };
     } catch (error: any) {
       logger.error('채팅방 생성 실패:', error);
@@ -535,7 +550,7 @@ export const chatService = {
         last_message_at: serverTimestamp(),
       });
 
-      logger.info('메시지 전송 성공:', docRef.id);
+      logger.info('메시지 전송 성공:', { messageId: docRef.id });
       return { messageId: docRef.id, error: null };
     } catch (error: any) {
       logger.error('메시지 전송 실패:', error);
@@ -589,7 +604,7 @@ export const postService = {
         comments_count: 0,
       } as Post;
 
-      logger.info('게시글 생성 성공:', post.id);
+      logger.info('게시글 생성 성공:', { postId: post.id });
       return { post, error: null };
     } catch (error: any) {
       logger.error('게시글 생성 실패:', error);
@@ -630,7 +645,7 @@ export const postService = {
         likes: increment(1),
       });
 
-      logger.info('게시글 좋아요 성공:', postId);
+      logger.info('게시글 좋아요 성공:', { postId });
       return { error: null };
     } catch (error: any) {
       logger.error('게시글 좋아요 실패:', error);

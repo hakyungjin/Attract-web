@@ -2,18 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
+    
+    // users 컬렉션 - 회원가입을 위해 인증 없이도 생성 가능
+    match /users/{userId} {
+      allow create: if true;  // 회원가입 허용
+      allow read: if true;    // 읽기 허용
+      allow update: if true;   // 업데이트 허용 (나중에 인증 추가 가능)
+      allow delete: if true;   // 삭제 허용 (나중에 인증 추가 가능)
+    }
+    
+    // matching_requests 컬렉션
+    match /matching_requests/{requestId} {
+      allow read, write: if true;
+    }
+    
+    // chat_rooms 컬렉션
+    match /chat_rooms/{roomId} {
+      allow read, write: if true;
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+    
+    // posts 컬렉션
+    match /posts/{postId} {
+      allow read, write: if true;
+    }
+    
+    // coin_packages 컬렉션
+    match /coin_packages/{packageId} {
+      allow read: if true;
+    }
+    
+    // notifications 컬렉션
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+    
+    // 기타 모든 문서 (임시로 허용 - 나중에 보안 강화 필요)
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 11, 23);
+      allow read, write: if request.time < timestamp.date(2026, 12, 31);
     }
   }
 }

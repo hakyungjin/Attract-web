@@ -1,11 +1,16 @@
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendVerificationSMS, verifyCode } from '../../services/ssodaaSmsService';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signInPhone, signUpPhone } = useAuth();
+  
+  // 리다이렉트된 경우 원래 페이지로 돌아가기
+  const from = (location.state as any)?.from?.pathname || '/';
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -16,6 +21,13 @@ export default function LoginPage() {
     age: '',
     gender: 'male'
   });
+  
+  // SMS 인증 상태
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isCodeVerified, setIsCodeVerified] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
 
   // 전화번호 포맷팅 (010-XXXX-XXXX)
   const formatPhoneNumber = (value: string) => {
@@ -67,12 +79,65 @@ export default function LoginPage() {
       if (!profileCompleted) {
         navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
       } else {
-        navigate('/');
+        // 원래 가려던 페이지로 이동 (없으면 홈으로)
+        navigate(from, { replace: true });
       }
     } catch (error: any) {
       alert(`로그인 오류: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * 인증번호 발송
+   */
+  const handleSendVerificationCode = async () => {
+    if (!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber)) {
+      alert('올바른 전화번호를 입력해주세요.');
+      return;
+    }
+
+    setSendingCode(true);
+    try {
+      const success = await sendVerificationSMS(formData.phoneNumber);
+      if (success) {
+        setIsCodeSent(true);
+        alert('인증번호가 발송되었습니다. 3분 내에 입력해주세요.');
+      } else {
+        alert('인증번호 발송에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch (error: any) {
+      console.error('인증번호 발송 오류:', error);
+      alert(`인증번호 발송 실패: ${error.message || '알 수 없는 오류'}`);
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  /**
+   * 인증번호 확인
+   */
+  const handleVerifyCode = async () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      alert('6자리 인증번호를 입력해주세요.');
+      return;
+    }
+
+    setVerifyingCode(true);
+    try {
+      const isValid = await verifyCode(formData.phoneNumber, verificationCode);
+      if (isValid) {
+        setIsCodeVerified(true);
+        alert('인증이 완료되었습니다!');
+      } else {
+        alert('인증번호가 일치하지 않거나 만료되었습니다.');
+      }
+    } catch (error: any) {
+      console.error('인증번호 확인 오류:', error);
+      alert(`인증 확인 실패: ${error.message || '알 수 없는 오류'}`);
+    } finally {
+      setVerifyingCode(false);
     }
   };
 
@@ -86,6 +151,12 @@ export default function LoginPage() {
 
     if (!isValidPhoneNumber(formData.phoneNumber)) {
       alert('올바른 전화번호 형식이 아닙니다. (010-XXXX-XXXX)');
+      return;
+    }
+
+    // 전화번호 인증 확인
+    if (!isCodeVerified) {
+      alert('전화번호 인증을 완료해주세요.');
       return;
     }
 
@@ -227,15 +298,56 @@ export default function LoginPage() {
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">전화번호 <span className="text-red-500">*</span></label>
-                <input
-                  type="tel"
-                  required
-                  value={formData.phoneNumber}
-                  onChange={handlePhoneChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                  placeholder="010-1234-5678"
-                  maxLength={13}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    required
+                    value={formData.phoneNumber}
+                    onChange={handlePhoneChange}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    placeholder="010-1234-5678"
+                    maxLength={13}
+                    disabled={isCodeVerified}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendVerificationCode}
+                    disabled={!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber) || sendingCode || isCodeVerified}
+                    className="px-4 py-3 bg-cyan-500 text-white rounded-xl text-sm font-medium hover:bg-cyan-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                  >
+                    {sendingCode ? '발송중...' : isCodeVerified ? '✓ 완료' : '발송'}
+                  </button>
+                </div>
+                
+                {/* 인증번호 입력 (인증번호 발송 후 표시) */}
+                {isCodeSent && !isCodeVerified && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+                      placeholder="인증번호 6자리 입력"
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      maxLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={!verificationCode || verificationCode.length !== 6 || verifyingCode}
+                      className="px-4 py-3 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      {verifyingCode ? '확인중...' : '인증 확인'}
+                    </button>
+                  </div>
+                )}
+                
+                {/* 인증 완료 표시 */}
+                {isCodeVerified && (
+                  <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                    <i className="ri-checkbox-circle-fill"></i>
+                    <span>전화번호 인증이 완료되었습니다.</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -314,11 +426,16 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !isCodeVerified}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-4 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? '가입 중...' : '회원가입'}
               </button>
+              
+              {/* 안내 문구 */}
+              <div className="text-center mt-4 text-xs text-gray-500">
+                <p>정보까지 다 입력해야 회원가입이 완료됩니다</p>
+              </div>
             </form>
           )}
 

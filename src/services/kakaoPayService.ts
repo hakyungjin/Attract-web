@@ -14,5 +14,20 @@
 
 console.warn('kakaoPayService는 deprecated되었습니다. 토스 페이먼츠로 마이그레이션하세요.');
 
-// 기존 코드는 참고용으로 보관
-// 실제 사용 시 토스 페이먼츠 SDK로 교체 필요
+/**
+ * 카카오페이 결제 준비 (Stub - 실제 구현 필요)
+ * @deprecated 토스 페이먼츠로 교체 필요
+ */
+export const kakaoPayReady = async (_userId: string, _options: any): Promise<any> => {
+  console.warn('kakaoPayReady는 deprecated되었습니다. 토스 페이먼츠를 사용하세요.');
+  throw new Error('카카오페이는 더 이상 지원되지 않습니다. 토스 페이먼츠를 사용해주세요.');
+};
+
+/**
+ * 카카오페이 결제 페이지로 리다이렉트 (Stub - 실제 구현 필요)
+ * @deprecated 토스 페이먼츠로 교체 필요
+ */
+export const redirectToKakaoPay = (_data: any): void => {
+  console.warn('redirectToKakaoPay는 deprecated되었습니다. 토스 페이먼츠를 사용하세요.');
+  throw new Error('카카오페이는 더 이상 지원되지 않습니다. 토스 페이먼츠를 사용해주세요.');
+};

@@ -88,11 +88,10 @@ export default function MatchingRequestsPage() {
           read: false,
           created_at: new Date().toISOString()
         });
-        }
 
-        logger.info(`만료된 요청 처리 완료: ${req.id}`);
+        console.log(`만료된 요청 처리 완료: ${req.id}`);
       } catch (error) {
-        logger.error('만료 요청 처리 실패', error);
+        console.error('만료 요청 처리 실패', error);
       }
     }
 

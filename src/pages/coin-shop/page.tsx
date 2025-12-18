@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 import { firebase } from '../../lib/firebaseService';
 import { useAuth } from '../../contexts/AuthContext';
-import { kakaoPayReady, redirectToKakaoPay } from '../../services/kakaoPayService';
+// 카카오페이는 더 이상 지원되지 않습니다. 토스페이먼츠만 사용합니다.
+// import { kakaoPayReady, redirectToKakaoPay } from '../../services/kakaoPayService';
 
 interface CoinPackage {
   id: string;
@@ -126,21 +127,10 @@ export default function CoinShopPage() {
       localStorage.setItem('selectedBonusCoins', bonusCoins.toString());
       localStorage.setItem('selectedPackageName', selectedPackage.name || orderName);
 
-      // 카카오페이 결제
+      // 카카오페이는 더 이상 지원되지 않습니다
       if (paymentMethod === 'KAKAOPAY') {
-        const result = await kakaoPayReady(user.id, {
-          id: selectedPackage.id,
-          name: orderName,
-          coins: selectedPackage.coins,
-          price: selectedPackage.price,
-          bonus: bonusCoins,
-        });
-
-        if (result.success && result.data) {
-          redirectToKakaoPay(result.data);
-        } else {
-          alert(result.error || '카카오페이 결제 요청에 실패했습니다.');
-        }
+        alert('카카오페이는 더 이상 지원되지 않습니다. 카드 또는 토스페이를 선택해주세요.');
+        setIsProcessing(false);
         return;
       }
 
@@ -369,26 +359,78 @@ export default function CoinShopPage() {
                 </div>
               </div>
 
-              {/* 카카오페이 결제 버튼 */}
+              {/* 결제 수단 선택 */}
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">결제 수단 선택</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => setPaymentMethod('CARD')}
+                    className={`py-3 px-4 rounded-xl border-2 transition-all cursor-pointer ${
+                      paymentMethod === 'CARD'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <i className="ri-bank-card-line text-xl mb-1 block"></i>
+                    <span className="text-xs font-medium">카드</span>
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('토스페이')}
+                    className={`py-3 px-4 rounded-xl border-2 transition-all cursor-pointer ${
+                      paymentMethod === '토스페이'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <i className="ri-wallet-3-line text-xl mb-1 block"></i>
+                    <span className="text-xs font-medium">토스페이</span>
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('KAKAOPAY')}
+                    className={`py-3 px-4 rounded-xl border-2 transition-all cursor-pointer ${
+                      paymentMethod === 'KAKAOPAY'
+                        ? 'border-yellow-400 bg-yellow-50 text-yellow-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <i className="ri-kakao-talk-fill text-xl mb-1 block"></i>
+                    <span className="text-xs font-medium">카카오페이</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 결제 버튼 */}
               <button
                 onClick={handlePayment}
-                disabled={isProcessing}
-                className="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold text-lg hover:bg-yellow-500 transition-all cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                disabled={isProcessing || !tossPayments}
+                className={`w-full py-4 rounded-xl font-bold text-lg transition-all cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 ${
+                  paymentMethod === 'KAKAOPAY'
+                    ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
               >
                 {isProcessing ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                     <span>결제 진행 중...</span>
                   </>
                 ) : (
                   <>
-                    <span className="font-bold">카카오페이</span>
+                    {paymentMethod === 'KAKAOPAY' ? (
+                      <span className="font-bold">카카오페이로 결제</span>
+                    ) : (
+                      <span className="font-bold">
+                        {paymentMethod === 'CARD' ? '카드로 결제' : '토스페이로 결제'}
+                      </span>
+                    )}
                   </>
                 )}
               </button>
               
               <p className="text-xs text-gray-400 text-center mt-3">
-                결제 시 카카오페이 앱으로 이동합니다
+                {paymentMethod === 'KAKAOPAY' 
+                  ? '결제 시 카카오페이 앱으로 이동합니다'
+                  : '안전한 결제를 위해 토스페이먼츠를 사용합니다'}
               </p>
             </div>
           </div>

@@ -28,7 +28,14 @@ export const app = initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(app);
 
 // Firestore 인스턴스
-export const db = getFirestore(app);
+// 'attract' 데이터베이스 사용
+const databaseName = import.meta.env.VITE_FIREBASE_DATABASE_NAME || 'attract';
+export const db = getFirestore(app, databaseName);
+
+console.log('📊 Firestore Database:', {
+  databaseName: databaseName,
+  projectId: firebaseConfig.projectId,
+});
 
 // Storage 인스턴스
 export const storage = getStorage(app);
