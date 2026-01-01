@@ -54,21 +54,7 @@ describe('avatarUtils', () => {
   });
 
   describe('optimizeImageUrl', () => {
-    it('Supabase URL에 최적화 파라미터를 추가해야 함', () => {
-      const url = 'https://example.supabase.co/storage/v1/object/public/avatars/image.jpg';
-      const optimized = optimizeImageUrl(url, 400, 80);
-      expect(optimized).toContain('width=400');
-      expect(optimized).toContain('quality=80');
-    });
-
-    it('이미 쿼리 파라미터가 있는 URL도 처리해야 함', () => {
-      const url = 'https://example.supabase.co/storage/image.jpg?token=abc';
-      const optimized = optimizeImageUrl(url, 300, 70);
-      expect(optimized).toContain('&width=300');
-      expect(optimized).toContain('&quality=70');
-    });
-
-    it('Supabase가 아닌 URL은 그대로 반환해야 함', () => {
+    it('URL을 그대로 반환해야 함 (현재 최적화 로직 비활성화)', () => {
       const url = 'https://example.com/image.jpg';
       const optimized = optimizeImageUrl(url);
       expect(optimized).toBe(url);

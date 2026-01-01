@@ -57,6 +57,29 @@ VITE_FIREBASE_MEASUREMENT_ID=G-0BRQDHMJME
 - ✅ 이미지 저장
 - ✅ 공개 URL 생성
 
+#### 🔐 Storage 보안 규칙 (Rules)
+이미지 업로드를 위해 Firebase Console > Storage > Rules에 다음 내용을 적용해야 합니다:
+
+```javascript
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /avatars/{allPaths=**} {
+      allow read: if true;
+      allow write: if true; // 테스트용 (운영 시 request.auth != null 권장)
+    }
+    match /posts/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /community/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
+```
+
 ## 💻 코드에서 사용하기
 
 ### Firebase 초기화

@@ -6,10 +6,12 @@ import { MBTI_TYPES } from '../../constants/mbti';
 import { logger } from '../../utils/logger';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignupProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setUser } = useAuth();
   const [formData, setFormData] = useState({
     phone_number: '',
     name: '',
@@ -161,12 +163,26 @@ export default function SignupProfilePage() {
         interests: formData.interests,
         profile_image: uploadedImageUrl || formData.profile_image,
         avatar_url: uploadedImageUrl || formData.profile_image,
+        profile_completed: true, // 프로필 완성 표시 추가
       });
 
       if (error) {
         alert('프로필 저장 실패: ' + error.message);
         logger.error('저장 에러', error);
         return;
+      }
+
+      // localStorage 및 AuthContext 업데이트
+      const storedUser = localStorage.getItem('auth_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        const updatedUser = {
+          ...userData,
+          profile_image: uploadedImageUrl || formData.profile_image,
+          profile_completed: true
+        };
+        localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
       }
 
       alert('프로필이 완성되었습니다!');

@@ -155,14 +155,12 @@ export interface LoginFormData {
   password: string;
 }
 
-// ===== Supabase 쿼리 결과 타입 =====
+// ===== API 결과 타입 =====
 
-export interface DatabaseQueryResult<T> {
+export interface ApiResult<T> {
   data: T | null;
   error: {
     message: string;
-    details?: string;
-    hint?: string;
     code?: string;
   } | null;
 }

@@ -20,7 +20,15 @@ const getDefaultAvatar = (gender?: string) => {
 export default function ProfileTab() {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<{
+    name: string;
+    age: number;
+    gender: string;
+    location: string;
+    avatar: string;
+    bio: string;
+    interests: string[];
+  }>({
     name: '사용자',
     age: 0,
     gender: '여자',

@@ -53,8 +53,12 @@ export interface User {
   coins?: number;
   fcm_token?: string;
   job?: string;
+  character?: string;
+  nickname?: string;
   is_ghost?: boolean;
+  is_admin?: boolean;
   profile_completed?: boolean;
+  last_login?: any;
   created_at?: any;
   updated_at?: any;
 }
@@ -89,9 +93,18 @@ export interface ChatMessage {
 export interface Post {
   id: string;
   user_id: string;
+  author_name?: string;
+  avatar_url?: string;
+  title?: string;
   content: string;
   images?: string[];
+  image_url?: string;
   likes?: number;
+  views?: number;
+  category?: string;
+  age?: number;
+  location?: string;
+  job?: string;
   comments_count?: number;
   created_at: any;
   updated_at?: any;
@@ -105,6 +118,19 @@ export interface CoinPackage {
   bonus_coins?: number;
   is_popular?: boolean;
   display_order?: number;
+}
+
+export interface PaymentRequest {
+  id: string;
+  user_id: string;
+  user_name: string;
+  phone_number: string;
+  package_id: string;
+  coins: number;
+  price: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: any;
+  updated_at?: any;
 }
 
 // ==================== Users ====================
@@ -200,10 +226,15 @@ export const userService = {
         dataKeys: Object.keys(userData)
       });
 
+      // undefined 값 제거 (Firestore는 undefined 값을 저장할 수 없음)
+      const cleanedData = Object.fromEntries(
+        Object.entries(userData).filter(([, value]) => value !== undefined)
+      );
+
       logger.info('Firestore에 문서 추가 시도 중...');
       const docRef = await addDoc(usersRef, {
-        ...userData,
-        coins: userData.coins || 0,
+        ...cleanedData,
+        coins: cleanedData.coins || 0,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
       });
@@ -417,15 +448,24 @@ export const matchingService = {
   /**
    * 사용자의 받은 매칭 요청 조회
    */
-  async getReceivedRequests(userId: string): Promise<{ requests: MatchingRequest[]; error: any }> {
+  async getReceivedRequests(userId: string, status?: string): Promise<{ requests: MatchingRequest[]; error: any }> {
     try {
       const requestsRef = collection(db, 'matching_requests');
-      const q = query(
-        requestsRef,
-        where('to_user_id', '==', userId),
-        where('status', '==', 'pending'),
-        orderBy('created_at', 'desc')
-      );
+      let q;
+      if (status) {
+        q = query(
+          requestsRef,
+          where('to_user_id', '==', userId),
+          where('status', '==', status),
+          orderBy('created_at', 'desc')
+        );
+      } else {
+        q = query(
+          requestsRef,
+          where('to_user_id', '==', userId),
+          orderBy('created_at', 'desc')
+        );
+      }
 
       const snapshot = await getDocs(q);
       const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchingRequest));
@@ -440,14 +480,24 @@ export const matchingService = {
   /**
    * 사용자의 보낸 매칭 요청 조회
    */
-  async getSentRequests(userId: string): Promise<{ requests: MatchingRequest[]; error: any }> {
+  async getSentRequests(userId: string, status?: string): Promise<{ requests: MatchingRequest[]; error: any }> {
     try {
       const requestsRef = collection(db, 'matching_requests');
-      const q = query(
-        requestsRef,
-        where('from_user_id', '==', userId),
-        orderBy('created_at', 'desc')
-      );
+      let q;
+      if (status) {
+        q = query(
+          requestsRef,
+          where('from_user_id', '==', userId),
+          where('status', '==', status),
+          orderBy('created_at', 'desc')
+        );
+      } else {
+        q = query(
+          requestsRef,
+          where('from_user_id', '==', userId),
+          orderBy('created_at', 'desc')
+        );
+      }
 
       const snapshot = await getDocs(q);
       const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchingRequest));
@@ -575,6 +625,36 @@ export const chatService = {
       return { messages: [], error };
     }
   },
+
+  /**
+   * 모든 채팅방 조회 (관리자용)
+   */
+  async getAllChatRooms(limitCount = 100): Promise<{ chatRooms: ChatRoom[]; error: any }> {
+    try {
+      const chatRoomsRef = collection(db, 'chat_rooms');
+      const q = query(chatRoomsRef, orderBy('created_at', 'desc'), limit(limitCount));
+      const snapshot = await getDocs(q);
+      const chatRooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatRoom));
+      return { chatRooms, error: null };
+    } catch (error: any) {
+      logger.error('모든 채팅방 조회 실패:', error);
+      return { chatRooms: [], error };
+    }
+  },
+
+  /**
+   * 채팅방 삭제 (관리자용)
+   */
+  async deleteChatRoom(roomId: string): Promise<{ error: any }> {
+    try {
+      const roomRef = doc(db, 'chat_rooms', roomId);
+      await deleteDoc(roomRef);
+      return { error: null };
+    } catch (error: any) {
+      logger.error('채팅방 삭제 실패:', error);
+      return { error };
+    }
+  },
 };
 
 // ==================== Posts ====================
@@ -583,25 +663,22 @@ export const postService = {
   /**
    * 게시글 생성
    */
-  async createPost(userId: string, content: string, images?: string[]): Promise<{ post: Post | null; error: any }> {
+  async createPost(userId: string, postData: Partial<Post>): Promise<{ post: Post | null; error: any }> {
     try {
       const postsRef = collection(db, 'posts');
       const docRef = await addDoc(postsRef, {
         user_id: userId,
-        content,
-        images: images || [],
-        likes: 0,
-        comments_count: 0,
+        ...postData,
+        likes: postData.likes || 0,
+        comments_count: postData.comments_count || 0,
         created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
       });
 
       const post = {
         id: docRef.id,
         user_id: userId,
-        content,
-        images,
-        likes: 0,
-        comments_count: 0,
+        ...postData,
       } as Post;
 
       logger.info('게시글 생성 성공:', { postId: post.id });
@@ -636,6 +713,60 @@ export const postService = {
   },
 
   /**
+   * 댓글 생성
+   */
+  async createComment(postId: string, userId: string, content: string, authorData: any): Promise<{ comment: any; error: any }> {
+    try {
+      const commentsRef = collection(db, 'posts', postId, 'comments');
+      const docRef = await addDoc(commentsRef, {
+        user_id: userId,
+        author_name: authorData.name || '익명',
+        avatar_url: authorData.profile_image || authorData.avatar_url || '',
+        content,
+        likes: 0,
+        created_at: serverTimestamp(),
+      });
+
+      // 게시글의 댓글 수 증가
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        comments_count: increment(1),
+      });
+
+      const comment = {
+        id: docRef.id,
+        user_id: userId,
+        author_name: authorData.name || '익명',
+        avatar_url: authorData.profile_image || authorData.avatar_url || '',
+        content,
+        likes: 0,
+      };
+
+      return { comment, error: null };
+    } catch (error: any) {
+      logger.error('댓글 생성 실패:', error);
+      return { comment: null, error };
+    }
+  },
+
+  /**
+   * 댓글 목록 조회
+   */
+  async getComments(postId: string): Promise<{ comments: any[]; error: any }> {
+    try {
+      const commentsRef = collection(db, 'posts', postId, 'comments');
+      const q = query(commentsRef, orderBy('created_at', 'asc'));
+      const snapshot = await getDocs(q);
+      const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      return { comments, error: null };
+    } catch (error: any) {
+      logger.error('댓글 조회 실패:', error);
+      return { comments: [], error };
+    }
+  },
+
+  /**
    * 게시글 좋아요
    */
   async likePost(postId: string): Promise<{ error: any }> {
@@ -649,6 +780,116 @@ export const postService = {
       return { error: null };
     } catch (error: any) {
       logger.error('게시글 좋아요 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 게시글 좋아요 취소
+   */
+  async unlikePost(postId: string): Promise<{ error: any }> {
+    try {
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        likes: increment(-1),
+      });
+
+      logger.info('게시글 좋아요 취소 성공:', { postId });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('게시글 좋아요 취소 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 게시글 조회수 증가
+   */
+  async incrementViews(postId: string): Promise<{ error: any }> {
+    try {
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        views: increment(1),
+      });
+
+      logger.info('게시글 조회수 증가 성공:', { postId });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('게시글 조회수 증가 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 게시글 삭제
+   */
+  async deletePost(postId: string): Promise<{ error: any }> {
+    try {
+      const postRef = doc(db, 'posts', postId);
+      await deleteDoc(postRef);
+
+      logger.info('게시글 삭제 성공:', { postId });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('게시글 삭제 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 댓글 삭제
+   */
+  async deleteComment(postId: string, commentId: string): Promise<{ error: any }> {
+    try {
+      const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+      await deleteDoc(commentRef);
+
+      // 게시글의 댓글 수 감소
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        comments_count: increment(-1),
+      });
+
+      logger.info('댓글 삭제 성공:', { postId, commentId });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('댓글 삭제 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 댓글 좋아요
+   */
+  async likeComment(postId: string, commentId: string): Promise<{ error: any }> {
+    try {
+      const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+      await updateDoc(commentRef, {
+        likes: increment(1),
+      });
+
+      logger.info('댓글 좋아요 성공:', { postId, commentId });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('댓글 좋아요 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 댓글 좋아요 취소
+   */
+  async unlikeComment(postId: string, commentId: string): Promise<{ error: any }> {
+    try {
+      const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+      await updateDoc(commentRef, {
+        likes: increment(-1),
+      });
+
+      logger.info('댓글 좋아요 취소 성공:', { postId, commentId });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('댓글 좋아요 취소 실패:', error);
       return { error };
     }
   },
@@ -672,6 +913,120 @@ export const coinService = {
     } catch (error: any) {
       logger.error('코인 패키지 조회 실패:', error);
       return { packages: [], error };
+    }
+  },
+
+  /**
+   * 코인 증가
+   */
+  async incrementCoins(userId: string, amount: number): Promise<{ error: any }> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        coins: increment(amount),
+        updated_at: serverTimestamp(),
+      });
+
+      logger.info('코인 증가 성공:', { userId, amount });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('코인 증가 실패:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * 코인 감소
+   */
+  async decrementCoins(userId: string, amount: number): Promise<{ error: any }> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        coins: increment(-amount),
+        updated_at: serverTimestamp(),
+      });
+
+      logger.info('코인 감소 성공:', { userId, amount });
+      return { error: null };
+    } catch (error: any) {
+      logger.error('코인 감소 실패:', error);
+      return { error };
+    }
+  },
+};
+
+// ==================== Payments ====================
+
+export const paymentService = {
+  /**
+   * 결제 요청 생성 (무통장 입금)
+   */
+  async createPaymentRequest(paymentData: Omit<PaymentRequest, 'id' | 'status' | 'created_at'>): Promise<{ paymentRequest: PaymentRequest | null; error: any }> {
+    try {
+      const paymentsRef = collection(db, 'payments');
+      const docRef = await addDoc(paymentsRef, {
+        ...paymentData,
+        status: 'pending',
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      });
+
+      const paymentRequest = {
+        id: docRef.id,
+        ...paymentData,
+        status: 'pending',
+      } as PaymentRequest;
+
+      logger.info('결제 요청 생성 성공:', { paymentId: docRef.id });
+      return { paymentRequest, error: null };
+    } catch (error: any) {
+      logger.error('결제 요청 생성 실패:', error);
+      return { paymentRequest: null, error };
+    }
+  },
+
+  /**
+   * 사용자의 결제 내역 조회
+   */
+  async getUserPayments(userId: string): Promise<{ payments: PaymentRequest[]; error: any }> {
+    try {
+      const paymentsRef = collection(db, 'payments');
+      const q = query(
+        paymentsRef,
+        where('user_id', '==', userId),
+        orderBy('created_at', 'desc'),
+        limit(50)
+      );
+
+      const snapshot = await getDocs(q);
+      const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentRequest));
+
+      return { payments, error: null };
+    } catch (error: any) {
+      logger.error('결제 내역 조회 실패:', error);
+      return { payments: [], error };
+    }
+  },
+
+  /**
+   * 모든 결제 내역 조회 (관리자용)
+   */
+  async getAllPayments(): Promise<{ payments: PaymentRequest[]; error: any }> {
+    try {
+      const paymentsRef = collection(db, 'payments');
+      const q = query(
+        paymentsRef,
+        orderBy('created_at', 'desc'),
+        limit(500)
+      );
+
+      const snapshot = await getDocs(q);
+      const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentRequest));
+
+      return { payments, error: null };
+    } catch (error: any) {
+      logger.error('전체 결제 내역 조회 실패:', error);
+      return { payments: [], error };
     }
   },
 };
@@ -736,6 +1091,7 @@ export const firebase = {
   chat: chatService,
   posts: postService,
   coins: coinService,
+  payments: paymentService,
   notifications: notificationService,
 };
 

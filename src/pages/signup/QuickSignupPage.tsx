@@ -6,10 +6,11 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { hashPassword } from '../../services/passwordService';
 import { KOREA_LOCATIONS, getSigunguList } from '../../constants/locations';
 import { searchSchools } from '../../constants/schools';
-import { sendVerificationSMS, verifyCode } from '../../services/ssodaaSmsService';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function QuickSignupPage() {
   const navigate = useNavigate();
+  const { setUser } = useAuth() as any;
 
   // 전체 필드 (빠른 가입용 - 모든 정보 입력 가능)
   const [formData, setFormData] = useState({
@@ -39,13 +40,6 @@ export default function QuickSignupPage() {
   const [selectedSido, setSelectedSido] = useState('');
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [schoolSearchResults, setSchoolSearchResults] = useState<string[]>([]);
-  
-  // SMS 인증 상태
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isCodeSent, setIsCodeSent] = useState(false);
-  const [isCodeVerified, setIsCodeVerified] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [verifyingCode, setVerifyingCode] = useState(false);
 
   const mbtiOptions = ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'];
   const heightOptions = ['150~155', '155~160', '160~165', '165~170', '170~175', '175~180', '180~185', '185~190'];
@@ -126,53 +120,6 @@ export default function QuickSignupPage() {
     }
   };
 
-  /**
-   * 인증번호 발송 (쏘다 API)
-   */
-  const handleSendVerificationCode = async () => {
-    if (!formData.phoneNumber || formData.phoneNumber.length < 13) {
-      alert('올바른 전화번호를 입력해주세요.');
-      return;
-    }
-
-    setSendingCode(true);
-    try {
-      const success = await sendVerificationSMS(formData.phoneNumber);
-      if (success) {
-        setIsCodeSent(true);
-        alert('인증번호가 발송되었습니다. 3분 내에 입력해주세요.');
-      } else {
-        alert('인증번호 발송에 실패했습니다. 다시 시도해주세요.');
-      }
-    } catch (error: any) {
-      console.error('인증번호 발송 오류:', error);
-      alert(`인증번호 발송 실패: ${error.message || '알 수 없는 오류'}`);
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  /**
-   * 인증번호 확인
-   */
-  const handleVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
-      alert('6자리 인증번호를 입력해주세요.');
-      return;
-    }
-
-    setVerifyingCode(true);
-    try {
-      const isValid = await verifyCode(formData.phoneNumber, verificationCode);
-      setIsCodeVerified(isValid);
-    } catch (error: any) {
-      console.error('인증번호 확인 오류:', error);
-      alert(`인증 확인 실패: ${error.message || '알 수 없는 오류'}`);
-    } finally {
-      setVerifyingCode(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -185,8 +132,6 @@ export default function QuickSignupPage() {
       alert('올바른 전화번호를 입력해주세요.');
       return;
     }
-
-    // 빠른 회원가입은 인증 불필요 (테스트용)
 
     if (!formData.password || formData.password.length < 4) {
       alert('비밀번호는 4자 이상이어야 합니다.');
@@ -214,24 +159,17 @@ export default function QuickSignupPage() {
         return;
       }
 
-      // 전화번호 중복 확인
+      // 전화번호에서 하이픈 제거
       const cleanedPhone = formData.phoneNumber.replace(/[^\d]/g, '');
-      const { user: existingUser } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
-
-      if (existingUser) {
-        alert('이미 등록된 전화번호입니다.');
-        setLoading(false);
-        return;
-      }
 
       // 비밀번호 해싱
       const hashedPassword = await hashPassword(formData.password);
 
       // 회원 생성 (is_ghost = true로 유령 회원 표시)
       const { user: data, error } = await firebase.users.createUser({
-        firebase_uid: '', // 유령 회원은 Firebase Auth 없이 생성
+        firebase_uid: '',
         phone_number: cleanedPhone,
-        password_hash: hashedPassword,
+        password: hashedPassword,
         name: formData.name.trim(),
         age: formData.age ? parseInt(formData.age) : undefined,
         gender: formData.gender,
@@ -247,6 +185,7 @@ export default function QuickSignupPage() {
         drinking: formData.drinking || undefined,
         interests: interests.length > 0 ? interests : undefined,
         profile_image: imageUrl,
+        avatar_url: imageUrl,
         is_ghost: true,
         profile_completed: true,
         created_at: new Date().toISOString()
@@ -254,13 +193,28 @@ export default function QuickSignupPage() {
 
       if (error) {
         console.error('회원가입 실패:', error);
-        alert('회원가입에 실패했습니다.');
+        alert(`회원가입에 실패했습니다: ${error.message || error}`);
         setLoading(false);
         return;
       }
 
       console.log('회원 생성 완료:', data);
+      
+      // 로그인 처리
+      if (data) {
+        const authUser = {
+          id: data.id,
+          phone_number: data.phone_number,
+          name: data.name,
+          profile_image: data.profile_image,
+          profile_completed: true,
+        };
+        setUser(authUser);
+        localStorage.setItem('auth_user', JSON.stringify(authUser));
+      }
+
       alert(`회원가입 완료!\n${formData.name}님 환영합니다!`);
+      navigate('/');
 
       // 폼 초기화
       setFormData({
@@ -345,7 +299,7 @@ export default function QuickSignupPage() {
               <input type="number" name="age" value={formData.age} onChange={handleChange} placeholder="나이" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" min="18" max="100" />
             </div>
 
-            {/* 전화번호 (빠른 회원가입은 인증 불필요) */}
+            {/* 전화번호 */}
             <input 
               type="tel" 
               name="phoneNumber" 
@@ -356,41 +310,6 @@ export default function QuickSignupPage() {
               maxLength={13} 
               required 
             />
-            
-            {/* 선택적: SMS 인증 테스트 버튼 */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSendVerificationCode}
-                disabled={!formData.phoneNumber || formData.phoneNumber.length < 13 || sendingCode}
-                className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-              >
-                {sendingCode ? '발송중...' : '📱 인증번호 테스트'}
-              </button>
-              {isCodeSent && !isCodeVerified && (
-                <div className="flex gap-1 flex-1">
-                  <input
-                    type="text"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                    placeholder="인증번호"
-                    className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    maxLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleVerifyCode}
-                    disabled={!verificationCode || verificationCode.length !== 6 || verifyingCode}
-                    className="px-2 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:bg-gray-300"
-                  >
-                    확인
-                  </button>
-                </div>
-              )}
-              {isCodeVerified && (
-                <span className="text-xs text-green-600">✓ 인증완료</span>
-              )}
-            </div>
             
             {/* 비밀번호 */}
             <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="비밀번호 * (4자 이상)" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" minLength={4} required />

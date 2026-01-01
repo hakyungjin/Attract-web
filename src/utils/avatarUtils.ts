@@ -9,7 +9,6 @@
  */
 export const getDefaultAvatar = (gender: string): string => {
   const isMale = gender === 'male' || gender === '남자';
-  const isFemale = gender === 'female' || gender === '여자';
 
   if (isMale) {
     return 'https://readdy.ai/api/search-image?query=minimalist%20male%20silhouette%20profile%20avatar%20icon%20on%20clean%20white%20background%20simple%20modern%20design%20professional%20business%20style%20neutral%20gray%20color%20scheme%20front%20facing%20head%20and%20shoulders%20portrait%20clean%20lines%20vector%20style%20illustration&width=300&height=300&seq=male-default-avatar&orientation=squarish';
@@ -28,14 +27,9 @@ export const getDefaultAvatar = (gender: string): string => {
  */
 export const optimizeImageUrl = (
   url: string,
-  width: number = 400,
-  quality: number = 80
+  _width: number = 400,
+  _quality: number = 80
 ): string => {
-  // Supabase Storage URL인 경우 변환 파라미터 추가
-  if (url.includes('supabase')) {
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}width=${width}&quality=${quality}`;
-  }
   return url;
 };
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 
 interface User {
   id: string;
@@ -15,6 +14,8 @@ interface User {
   coins: number;
   created_at: string;
   last_login: string;
+  bank_account?: string;
+  account_holder?: string;
 }
 
 interface ChatRoom {
@@ -43,11 +44,26 @@ interface Message {
   created_at: string;
 }
 
+interface PaymentRequest {
+  id: string;
+  user_id: string;
+  user_name?: string;
+  user_phone?: string;
+  bank_account?: string;
+  account_holder?: string;
+  coins: number;
+  price: number;
+  status: string;
+  created_at: string;
+}
+
 export default function AdminPage() {
-  const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -60,6 +76,9 @@ export default function AdminPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRequest | null>(null);
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -68,20 +87,30 @@ export default function AdminPage() {
     totalMessages: 0
   });
 
+  const handleAdminLogin = () => {
+    if (adminPassword === '5174') {
+      setIsAuthenticated(true);
+      setPasswordError('');
+      setAdminPassword('');
+    } else {
+      setPasswordError('관리자 코드가 잘못되었습니다.');
+      setAdminPassword('');
+    }
+  };
+
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (isAuthenticated) {
+      loadDashboardData();
+    }
+  }, [isAuthenticated]);
 
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { users: usersData } = await firebase.users.getAllUsers(1000);
 
       if (usersData) {
-        setUsers(usersData);
+        setUsers(usersData as any);
         const totalCoins = usersData.reduce((sum, u) => sum + (u.coins || 0), 0);
         setStats(prev => ({
           ...prev,
@@ -91,18 +120,12 @@ export default function AdminPage() {
         }));
       }
 
-      const { count: roomCount } = await supabase
-        .from('chat_rooms')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: msgCount } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true });
-
+      const { chatRooms: roomsData } = await firebase.chat.getAllChatRooms(1000);
+      
       setStats(prev => ({
         ...prev,
-        totalChatRooms: roomCount || 0,
-        totalMessages: msgCount || 0
+        totalChatRooms: roomsData.length,
+        totalMessages: 0 // Firebase에서는 전체 메시지 수를 가져오기 어려움
       }));
 
     } catch (error) {
@@ -115,10 +138,7 @@ export default function AdminPage() {
   const loadChatRooms = async () => {
     setLoading(true);
     try {
-      const { data: rooms, error } = await supabase
-        .from('chat_rooms')
-        .select('*')
-        .order('last_message_at', { ascending: false, nullsFirst: false });
+      const { chatRooms: rooms, error } = await firebase.chat.getAllChatRooms(100);
 
       if (error) throw error;
 
@@ -129,37 +149,24 @@ export default function AdminPage() {
           userIds.add(room.user2_id);
         });
 
-        const { data: usersInfo } = await supabase
-          .from('users')
-          .select('id, name, profile_image')
-          .in('id', Array.from(userIds));
-
-        const userMap = new Map(
-          (usersInfo || []).map(u => [u.id, u])
-        );
-
         const roomsWithInfo = await Promise.all(
           rooms.map(async (room) => {
-            const { count } = await supabase
-              .from('messages')
-              .select('*', { count: 'exact', head: true })
-              .eq('room_id', room.id);
-
-            const user1 = userMap.get(room.user1_id);
-            const user2 = userMap.get(room.user2_id);
+            const { user: user1 } = await firebase.users.getUserById(room.user1_id);
+            const { user: user2 } = await firebase.users.getUserById(room.user2_id);
+            const { messages } = await firebase.chat.getMessages(room.id, 1);
 
             return {
               ...room,
               user1_name: user1?.name || '알 수 없음',
               user2_name: user2?.name || '알 수 없음',
-              user1_avatar: user1?.profile_image,
-              user2_avatar: user2?.profile_image,
-              message_count: count || 0
+              user1_avatar: user1?.profile_image || user1?.avatar_url,
+              user2_avatar: user2?.profile_image || user2?.avatar_url,
+              message_count: messages.length // 실제로는 더 많을 수 있음
             };
           })
         );
 
-        setChatRooms(roomsWithInfo);
+        setChatRooms(roomsWithInfo as any);
       } else {
         setChatRooms([]);
       }
@@ -175,30 +182,19 @@ export default function AdminPage() {
     setLoadingMessages(true);
     
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('room_id', room.id)
-        .order('created_at', { ascending: true });
+      const { messages: data, error } = await firebase.chat.getMessages(room.id, 100);
 
       if (error) throw error;
 
-      const senderIds = new Set((data || []).map(m => m.sender_id));
-      const { data: senders } = await supabase
-        .from('users')
-        .select('id, name')
-        .in('id', Array.from(senderIds));
-
-      const senderMap = new Map(
-        (senders || []).map(s => [s.id, s.name])
-      );
-
-      const messagesWithNames = (data || []).map(msg => ({
-        ...msg,
-        sender_name: senderMap.get(msg.sender_id) || '알 수 없음'
+      const messagesWithInfo = await Promise.all((data || []).map(async (m) => {
+        const { user: sender } = await firebase.users.getUserById(m.sender_id);
+        return {
+          ...m,
+          sender_name: sender?.name || '알 수 없음'
+        };
       }));
 
-      setMessages(messagesWithNames);
+      setMessages(messagesWithInfo as any);
     } catch (error) {
       console.error('메시지 로드 실패:', error);
     } finally {
@@ -209,8 +205,43 @@ export default function AdminPage() {
   useEffect(() => {
     if (activeMenu === 'chats') {
       loadChatRooms();
+    } else if (activeMenu === 'payments') {
+      loadPaymentRequests();
     }
   }, [activeMenu]);
+
+  const loadPaymentRequests = async () => {
+    setLoading(true);
+    try {
+      const { payments, error } = await firebase.payments.getAllPayments();
+      
+      if (error) throw error;
+
+      if (payments && payments.length > 0) {
+        const paymentsWithUserInfo = await Promise.all(
+          payments.map(async (payment: any) => {
+            const { user } = await firebase.users.getUserById(payment.user_id);
+            const userInfo = user as any;
+            return {
+              ...payment,
+              user_name: userInfo?.name || '알 수 없음',
+              user_phone: userInfo?.phone_number || '-',
+              bank_account: userInfo?.bank_account || '-',
+              account_holder: userInfo?.account_holder || '-'
+            };
+          })
+        );
+
+        setPaymentRequests(paymentsWithUserInfo as any);
+      } else {
+        setPaymentRequests([]);
+      }
+    } catch (error) {
+      console.error('입금 신청 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredUsers = users.filter(user => 
     (user.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -221,15 +252,12 @@ export default function AdminPage() {
     if (!selectedUser || !coinAmount) return;
 
     try {
-      const newCoins = (selectedUser.coins || 0) + parseInt(coinAmount);
-      
-      const { error } = await supabase
-        .from('users')
-        .update({ coins: newCoins })
-        .eq('id', selectedUser.id);
+      const amount = parseInt(coinAmount);
+      const { error } = await firebase.coins.incrementCoins(selectedUser.id, amount);
 
       if (error) throw error;
 
+      const newCoins = (selectedUser.coins || 0) + amount;
       setUsers(prev => prev.map(user => 
         user.id === selectedUser.id 
           ? { ...user, coins: newCoins }
@@ -356,6 +384,133 @@ export default function AdminPage() {
     </div>
   );
 
+  const renderPaymentManagement = () => (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="p-3 border-b flex items-center justify-between">
+          <h3 className="font-bold text-gray-800 text-sm">입금 신청 내역</h3>
+          <button 
+            onClick={loadPaymentRequests}
+            className="text-xs text-pink-500"
+          >
+            <i className="ri-refresh-line mr-1"></i>새로고침
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto">
+          {loading ? (
+            <div className="p-8 text-center text-gray-500 text-sm">로딩 중...</div>
+          ) : paymentRequests.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 text-sm">입금 신청이 없습니다.</div>
+          ) : (
+            paymentRequests.map(payment => (
+              <div
+                key={payment.id}
+                onClick={() => setSelectedPayment(payment)}
+                className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
+                  payment.status === 'pending' ? 'bg-yellow-50' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{payment.user_name}</p>
+                    <p className="text-xs text-gray-500">{payment.user_phone}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-800 text-sm">{payment.coins.toLocaleString()} 자석</p>
+                    <p className="text-xs text-gray-500">{payment.price.toLocaleString()}원</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold px-2 py-1 rounded ${
+                    payment.status === 'pending' 
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : payment.status === 'completed'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {payment.status === 'pending' ? '확인 중' : payment.status === 'completed' ? '완료' : '취소'}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(payment.created_at).toLocaleDateString('ko-KR')}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {selectedPayment && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h3 className="font-bold text-gray-800 text-sm">입금 신청 상세</h3>
+            <button
+              onClick={() => setSelectedPayment(null)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <i className="ri-close-line text-xl"></i>
+            </button>
+          </div>
+
+          <div className="p-4 space-y-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">신청자</p>
+              <p className="font-bold text-gray-800">{selectedPayment.user_name}</p>
+              <p className="text-xs text-gray-500">{selectedPayment.user_phone}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">자석</p>
+                <p className="font-bold text-gray-800">{selectedPayment.coins.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">금액</p>
+                <p className="font-bold text-gray-800">{selectedPayment.price.toLocaleString()}원</p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">입금 계좌</p>
+              <p className="font-bold text-gray-800">{selectedPayment.bank_account}</p>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">입금자 명</p>
+              <p className="font-bold text-gray-800">{selectedPayment.account_holder}</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">신청 시간</p>
+              <p className="font-bold text-gray-800">{new Date(selectedPayment.created_at).toLocaleString('ko-KR')}</p>
+            </div>
+
+            <div className={`rounded-lg p-3 text-center ${
+              selectedPayment.status === 'pending' 
+                ? 'bg-yellow-50'
+                : selectedPayment.status === 'completed'
+                ? 'bg-green-50'
+                : 'bg-gray-50'
+            }`}>
+              <p className="text-xs text-gray-500 mb-1">상태</p>
+              <p className={`font-bold ${
+                selectedPayment.status === 'pending' 
+                  ? 'text-yellow-700'
+                  : selectedPayment.status === 'completed'
+                  ? 'text-green-700'
+                  : 'text-gray-700'
+              }`}>
+                {selectedPayment.status === 'pending' ? '확인 중' : selectedPayment.status === 'completed' ? '완료' : '취소'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const renderChatManagement = () => (
     <div className="space-y-4">
       {selectedChatRoom && (
@@ -461,6 +616,59 @@ export default function AdminPage() {
     </div>
   );
 
+  // 인증되지 않았을 때 로그인 화면 표시
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
+          <div className="flex items-center justify-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl flex items-center justify-center">
+              <i className="ri-admin-line text-white text-2xl"></i>
+            </div>
+          </div>
+
+          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
+            관리자 패널
+          </h1>
+          <p className="text-center text-gray-500 text-sm mb-8">
+            관리자 코드를 입력해주세요
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  setPasswordError('');
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                placeholder="관리자 코드"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent text-center text-lg tracking-widest"
+              />
+              {passwordError && (
+                <p className="text-red-500 text-sm mt-2 text-center">{passwordError}</p>
+              )}
+            </div>
+
+            <button
+              onClick={handleAdminLogin}
+              disabled={!adminPassword}
+              className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              관리자 로그인
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-6">
+            본 사이트와 독립적으로 운영됩니다
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 모바일 헤더 */}
@@ -472,12 +680,7 @@ export default function AdminPage() {
           <i className="ri-menu-line text-xl text-gray-600"></i>
         </button>
         <h1 className="font-bold text-gray-800">관리자</h1>
-        <button
-          onClick={() => navigate('/')}
-          className="w-10 h-10 flex items-center justify-center"
-        >
-          <i className="ri-home-line text-xl text-gray-600"></i>
-        </button>
+        <div className="w-10 h-10 flex items-center justify-center"></div>
       </div>
 
       {/* 사이드바 오버레이 */}
@@ -542,6 +745,16 @@ export default function AdminPage() {
           </button>
           
           <button
+            onClick={() => handleMenuClick('payments')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${
+              activeMenu === 'payments' ? 'bg-pink-50 text-pink-600' : 'text-gray-600'
+            }`}
+          >
+            <i className="ri-bank-card-line text-xl"></i>
+            <span className="font-medium">입금 신청</span>
+          </button>
+          
+          <button
             onClick={() => handleMenuClick('reports')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${
               activeMenu === 'reports' ? 'bg-pink-50 text-pink-600' : 'text-gray-600'
@@ -554,11 +767,11 @@ export default function AdminPage() {
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
           <button
-            onClick={() => navigate('/')}
-            className="w-full flex items-center space-x-3 px-4 py-3 text-gray-600 rounded-xl"
+            onClick={() => setIsAuthenticated(false)}
+            className="w-full flex items-center space-x-3 px-4 py-3 text-gray-600 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
           >
             <i className="ri-logout-box-line text-xl"></i>
-            <span className="font-medium">메인으로</span>
+            <span className="font-medium">로그아웃</span>
           </button>
         </div>
       </div>
@@ -570,6 +783,7 @@ export default function AdminPage() {
             {activeMenu === 'dashboard' && '대시보드'}
             {activeMenu === 'users' && '유저 관리'}
             {activeMenu === 'chats' && '채팅 관리'}
+            {activeMenu === 'payments' && '입금 신청'}
             {activeMenu === 'reports' && '신고 관리'}
           </h2>
         </div>
@@ -577,6 +791,7 @@ export default function AdminPage() {
         {activeMenu === 'dashboard' && renderDashboard()}
         {activeMenu === 'users' && renderUserList()}
         {activeMenu === 'chats' && renderChatManagement()}
+        {activeMenu === 'payments' && renderPaymentManagement()}
         {activeMenu === 'reports' && (
           <div className="bg-white rounded-xl p-6 shadow-sm text-center">
             <i className="ri-flag-line text-3xl text-gray-300 mb-2 block"></i>
@@ -633,6 +848,20 @@ export default function AdminPage() {
                 <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-xs text-gray-500">ID</p>
                   <p className="font-mono text-xs break-all">{selectedUser.id}</p>
+                </div>
+
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">입금 계좌</p>
+                  <p className="font-medium text-sm break-all">
+                    {(selectedUser as any).bank_account || '-'}
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">입금자 명</p>
+                  <p className="font-medium text-sm">
+                    {(selectedUser as any).account_holder || '-'}
+                  </p>
                 </div>
               </div>
 

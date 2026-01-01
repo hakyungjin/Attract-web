@@ -39,12 +39,11 @@ export default function MatchingTab() {
   const { user: authUser } = useAuth();
   const [selectedGender, setSelectedGender] = useState<string>(''); // 초기값을 빈 문자열로
   const [showFilter, setShowFilter] = useState(false);
-  const [showLocationModal, setShowLocationModal] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [lastDoc, setLastDoc] = useState<any>(null);
   const PROFILES_PER_PAGE = 20;
   const isLoadingRef = useRef(false); // 중복 로드 방지
   
@@ -117,11 +116,11 @@ export default function MatchingTab() {
       const currentPage = loadMore ? page + 1 : 0;
 
       // Firebase에서 성별로 사용자 조회
-      const { users: data, error, totalCount } = await firebase.users.getUsersByGender(
+      const { users: data, error, lastDoc: newLastDoc } = await firebase.users.getUsersByGender(
         selectedGender,
         authUser?.id, // 로그인한 사용자 제외
         PROFILES_PER_PAGE,
-        loadMore ? undefined : undefined // TODO: Implement pagination with lastDoc
+        loadMore ? lastDoc : undefined
       );
 
       if (error) throw error;
@@ -190,6 +189,7 @@ export default function MatchingTab() {
           }
         }
 
+        setLastDoc(newLastDoc);
         setPage(currentPage);
         setHasMore(formattedProfiles.length >= PROFILES_PER_PAGE);
       }
@@ -208,11 +208,6 @@ export default function MatchingTab() {
     () => profiles.filter(profile => profile.gender === selectedGender),
     [profiles, selectedGender]
   );
-
-  const handleLocationClick = (location: string) => {
-    setSelectedLocation(location);
-    setShowLocationModal(true);
-  };
 
   const handleProfileClick = (profile: Profile) => {
     // DB 필드명(snake_case)을 인터페이스 필드명(camelCase)으로 변환
@@ -324,14 +319,27 @@ export default function MatchingTab() {
       </div>
 
       {/* 더보기 버튼 */}
-      <div className="mt-10 text-center pb-8">
-        <button onClick={() => {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }} className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2">
-          <span>친구 더보기</span>
-          <i className="ri-arrow-down-s-line"></i>
-        </button>
-      </div>
+      {hasMore && (
+        <div className="mt-10 text-center pb-8">
+          <button 
+            onClick={() => loadProfiles(true)} 
+            disabled={isLoading}
+            className="bg-white text-slate-600 px-8 py-3 rounded-full font-bold shadow-lg hover:shadow-xl hover:text-primary-600 hover:scale-105 transition-all cursor-pointer whitespace-nowrap flex items-center mx-auto space-x-2 disabled:opacity-50"
+          >
+            {isLoading ? (
+              <>
+                <i className="ri-loader-4-line animate-spin mr-2"></i>
+                <span>로딩 중...</span>
+              </>
+            ) : (
+              <>
+                <span>친구 더보기</span>
+                <i className="ri-arrow-down-s-line"></i>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* 필터 팝업 */}
       {showFilter && (
@@ -428,56 +436,6 @@ export default function MatchingTab() {
                   적용하기
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 위치 지도 모달 */}
-      {showLocationModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-slide-up">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h3 className="text-xl font-bold font-display text-slate-800">{selectedLocation}</h3>
-              <button
-                onClick={() => setShowLocationModal(false)}
-                className="w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full transition-colors"
-              >
-                <i className="ri-close-line text-xl text-slate-400"></i>
-              </button>
-            </div>
-
-            <div className="p-5">
-              <div className="w-full h-64 bg-slate-100 rounded-2xl overflow-hidden shadow-inner">
-                <iframe
-                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dO_X0Q&q=${encodeURIComponent(selectedLocation)}`}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title={`${selectedLocation} 지도`}
-                />
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <div className="flex items-center text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
-                  <i className="ri-map-pin-line text-primary-500 text-lg mr-3"></i>
-                  <span className="font-medium">{selectedLocation}</span>
-                </div>
-                <div className="flex items-center text-sm text-slate-600 bg-slate-50 p-3 rounded-xl cursor-pointer hover:bg-primary-50 hover:text-primary-700 transition-colors group">
-                  <i className="ri-navigation-line text-primary-500 text-lg mr-3 group-hover:scale-110 transition-transform"></i>
-                  <span className="font-medium">길찾기로 이동</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowLocationModal(false)}
-                className="w-full mt-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white py-4 rounded-2xl font-bold hover:from-primary-600 hover:to-primary-700 transition-all cursor-pointer shadow-lg shadow-primary-500/30"
-              >
-                확인
-              </button>
             </div>
           </div>
         </div>

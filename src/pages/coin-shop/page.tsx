@@ -31,39 +31,16 @@ export default function CoinShopPage() {
   const [coinPackages, setCoinPackages] = useState<CoinPackage[]>([]);
   const [userCoins, setUserCoins] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   // 코인 패키지 및 사용자 코인 로드
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 코인 패키지 가져오기 - Firebase 사용
-        const { packages, error: packagesError } = await firebase.coins.getCoinPackages();
-
-        if (packagesError || !packages || packages.length === 0) {
-          console.error('코인 패키지 로드 실패:', packagesError);
-          // 기본 패키지 사용
-          setCoinPackages([
-            { id: 'basic', coins: 50, price: 5000 },
-            { id: 'standard', coins: 100, price: 9000, bonus: 10 },
-            { id: 'premium', coins: 300, price: 25000, bonus: 50, popular: true },
-            { id: 'vip', coins: 500, price: 40000, bonus: 100 },
-            { id: 'mega', coins: 1000, price: 75000, bonus: 250 },
-            { id: 'ultra', coins: 2000, price: 140000, bonus: 600 },
-          ]);
-        } else {
-          // 데이터베이스에서 가져온 패키지 변환
-          const formattedPackages = packages.map((pkg: any) => ({
-            id: pkg.id.toString(),
-            name: pkg.name,
-            coins: pkg.coins,
-            price: pkg.price,
-            bonus_coins: pkg.bonus_coins,
-            bonus: pkg.bonus_coins,
-            is_popular: pkg.is_popular,
-            popular: pkg.is_popular,
-          }));
-          setCoinPackages(formattedPackages);
-        }
+        // 당분간 만원 단일 패키지만 사용
+        setCoinPackages([
+          { id: 'special_10000', coins: 120, price: 10000, bonus: 20, popular: true, name: '특별 자석 패키지' },
+        ]);
 
         // 사용자 코인 가져오기 - Firebase 사용
         if (user?.id) {
@@ -98,7 +75,7 @@ export default function CoinShopPage() {
 
   const handlePurchase = (pkg: CoinPackage) => {
     setSelectedPackage(pkg);
-    setShowPaymentModal(true);
+    setShowAccountModal(true);
   };
 
   /**
@@ -113,49 +90,41 @@ export default function CoinShopPage() {
       return;
     }
 
+    // 무통장 입금 안내 모달 표시
+    setShowPaymentModal(false);
+    setShowAccountModal(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedPackage || !user?.id) return;
+
     setIsProcessing(true);
-
     try {
-      // 총 코인 계산 (기본 + 보너스)
-      const bonusCoins = selectedPackage.bonus_coins || selectedPackage.bonus || 0;
-      const totalCoins = selectedPackage.coins + bonusCoins;
-      const orderName = `자석 ${selectedPackage.coins}개${bonusCoins > 0 ? ` (+${bonusCoins} 보너스)` : ''}`;
-
-      // localStorage에 패키지 정보 저장 (결제 완료 후 사용)
-      localStorage.setItem('selectedPackageId', selectedPackage.id);
-      localStorage.setItem('selectedCoins', totalCoins.toString());
-      localStorage.setItem('selectedBonusCoins', bonusCoins.toString());
-      localStorage.setItem('selectedPackageName', selectedPackage.name || orderName);
-
-      // 카카오페이는 더 이상 지원되지 않습니다
-      if (paymentMethod === 'KAKAOPAY') {
-        alert('카카오페이는 더 이상 지원되지 않습니다. 카드 또는 토스페이를 선택해주세요.');
-        setIsProcessing(false);
-        return;
-      }
-
-      // 토스페이먼츠 결제 (카드, 토스페이)
-      if (!tossPayments) {
-        alert('결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
-        return;
-      }
-
-      const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-      await tossPayments.requestPayment(paymentMethod, {
-        amount: selectedPackage.price,
-        orderId: orderId,
-        orderName: orderName,
-        successUrl: `${window.location.origin}/payment/success?orderId=${orderId}`,
-        failUrl: `${window.location.origin}/payment/fail`,
-        customerName: user.name || '사용자',
+      const { error } = await firebase.payments.createPaymentRequest({
+        user_id: user.id,
+        user_name: user.name || '사용자',
+        phone_number: user.phone_number || '',
+        package_id: selectedPackage.id,
+        coins: selectedPackage.coins + (selectedPackage.bonus || selectedPackage.bonus_coins || 0),
+        price: selectedPackage.price,
       });
+
+      if (error) throw error;
+
+      alert('결제 요청이 완료되었습니다. 입금 확인 후 자석이 지급됩니다.');
+      setShowAccountModal(false);
+      navigate('/payment/history');
     } catch (error: any) {
       console.error('결제 요청 실패:', error);
-      alert(error.message || '결제 요청에 실패했습니다. 다시 시도해주세요.');
+      alert('결제 요청 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('계좌번호가 복사되었습니다.');
   };
 
   return (
@@ -170,7 +139,12 @@ export default function CoinShopPage() {
             <i className="ri-arrow-left-line text-2xl text-gray-800"></i>
           </button>
           <h1 className="text-xl font-bold text-gray-900">자석 충전</h1>
-          <div className="w-10"></div>
+          <button 
+            onClick={() => navigate('/payment/history')}
+            className="w-10 h-10 flex items-center justify-center cursor-pointer"
+          >
+            <i className="ri-history-line text-2xl text-gray-800"></i>
+          </button>
         </div>
       </div>
 
@@ -251,7 +225,7 @@ export default function CoinShopPage() {
               <ul className="text-xs text-gray-600 space-y-1 ml-4">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
-                  <span>결제 완료 즉시 자석이 충전됩니다</span>
+                  <span>입금 확인 후 5분 이내에 자석이 충전됩니다</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
@@ -432,6 +406,83 @@ export default function CoinShopPage() {
                   ? '결제 시 카카오페이 앱으로 이동합니다'
                   : '안전한 결제를 위해 토스페이먼츠를 사용합니다'}
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 무통장 입금 안내 모달 */}
+      {showAccountModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl animate-scale-in">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="ri-bank-line text-3xl text-blue-500"></i>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">무통장 입금 안내</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                아래 계좌로 입금해 주시면<br />
+                확인 후 자석이 지급됩니다.
+              </p>
+
+              <div className="bg-gray-50 rounded-2xl p-5 mb-6 text-left">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs text-gray-400">입금 은행</span>
+                  <span className="text-sm font-bold text-gray-800">신한은행</span>
+                </div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs text-gray-400">계좌 번호</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-bold text-gray-800">110-123-456789</span>
+                    <button 
+                      onClick={() => copyToClipboard('110-123-456789')}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <i className="ri-file-copy-line text-blue-500"></i>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs text-gray-400">예금주</span>
+                  <span className="text-sm font-bold text-gray-800">어트랙트</span>
+                </div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs text-gray-400">입금 금액</span>
+                  <span className="text-lg font-bold text-blue-600">10,000원</span>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                  <span className="text-xs text-gray-400">지급 자석</span>
+                  <span className="text-sm font-bold text-gray-800">120개 (+20 보너스)</span>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-xl p-4 mb-6">
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  <i className="ri-time-line mr-1"></i>
+                  입금 확인은 약 <strong>5분 정도</strong> 소요됩니다.<br />
+                  확인 즉시 자석이 자동으로 지급됩니다.
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowAccountModal(false)}
+                  className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleConfirmPayment}
+                  disabled={isProcessing}
+                  className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isProcessing ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    '결제 완료'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

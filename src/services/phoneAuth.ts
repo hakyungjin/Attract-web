@@ -78,7 +78,7 @@ export const verifyCode = async (
 
     console.log('Firebase 인증 성공:', user.uid);
 
-    // Supabase에서 기존 사용자 확인 (전화번호도 함께 전달)
+    // Firestore에서 기존 사용자 확인 (전화번호도 함께 전달)
     const { isNewUser, userData } = await checkUserExists(user.uid, phoneNumber);
 
     return {
@@ -231,7 +231,7 @@ export const createUserProfile = async (
       drinking: userData.drinking,
       interests: userData.interests,
       photos: userData.photos,
-      password: userData.password || null, // 비밀번호 추가
+      password: userData.password || undefined, // 비밀번호 추가
       created_at: new Date().toISOString()
     });
 

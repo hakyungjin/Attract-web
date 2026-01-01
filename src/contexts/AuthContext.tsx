@@ -8,11 +8,14 @@ interface AuthUser {
   phone_number: string;
   name: string;
   profile_image?: string;
+  is_admin?: boolean;
+  profile_completed?: boolean;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
+  setUser: (user: AuthUser | null) => void;
   signInPhone: (phoneNumber: string, password: string) => Promise<{ error: any; profileCompleted?: boolean }>;
   signUpPhone: (phoneNumber: string, password: string, userData: {
     name: string;
@@ -73,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone_number: users.phone_number,
         name: users.name,
         profile_image: users.profile_image,
+        is_admin: users.is_admin || false,
+        profile_completed: users.profile_completed || false,
       };
 
       setUser(authUser);
@@ -112,15 +117,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 새 사용자 생성
       const hashedPassword = await hashPassword(password);
       const { user: newUser, error: insertError } = await firebase.users.createUser({
+        firebase_uid: '',
         phone_number: cleanPhoneNumber,
         password_hash: hashedPassword,
         name: userData.name,
-        age: userData.age || null,
+        age: userData.age || undefined,
         gender: userData.gender || 'male',
-        location: userData.location || null,
-        school: userData.school || null,
-        job: userData.job || null,
-        bio: userData.bio || null,
+        location: userData.location || undefined,
+        school: userData.school || undefined,
+        job: userData.job || undefined,
+        bio: userData.bio || undefined,
+        profile_completed: false, // 초기 가입 시 프로필 미완성 상태로 설정
       });
 
       if (insertError || !newUser) {
@@ -156,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextType = {
     user,
     loading,
+    setUser,
     signInPhone,
     signUpPhone,
     signOut,

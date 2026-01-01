@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { firebase } from '../../../lib/firebaseService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { logger } from '../../../utils/logger';
 
 interface Comment {
-  id: number;
+  id: string;
   author: string;
   avatar: string;
   content: string;
@@ -15,7 +15,7 @@ interface Comment {
 }
 
 interface Post {
-  id: number;
+  id: string;
   author: string;
   avatar: string;
   content: string;
@@ -37,7 +37,7 @@ interface PostDetailPageProps {
   post: Post;
   onBack: () => void;
   onUpdatePost: (updatedPost: Post) => void;
-  onDeletePost?: (postId: number) => void;
+  onDeletePost?: (postId: string) => void;
 }
 
 export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePost }: PostDetailPageProps) {
@@ -46,21 +46,63 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [newComment, setNewComment] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [post]);
+    loadComments();
+  }, [post.id]);
+
+  const loadComments = async () => {
+    setIsLoadingComments(true);
+    try {
+      const { comments: data, error } = await firebase.posts.getComments(post.id);
+      if (error) throw error;
+
+      if (data) {
+        const formattedComments: Comment[] = data.map((comment: any) => ({
+          id: comment.id,
+          author: comment.author_name,
+          avatar: comment.avatar_url || 'https://via.placeholder.com/100',
+          content: comment.content,
+          timeAgo: getTimeAgo(comment.created_at?.toDate?.()?.toISOString() || comment.created_at || new Date().toISOString()),
+          likes: comment.likes || 0,
+          isLiked: false
+        }));
+
+        setCurrentPost(prev => ({
+          ...prev,
+          comments: formattedComments
+        }));
+      }
+    } catch (error) {
+      logger.error('댓글 로드 실패', error);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  const getTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - past.getTime()) / (1000 * 60));
+
+    if (diffInMinutes < 1) return '방금 전';
+    if (diffInMinutes < 60) return `${diffInMinutes}분 전`;
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}시간 전`;
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays}일 전`;
+  };
 
   /**
    * userId로 프로필을 로드하고 프로필 상세 페이지로 이동
    */
   const loadAndNavigateToProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const { user: data, error } = await firebase.users.getUserById(userId);
 
       if (error) throw error;
 
@@ -73,10 +115,10 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
               age: data.age,
               gender: data.gender,
               location: data.location,
-              school: data.school,
+              school: data.school || data.job,
               mbti: data.mbti,
               bio: data.bio,
-              photos: data.profile_image ? [data.profile_image] : [],
+              photos: data.profile_image ? [data.profile_image] : (data.avatar_url ? [data.avatar_url] : []),
               interests: data.interests || [],
               height: data.height,
               bodyType: data.body_type,
@@ -106,16 +148,17 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
 
     // DB 업데이트
     try {
-      await supabase
-        .from('community_posts')
-        .update({ likes: newLikes })
-        .eq('id', currentPost.id);
+      if (currentPost.isLiked) {
+        await firebase.posts.unlikePost(currentPost.id);
+      } else {
+        await firebase.posts.likePost(currentPost.id);
+      }
     } catch (error) {
       logger.error('좋아요 업데이트 오류', error);
     }
   };
 
-  const handleCommentLike = async (commentId: number) => {
+  const handleCommentLike = async (commentId: string) => {
     const comment = currentPost.comments.find(c => c.id === commentId);
     if (!comment) return;
 
@@ -138,10 +181,11 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
 
     // DB 업데이트
     try {
-      await supabase
-        .from('post_comments')
-        .update({ likes: newLikes })
-        .eq('id', commentId);
+      if (comment.isLiked) {
+        await firebase.posts.unlikeComment(currentPost.id, commentId);
+      } else {
+        await firebase.posts.likeComment(currentPost.id, commentId);
+      }
     } catch (error) {
       logger.error('댓글 좋아요 업데이트 오류', error);
     }
@@ -155,20 +199,12 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
     }
 
     try {
-      const commentData = {
-        post_id: currentPost.id,
-        user_id: authUser.id,
-        author_name: authUser.name || '익명',
-        avatar_url: authUser.profile_image || '',
-        content: newComment,
-        likes: 0
-      };
-
-      const { data, error } = await supabase
-        .from('post_comments')
-        .insert([commentData])
-        .select()
-        .single();
+      const { comment: data, error } = await firebase.posts.createComment(
+        currentPost.id,
+        authUser.id,
+        newComment,
+        authUser
+      );
 
       if (error) throw error;
 
@@ -176,7 +212,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
         const newCommentObj: Comment = {
           id: data.id,
           author: data.author_name,
-          avatar: data.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20profile%20avatar%2C%20friendly%20expression%2C%20professional%20portrait%20photography%2C%20soft%20natural%20lighting%2C%20clean%20white%20background%2C%20high%20quality%2C%20realistic&width=100&height=100&seq=myavatar&orientation=squarish',
+          avatar: data.avatar_url || 'https://via.placeholder.com/100',
           content: data.content,
           timeAgo: '방금 전',
           likes: 0,
@@ -217,10 +253,7 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
     setIsDeleting(true);
     try {
       // 게시글 삭제
-      const { error } = await supabase
-        .from('community_posts')
-        .delete()
-        .eq('id', currentPost.id);
+      const { error } = await firebase.posts.deletePost(currentPost.id);
 
       if (error) throw error;
 
@@ -346,7 +379,11 @@ export default function PostDetailPage({ post, onBack, onUpdatePost, onDeletePos
       <div className="px-4 py-4">
         <div className="font-bold text-sm mb-4">댓글 {currentPost.comments.length}</div>
 
-        {currentPost.comments.length === 0 ? (
+        {isLoadingComments ? (
+          <div className="flex justify-center py-8">
+            <i className="ri-loader-4-line animate-spin text-2xl text-primary-500"></i>
+          </div>
+        ) : currentPost.comments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-300">
             <i className="ri-chat-3-line text-4xl mb-2 opacity-50"></i>
             <p className="text-sm">첫 번째 댓글을 남겨보세요!</p>

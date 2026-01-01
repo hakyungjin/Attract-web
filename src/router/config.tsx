@@ -17,6 +17,7 @@ const CoinShopPage = lazy(() => import("../pages/coin-shop/page"));
 const MatchingRequestsPage = lazy(() => import("../pages/matching-requests/page"));
 const PaymentSuccessPage = lazy(() => import("../pages/payment/success"));
 const PaymentFailPage = lazy(() => import("../pages/payment/fail"));
+const PaymentHistoryPage = lazy(() => import("../pages/payment/history"));
 const CreatePostPage = lazy(() => import("../pages/post/create"));
 const SettingsPage = lazy(() => import("../pages/settings/page"));
 const FAQPage = lazy(() => import("../pages/faq/page"));
@@ -24,6 +25,7 @@ const SupportPage = lazy(() => import("../pages/support/page"));
 const PolicyDetailPage = lazy(() => import("../pages/policy/page"));
 const SafetyPage = lazy(() => import("../pages/safety/page"));
 const DataDeletionPage = lazy(() => import("../pages/data-deletion/page"));
+const PosterPage = lazy(() => import("../pages/poster/page"));
 
 const routes: RouteObject[] = [
   // 🔒 로그인 필요한 페이지들
@@ -48,10 +50,6 @@ const routes: RouteObject[] = [
     element: <ProtectedRoute><MyProfilePage /></ProtectedRoute>,
   },
   {
-    path: "/admin",
-    element: <ProtectedRoute><AdminPage /></ProtectedRoute>,
-  },
-  {
     path: "/coin-shop",
     element: <ProtectedRoute><CoinShopPage /></ProtectedRoute>,
   },
@@ -68,6 +66,10 @@ const routes: RouteObject[] = [
     element: <ProtectedRoute><PaymentFailPage /></ProtectedRoute>,
   },
   {
+    path: "/payment/history",
+    element: <ProtectedRoute><PaymentHistoryPage /></ProtectedRoute>,
+  },
+  {
     path: "/post/create",
     element: <ProtectedRoute><CreatePostPage /></ProtectedRoute>,
   },
@@ -77,6 +79,10 @@ const routes: RouteObject[] = [
   },
   
   // 🔓 로그인 없이 접근 가능한 페이지들
+  {
+    path: "/admin",
+    element: <AdminPage />,
+  },
   {
     path: "/login",
     element: <LoginPage />,
@@ -108,6 +114,10 @@ const routes: RouteObject[] = [
   {
     path: "/data-deletion",
     element: <DataDeletionPage />,
+  },
+  {
+    path: "/poster",
+    element: <PosterPage />,
   },
   {
     path: "*",

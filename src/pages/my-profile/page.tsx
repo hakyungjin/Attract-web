@@ -37,7 +37,7 @@ export default function MyProfilePage() {
   useEffect(() => {
     const loadMyProfile = async () => {
       try {
-        const localUser = localStorage.getItem('user');
+        const localUser = localStorage.getItem('auth_user');
         let userId = authUser?.id;
         
         if (!userId && localUser) {
@@ -76,7 +76,7 @@ export default function MyProfilePage() {
             profile_image: data.profile_image || '',
             interests: data.interests || [],
             height: data.height || '',
-            bodyType: data.body_type || data.bodyType || '',
+            bodyType: data.body_type || '',
             style: data.style || '',
             religion: data.religion || '',
             smoking: data.smoking || '',

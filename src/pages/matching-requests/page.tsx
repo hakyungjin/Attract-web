@@ -79,14 +79,11 @@ export default function MatchingRequestsPage() {
         await firebase.users.incrementCoins(senderId, MATCH_COST);
 
         // 환불 알림 전송 - Firebase 사용
-        await firebase.notifications.createNotification({
-          user_id: senderId,
+        await firebase.notifications.createNotification(senderId, {
           type: 'refund',
           title: '자석 환불 💎',
           message: `매칭 요청이 24시간 초과로 자동 만료되어 자석 ${MATCH_COST}개가 환불되었습니다.`,
           data: {},
-          read: false,
-          created_at: new Date().toISOString()
         });
 
         console.log(`만료된 요청 처리 완료: ${req.id}`);
@@ -229,11 +226,7 @@ export default function MatchingRequestsPage() {
       const otherUserId = String(selectedUser.userId);
 
       // 1. 내 코인 잔액 확인
-      const { data: userData } = await supabase
-        .from('users')
-        .select('coins')
-        .eq('id', currentUserId)
-        .single();
+      const { user: userData } = await firebase.users.getUserById(currentUserId);
 
       const myCoins = userData?.coins || 0;
 
@@ -245,42 +238,28 @@ export default function MatchingRequestsPage() {
       }
 
       // 2. 내 코인 차감
-      await supabase
-        .from('users')
-        .update({ coins: myCoins - MATCH_COST })
-        .eq('id', currentUserId);
+      await firebase.users.decrementCoins(currentUserId, MATCH_COST);
 
       // 3. 매칭 요청 상태 업데이트
-      await supabase
-        .from('matching_requests')
-        .update({ status: 'accepted' })
-        .eq('id', selectedUser.id);
+      await firebase.matching.updateMatchingRequestStatus(selectedUser.id, 'accepted');
 
       // 4. 상대방이 나에게 보낸 요청도 있는지 확인하고 업데이트
-      await supabase
-        .from('matching_requests')
-        .update({ status: 'accepted' })
-        .eq('from_user_id', otherUserId)
-        .eq('to_user_id', currentUserId)
-        .eq('status', 'pending');
+      const { requests: otherSentRequests } = await firebase.matching.getSentRequests(otherUserId);
+      const reverseRequest = otherSentRequests.find(r => r.to_user_id === currentUserId && r.status === 'pending');
+      
+      if (reverseRequest) {
+        await firebase.matching.updateMatchingRequestStatus(reverseRequest.id, 'accepted');
+      }
 
       // 5. 채팅방 생성 (이미 존재하지 않는 경우만)
-      const { data: existingRoom } = await supabase
-        .from('chat_rooms')
-        .select('id')
-        .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${otherUserId}),and(user1_id.eq.${otherUserId},user2_id.eq.${currentUserId})`)
-        .single();
+      const { chatRooms } = await firebase.chat.getUserChatRooms(currentUserId);
+      const existingRoom = chatRooms.find(room => 
+        (room.user1_id === currentUserId && room.user2_id === otherUserId) ||
+        (room.user1_id === otherUserId && room.user2_id === currentUserId)
+      );
 
       if (!existingRoom) {
-        const { data: chatRoom, error: chatError } = await supabase
-          .from('chat_rooms')
-          .insert({
-            user1_id: currentUserId,
-            user2_id: otherUserId,
-            created_at: new Date().toISOString()
-          })
-          .select()
-          .single();
+        const { chatRoom, error: chatError } = await firebase.chat.createChatRoom(currentUserId, otherUserId);
 
         if (chatError) {
           logger.error('채팅방 생성 실패', chatError);
@@ -292,11 +271,7 @@ export default function MatchingRequestsPage() {
       // 매칭 수락 SMS 알림 발송
       try {
         // 요청 보낸 사람에게 SMS 발송
-        const { data: otherUserData } = await supabase
-          .from('users')
-          .select('phone_number')
-          .eq('id', otherUserId)
-          .single();
+        const { user: otherUserData } = await firebase.users.getUserById(otherUserId);
 
         if (otherUserData?.phone_number) {
           await sendMatchAcceptNotification(
@@ -338,32 +313,20 @@ export default function MatchingRequestsPage() {
 
     try {
       // 1. 매칭 요청 상태를 rejected로 업데이트
-      await supabase
-        .from('matching_requests')
-        .update({ status: 'rejected' })
-        .eq('id', requestId);
+      await firebase.matching.updateMatchingRequestStatus(requestId, 'rejected');
 
       // 2. 요청 보낸 사람에게 코인 환불
-      const { data: senderData } = await supabase
-        .from('users')
-        .select('coins')
-        .eq('id', fromUserId)
-        .single();
+      const { user: senderData } = await firebase.users.getUserById(fromUserId);
 
       if (senderData) {
-        await supabase
-          .from('users')
-          .update({ coins: (senderData.coins || 0) + MATCH_COST })
-          .eq('id', fromUserId);
+        await firebase.users.incrementCoins(fromUserId, MATCH_COST);
 
         // 환불 알림 전송
-        await supabase.from('notifications').insert({
-          user_id: fromUserId,
+        await firebase.notifications.createNotification(fromUserId, {
           type: 'refund',
           title: '자석 환불 💎',
           message: `매칭 요청이 거절되어 자석 ${MATCH_COST}개가 환불되었습니다.`,
-          data: {},
-          read: false
+          data: {}
         });
       }
 

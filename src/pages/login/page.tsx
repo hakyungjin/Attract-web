@@ -67,14 +67,21 @@ export default function LoginPage() {
 
       // 전화번호에서 '-' 제거
       const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
+      console.log('로그인 시도:', cleanPhoneNumber);
+      
       const { error, profileCompleted } = await signInPhone(cleanPhoneNumber, formData.password);
+
+      console.log('로그인 결과:', { error, profileCompleted });
 
       if (error) {
         alert(`로그인 실패: ${error.message}`);
+        setLoading(false);
         return;
       }
 
       // 로그인 성공
+      console.log('로그인 성공, 프로필 완성 여부:', profileCompleted);
+      
       // 프로필이 완성되지 않으면 프로필 완성 페이지로 리다이렉트
       if (!profileCompleted) {
         navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
@@ -83,6 +90,7 @@ export default function LoginPage() {
         navigate(from, { replace: true });
       }
     } catch (error: any) {
+      console.error('로그인 오류:', error);
       alert(`로그인 오류: ${error.message}`);
     } finally {
       setLoading(false);
@@ -165,43 +173,25 @@ export default function LoginPage() {
       return;
     }
 
-    if (!formData.age) {
-      alert('나이를 입력해주세요.');
-      return;
-    }
-
-    if (!formData.gender || formData.gender === '') {
-      alert('성별을 선택해주세요.');
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      alert('비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      alert('비밀번호는 8자 이상이어야 합니다.');
-      return;
-    }
-
     setLoading(true);
 
     try {
       const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
-      const { error } = await signUpPhone(cleanPhoneNumber, formData.password, {
+      
+      // 1단계: 중복 확인
+      const { error: signupError } = await signUpPhone(cleanPhoneNumber, formData.password || 'temp', {
         name: formData.name,
-        age: parseInt(formData.age),
         gender: formData.gender,
       });
 
-      if (error) {
-        alert(`회원가입 실패: ${error.message}`);
+      if (signupError) {
+        alert(`중복 확인 실패: ${signupError.message}`);
         return;
       }
 
-      alert('회원가입이 완료되었습니다! 프로필을 완성해주세요.');
-      navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber } });
+      // 중복 확인 완료 - 회원가입 진행
+      alert('중복 확인이 완료되었습니다. 회원가입을 계속 진행해주세요.');
+      navigate('/signup', { state: { phoneNumber: cleanPhoneNumber, name: formData.name } });
     } catch (error: any) {
       alert(`회원가입 오류: ${error.message}`);
     } finally {

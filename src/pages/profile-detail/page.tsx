@@ -57,7 +57,7 @@ export default function ProfileDetailPage() {
   }, []);
 
   const getCurrentUserId = () => {
-    const localUser = localStorage.getItem('user');
+    const localUser = localStorage.getItem('auth_user');
     if (!localUser) return null;
     try {
       const userData = JSON.parse(localUser);
@@ -79,14 +79,10 @@ export default function ProfileDetailPage() {
   useEffect(() => {
     const loadUserCoins = async () => {
       if (!authUser?.id) return;
-      const { data } = await supabase
-        .from('users')
-        .select('coins, mbti')
-        .eq('id', authUser.id)
-        .single();
-      if (data) {
-        setUserCoins(data.coins || 0);
-        setMyMBTI(data.mbti || null);
+      const { user: userData } = await firebase.users.getUserById(authUser.id);
+      if (userData) {
+        setUserCoins(userData.coins || 0);
+        setMyMBTI(userData.mbti || null);
       }
     };
     loadUserCoins();
@@ -180,33 +176,23 @@ export default function ProfileDetailPage() {
 
       logger.info('매칭 요청 정보', { fromUserId, toUserId });
 
-      const { data: reverseRequest } = await supabase
-        .from('matching_requests')
-        .select('id')
-        .eq('from_user_id', toUserId)
-        .eq('to_user_id', fromUserId)
-        .eq('status', 'pending')
-        .limit(1);
+      // 상대방이 나에게 보낸 요청이 있는지 확인 (상호 매칭 확인)
+      const { requests: receivedRequests } = await firebase.matching.getReceivedRequests(fromUserId);
+      const reverseRequest = receivedRequests.find(r => r.from_user_id === toUserId);
+      const isMutualMatch = !!reverseRequest;
 
-      const isMutualMatch = reverseRequest && reverseRequest.length > 0;
+      // 내가 이미 보낸 요청이 있는지 확인
+      const { requests: sentRequests } = await firebase.matching.getSentRequests(fromUserId);
+      const myRequest = sentRequests.find(r => r.to_user_id === toUserId);
 
-      const { data: myRequest } = await supabase
-        .from('matching_requests')
-        .select('id')
-        .eq('from_user_id', fromUserId)
-        .eq('to_user_id', toUserId)
-        .limit(1);
-
-      if (myRequest && myRequest.length > 0) {
+      if (myRequest) {
         alert('이미 매칭 요청을 보낸 상대입니다');
         setIsLikeAnimating(false);
         return;
       }
 
-      const { error: coinError } = await supabase
-        .from('users')
-        .update({ coins: userCoins - MATCH_COST })
-        .eq('id', authUser.id);
+      // 코인 차감
+      const { error: coinError } = await firebase.users.decrementCoins(fromUserId, MATCH_COST);
 
       if (coinError) {
         logger.error('코인 차감 실패', coinError);
@@ -217,62 +203,31 @@ export default function ProfileDetailPage() {
 
       setUserCoins(prev => prev - MATCH_COST);
 
-      const { error } = await supabase
-        .from('matching_requests')
-        .insert({
-          from_user_id: fromUserId,
-          to_user_id: toUserId,
-          status: isMutualMatch ? 'accepted' : 'pending'
-        })
-        .select();
-
-      if (error) {
-        if (error.code === '23505') {
-          alert('이미 매칭 요청을 보낸 상대입니다');
-          setIsLikeAnimating(false);
-          return;
-        }
-        throw error;
-      }
-
+      // 매칭 요청 생성 또는 수락
       if (isMutualMatch) {
-        await supabase
-          .from('matching_requests')
-          .update({ status: 'accepted' })
-          .eq('from_user_id', toUserId)
-          .eq('to_user_id', fromUserId);
+        // 상호 매칭: 기존 요청 수락
+        await firebase.matching.updateMatchingRequestStatus(reverseRequest.id, 'accepted');
 
-        const { data: chatRoom, error: chatError } = await supabase
-          .from('chat_rooms')
-          .insert({
-            user1_id: fromUserId,
-            user2_id: toUserId,
-            created_at: new Date().toISOString()
-          })
-          .select()
-          .single();
+        // 채팅방 생성
+        const { chatRoom, error: chatError } = await firebase.chat.createChatRoom(fromUserId, toUserId);
 
         if (chatError) {
           logger.error('채팅방 생성 실패', chatError);
         }
 
         // Firebase 알림 생성 (두 명의 사용자에게)
-        await firebase.notifications.createNotification({
-          user_id: toUserId,
+        await firebase.notifications.createNotification(toUserId, {
           type: 'match',
+          title: '매칭 성사! 💕',
           message: `${authUser.name || '누군가'}님과 매칭되었습니다!`,
-          content: `매칭 성사! 💕`,
-          read: false,
-          created_at: new Date().toISOString()
+          data: { roomId: chatRoom?.id }
         });
 
-        await firebase.notifications.createNotification({
-          user_id: fromUserId,
+        await firebase.notifications.createNotification(fromUserId, {
           type: 'match',
+          title: '매칭 성사! 💕',
           message: `${profile.name}님과 매칭되었습니다!`,
-          content: `매칭 성사! 💕`,
-          read: false,
-          created_at: new Date().toISOString()
+          data: { roomId: chatRoom?.id }
         });
 
         await sendMatchSuccessPush(toUserId, authUser.name || '누군가', chatRoom?.id);
@@ -300,30 +255,30 @@ export default function ProfileDetailPage() {
           }
         } catch (smsError) {
           logger.error('매칭 성사 SMS 발송 실패', smsError);
-          // SMS 발송 실패는 무시하고 계속 진행
         }
 
         setIsLikeAnimating(false);
         setShowMatchModal(true);
       } else {
-        await firebase.notifications.createNotification({
-          user_id: toUserId,
+        // 일반 매칭 요청
+        const { error: requestError } = await firebase.matching.createMatchingRequest(fromUserId, toUserId);
+
+        if (requestError) {
+          throw requestError;
+        }
+
+        await firebase.notifications.createNotification(toUserId, {
           type: 'like',
+          title: '새로운 매칭 요청',
           message: `${authUser.name || '누군가'}님이 매칭을 요청했습니다`,
-          content: '새로운 매칭 요청',
-          read: false,
-          created_at: new Date().toISOString()
+          data: { fromUserId }
         });
 
         await sendMatchRequestPush(toUserId, authUser.name || '누군가', fromUserId);
 
         // 매칭 요청 SMS 알림 발송
         try {
-          const { data: toUserData } = await supabase
-            .from('users')
-            .select('phone_number')
-            .eq('id', toUserId)
-            .single();
+          const { user: toUserData } = await firebase.users.getUserById(toUserId);
 
           if (toUserData?.phone_number) {
             await sendMatchRequestNotification(
@@ -333,7 +288,6 @@ export default function ProfileDetailPage() {
           }
         } catch (smsError) {
           logger.error('매칭 요청 SMS 발송 실패', smsError);
-          // SMS 발송 실패는 무시하고 계속 진행
         }
 
         setIsLikeAnimating(false);

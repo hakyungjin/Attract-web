@@ -36,7 +36,7 @@ export const generateVerificationCode = ssodaaSmsService.generateVerificationCod
  * SMS 발송
  *
  * ⚠️ 주의: 프론트엔드에서 직접 호출하면 API Key가 노출됩니다!
- * 실제 운영에서는 Supabase Edge Function을 통해 호출하세요.
+ * 실제 운영에서는 Firebase Cloud Functions를 통해 호출하세요.
  */
 export const sendSMS = async (
   phone: string,

@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { firebase } from '../../../lib/firebaseService';
 import { CommunityListSkeleton } from '../../../components/base/Skeleton';
 
 interface Comment {
-  id: number;
+  id: string;
   author: string;
   avatar: string;
   content: string;
@@ -14,13 +14,14 @@ interface Comment {
 }
 
 interface Post {
-  id: number;
+  id: string;
   author: string;
   avatar: string;
   content: string;
   image?: string;
   likes: number;
   comments: Comment[];
+  commentsCount?: number;
   timeAgo: string;
   isLiked: boolean;
   age?: number;
@@ -61,38 +62,22 @@ export default function CommunityTab() {
         if (authUser) {
           try {
             const parsedUser = JSON.parse(authUser);
-            setCurrentUser(parsedUser);
-            console.log('auth_user 사용자:', parsedUser);
+            
+            // Firebase에서 최신 정보 가져오기
+            const { user: userData } = await firebase.users.getUserById(parsedUser.id);
+            if (userData) {
+              setCurrentUser(userData);
+              console.log('Firebase 사용자:', userData);
+            } else {
+              setCurrentUser(parsedUser);
+            }
             return;
           } catch (err) {
             console.error('auth_user 파싱 실패:', err);
           }
         }
-
-        // Supabase 인증 사용자 확인 (폴백)
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (user) {
-          setCurrentUser(user);
-
-          // 사용자 프로필 정보 가져오기
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', user.id)
-              .single();
-
-            if (!profileError && profile) {
-              setCurrentUser({ ...user, profile });
-            }
-          } catch (err) {
-            // Profile fetch failed, continue with basic user info
-          }
-        } else {
-          // 로그인 안됨
-          setCurrentUser(null);
-        }
+        
+        setCurrentUser(null);
       } catch (err) {
         console.error('사용자 정보 조회 실패:', err);
         setCurrentUser(null);
@@ -122,129 +107,63 @@ export default function CommunityTab() {
     setIsLoading(true);
 
     try {
-      // 타임아웃 설정 (5초)
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-
-      // 먼저 게시글만 가져오기
-      const fetchPromise = supabase
-        .from('community_posts')
-        .select(`
-          *,
-          post_comments (
-            id,
-            author_name,
-            avatar_url,
-            content,
-            likes,
-            created_at
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      // Firebase에서 게시글 가져오기
+      const { posts: data, error } = await firebase.posts.getPosts(50);
 
       if (error) {
         throw error;
       }
 
       if (data && data.length > 0) {
-        // 현재 사용자가 좋아요한 게시글 확인
-        let userLikes: number[] = [];
-        if (currentUser) {
-          const { data: likesData } = await supabase
-            .from('community_post_likes')
-            .select('post_id')
-            .eq('user_id', currentUser.id);
-
-          userLikes = likesData?.map(like => like.post_id) || [];
-        }
-
         // 게시글 작성자 ID 목록 수집
         const userIds = [...new Set(data.map((post: any) => post.user_id).filter(Boolean))];
         
         // 작성자 정보 일괄 조회
         let usersMap: { [key: string]: any } = {};
         if (userIds.length > 0) {
-          const { data: usersData } = await supabase
-            .from('users')
-            .select('id, name, avatar_url, profile_image, age, location, gender, bio, school, job')
-            .in('id', userIds);
-          
-          if (usersData) {
-            usersData.forEach((user: any) => {
-              usersMap[user.id] = user;
-            });
-          }
+          await Promise.all(userIds.map(async (userId) => {
+            const { user } = await firebase.users.getUserById(userId);
+            if (user) {
+              usersMap[userId] = user;
+            }
+          }));
         }
 
-        const formattedPosts: Post[] = data.map((post: any) => {
+        const formattedPosts: Post[] = await Promise.all(data.map(async (post: any) => {
           // users 테이블에서 가져온 정보 또는 게시글에 저장된 정보 사용
           const author = usersMap[post.user_id];
           const authorName = author?.name || post.author_name || '익명';
-          const authorAvatar = author?.avatar_url || author?.profile_image || post.avatar_url || 'https://via.placeholder.com/100';
+          const authorAvatar = author?.profile_image || author?.avatar_url || post.avatar_url || 'https://via.placeholder.com/100';
           
           return {
             id: post.id,
             author: authorName,
             avatar: authorAvatar,
             content: post.content,
-            image: post.image_url,
-            likes: post.likes,
-            comments: post.post_comments?.map((comment: any) => ({
-              id: comment.id,
-              author: comment.author_name,
-              avatar: comment.avatar_url || 'https://via.placeholder.com/100',
-              content: comment.content,
-              timeAgo: getTimeAgo(comment.created_at),
-              likes: comment.likes,
-              isLiked: false
-            })) || [],
-            timeAgo: getTimeAgo(post.created_at),
-            isLiked: userLikes.includes(post.id),
+            image: post.image_url || (post.images && post.images[0]),
+            likes: post.likes || 0,
+            comments: [], // 목록에서는 댓글을 미리 가져오지 않음 (성능 최적화)
+            commentsCount: post.comments_count || 0,
+            timeAgo: getTimeAgo(post.created_at?.toDate?.()?.toISOString() || post.created_at || new Date().toISOString()),
+            isLiked: false,
             age: author?.age || post.age,
             location: author?.location || post.location,
-            job: author?.job || post.job,
-            views: post.views,
-            category: post.category,
+            job: author?.school || author?.job || post.job,
+            views: post.views || 0,
+            category: (post.category as 'dating' | 'chat') || 'dating',
             userId: post.user_id,
-            authorData: author ? {
-              id: author.id,
-              name: author.name || '익명',
-              avatar_url: author.avatar_url || author.profile_image,
-              age: author.age,
-              location: author.location,
-              gender: author.gender,
-              bio: author.bio,
-              school: author.school,
-              job: author.job
-            } : {
-              id: post.user_id,
-              name: post.author_name || '익명',
-              avatar_url: post.avatar_url,
-              age: post.age,
-              location: post.location,
-              gender: post.gender,
-              bio: post.bio,
-              school: post.school,
-              job: post.job
-            }
+            authorData: author
           };
-        });
-        
-        // 캐시에 저장
+        }));
+
+        setPosts(formattedPosts);
         cachedPosts = formattedPosts;
         lastLoadTime = Date.now();
-        
-        setPosts(formattedPosts);
       } else {
-        throw new Error('No data');
+        setPosts([]);
       }
-    } catch (error: any) {
-      // 에러 로깅
+    } catch (error) {
       console.error('게시글 로드 실패:', error);
-      // Mock 데이터 없이 빈 배열 표시
       setPosts([]);
     } finally {
       setIsLoading(false);
@@ -268,78 +187,16 @@ export default function CommunityTab() {
   };
 
 
-  const handleLike = async (postId: number) => {
-    if (!currentUser) {
-      alert('로그인이 필요합니다.');
-      return;
-    }
-
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    try {
-      if (post.isLiked) {
-        // 좋아요 취소
-        await supabase
-          .from('community_post_likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', currentUser.id);
-
-        // 좋아요 수 감소
-        await supabase
-          .from('community_posts')
-          .update({ likes: Math.max(0, post.likes - 1) })
-          .eq('id', postId);
-
-        // 로컬 상태 업데이트
-        setPosts(posts.map(p =>
-          p.id === postId
-            ? { ...p, isLiked: false, likes: Math.max(0, p.likes - 1) }
-            : p
-        ));
-      } else {
-        // 좋아요 추가
-        await supabase
-          .from('community_post_likes')
-          .insert({
-            post_id: postId,
-            user_id: currentUser.id
-          });
-
-        // 좋아요 수 증가
-        await supabase
-          .from('community_posts')
-          .update({ likes: post.likes + 1 })
-          .eq('id', postId);
-
-        // 로컬 상태 업데이트
-        setPosts(posts.map(p =>
-          p.id === postId
-            ? { ...p, isLiked: true, likes: p.likes + 1 }
-            : p
-        ));
-      }
-    } catch (error) {
-      console.error('좋아요 업데이트 오류:', error);
-      alert('좋아요 처리 중 오류가 발생했습니다.');
-    }
-  };
-
   const handleCommentClick = async (post: Post) => {
     // 로그인 체크
-    const authUser = localStorage.getItem('auth_user');
-    if (!authUser) {
+    if (!currentUser) {
       setShowLoginModal(true);
       return;
     }
 
     // 조회수 증가
     try {
-      await supabase
-        .from('community_posts')
-        .update({ views: (post.views || 0) + 1 })
-        .eq('id', post.id);
+      await firebase.posts.incrementViews(post.id);
 
       // 로컬 상태 업데이트
       setPosts(posts.map(p =>
@@ -370,34 +227,27 @@ export default function CommunityTab() {
 
     try {
       const postData = {
-        user_id: currentUser.id,
-        author_name: currentUser.profile?.name || '익명',
-        avatar_url: currentUser.profile?.avatar_url || '',
-        title: newPost.substring(0, 50),
-        content: `${currentUser.profile?.name || '익명'} (${currentUser.profile?.location || '위치 미설정'} / ${currentUser.profile?.age || '나이 미설정'}세 / ${currentUser.profile?.school || '직업 미설정'})`,
-        image_url: currentUser.profile?.avatar_url || 'https://readdy.ai/api/search-image?query=Korean%20person%20casual%20portrait%2C%20friendly%20expression%2C%20natural%20lighting%2C%20clean%20background%2C%20high%20quality%2C%20realistic&width=400&height=500&seq=newpost&orientation=portrait',
+        author_name: currentUser.name || '익명',
+        avatar_url: currentUser.profile_image || currentUser.avatar_url || '',
+        content: newPost,
         likes: 0,
         views: 0,
         category: selectedCategory,
-        age: currentUser.profile?.age,
-        location: currentUser.profile?.location,
-        job: currentUser.profile?.school
+        age: currentUser.age,
+        location: currentUser.location,
+        job: currentUser.school || currentUser.job
       };
 
-      const { data, error } = await supabase
-        .from('community_posts')
-        .insert([postData])
-        .select()
-        .single();
+      const { post: data, error } = await firebase.posts.createPost(currentUser.id, postData);
 
       if (error) throw error;
 
       if (data) {
         const newPostObj: Post = {
           id: data.id,
-          author: data.title,
-          avatar: data.avatar_url,
-          content: data.content,
+          author: data.author_name || '익명',
+          avatar: data.avatar_url || '',
+          content: data.content || '',
           image: data.image_url,
           likes: 0,
           comments: [],
@@ -407,7 +257,7 @@ export default function CommunityTab() {
           location: data.location,
           job: data.job,
           views: 0,
-          category: data.category
+          category: (data.category as 'dating' | 'chat') || 'dating'
         };
         setPosts([newPostObj, ...posts]);
         setNewPost('');
@@ -552,7 +402,7 @@ export default function CommunityTab() {
                     </div>
                     <div className="flex items-center space-x-1">
                       <i className="ri-chat-3-line"></i>
-                      <span>{post.comments.length}</span>
+                      <span>{post.commentsCount || 0}</span>
                     </div>
                     <span>|</span>
                     <span>{post.timeAgo}</span>

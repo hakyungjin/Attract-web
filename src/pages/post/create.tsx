@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadImage } from '../../services/imageUpload';
-import { supabase } from '../../lib/supabase';
+import { firebase } from '../../lib/firebaseService';
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
@@ -14,10 +14,10 @@ export default function CreatePostPage() {
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
 
-  // 현재 로그인한 사용자 (Supabase 또는 로컬 스토리지)
+  // 현재 로그인한 사용자 (Firebase 또는 로컬 스토리지)
   const getCurrentUser = () => {
     if (user) return user;
-    const localUser = localStorage.getItem('user');
+    const localUser = localStorage.getItem('auth_user');
     return localUser ? JSON.parse(localUser) : null;
   };
 
@@ -80,30 +80,26 @@ export default function CreatePostPage() {
     setPosting(true);
 
     try {
-      // 로컬 스토리지 사용자 정보 사용
-      const { data, error } = await supabase
-        .from('community_posts')
-        .insert({
-          user_id: currentUser.id,
-          author_name: currentUser.name || '익명',
-          avatar_url: currentUser.avatar_url || '',
-          title: content.substring(0, 50),
-          content: content.trim(),
-          image_url: images.length > 0 ? images[0] : null,
-          likes: 0,
-          views: 0,
-          category: category,
-          age: currentUser.age,
-          location: currentUser.location,
-          job: currentUser.school || currentUser.job,
-        })
-        .select()
-        .single();
+      // Firebase 게시글 생성
+      const { error } = await firebase.posts.createPost(currentUser.id, {
+        author_name: currentUser.name || '익명',
+        avatar_url: currentUser.profile_image || currentUser.avatar_url || '',
+        title: content.substring(0, 50),
+        content: content.trim(),
+        images: images,
+        image_url: images.length > 0 ? images[0] : undefined,
+        likes: 0,
+        views: 0,
+        category: category,
+        age: currentUser.age,
+        location: currentUser.location,
+        job: currentUser.school || currentUser.job,
+      });
 
       if (error) throw error;
 
       alert('게시물이 작성되었습니다!');
-      navigate('/');
+      navigate('/', { state: { activeTab: 'community' } });
     } catch (error: any) {
       console.error('게시물 작성 실패:', error);
       alert(`게시물 작성에 실패했습니다: ${error.message}`);

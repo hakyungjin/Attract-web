@@ -12,7 +12,7 @@ import { logger } from '../../utils/logger';
 
 export default function ProfileEditPage() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, setUser } = useAuth();
   const [formData, setFormData] = useState({
     nickname: '',
     name: '',
@@ -30,7 +30,9 @@ export default function ProfileEditPage() {
     drinking: '가끔',
     interests: [] as string[],
     avatar: '',
-    photos: [] as string[] // 여러 장 사진
+    photos: [] as string[], // 여러 장 사진
+    bankAccount: '1001-6739-5888', // 토스뱅크 계좌
+    accountHolder: '' // 입금자 명
   });
 
   const [newInterest, setNewInterest] = useState('');
@@ -57,7 +59,7 @@ export default function ProfileEditPage() {
 
       try {
         // Firebase에서 최신 사용자 데이터 로드
-        const { user: userData, error } = await firebase.users.getUserById(authUser.id);
+        const { user: userData, error } = await firebase.users.getUserById(authUser.id) as any;
 
         if (error || !userData) {
           logger.error('사용자 데이터 로드 실패:', error);
@@ -86,7 +88,9 @@ export default function ProfileEditPage() {
             drinking: userData.drinking || '가끔',
             interests: userData.interests || [],
             avatar: profileImage,
-            photos: userData.photos || (profileImage ? [profileImage] : [])
+            photos: userData.photos || (profileImage ? [profileImage] : []),
+            bankAccount: (userData as any).bank_account || '1001-6739-5888',
+            accountHolder: (userData as any).account_holder || ''
           });
         }
       } catch (error) {
@@ -171,6 +175,8 @@ export default function ProfileEditPage() {
         smoking: formData.smoking,
         drinking: formData.drinking,
         interests: formData.interests,
+        bank_account: formData.bankAccount,
+        account_holder: formData.accountHolder,
         updated_at: new Date().toISOString()
       };
 
@@ -194,16 +200,17 @@ export default function ProfileEditPage() {
         return;
       }
 
-      // localStorage의 auth_user 업데이트
+      // localStorage 및 AuthContext 업데이트
       const storedUser = localStorage.getItem('auth_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         const updatedUser = {
           ...userData,
           name: formData.name,
-          profile_image: uploadedImageUrl || formData.avatar
+          profile_image: finalProfileImage || formData.avatar
         };
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
       }
 
       logger.info('저장된 데이터:', profileData);
@@ -246,7 +253,7 @@ export default function ProfileEditPage() {
       const storageRef = ref(storage, filePath);
       await uploadBytes(storageRef, file);
 
-      logger.info('업로드 성공:', filePath);
+      logger.info('업로드 성공', { filePath });
 
       // 공개 URL 생성
       const publicUrl = await getDownloadURL(storageRef);
@@ -428,7 +435,7 @@ export default function ProfileEditPage() {
                       const storageRef = ref(storage, filePath);
                       await uploadBytes(storageRef, file);
 
-                      logger.info('갤러리 사진 업로드 성공:', filePath);
+                      logger.info('갤러리 사진 업로드 성공', { filePath });
 
                       // 공개 URL 생성
                       const publicUrl = await getDownloadURL(storageRef);
@@ -822,6 +829,46 @@ export default function ProfileEditPage() {
           />
           <div className="text-right text-xs text-gray-400 mt-2">
             {formData.bio.length}/500
+          </div>
+        </div>
+
+        {/* 계좌 정보 */}
+        <div className="bg-white rounded-3xl shadow-sm p-6 mb-4">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+            <i className="ri-bank-card-line mr-2 text-cyan-500"></i>
+            계좌 정보
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                토스뱅크 계좌번호
+              </label>
+              <div className="bg-gray-100 px-4 py-3 rounded-xl font-medium text-gray-800">
+                {formData.bankAccount}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                <i className="ri-information-line mr-1"></i>
+                입금 받을 계좌번호입니다
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                입금자 명 (입금받을 때 수수료 확인용)
+              </label>
+              <input
+                type="text"
+                value={formData.accountHolder}
+                onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                placeholder="입금자 명을 입력하세요"
+                maxLength={50}
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                예: 김철수, 박영희 등
+              </p>
+            </div>
           </div>
         </div>
 
