@@ -97,6 +97,13 @@ export default function PaymentHistoryPage() {
                   <span className="font-bold text-slate-900">{payment.price.toLocaleString()}원</span>
                 </div>
 
+                {payment.account_holder && (
+                  <div className="flex justify-between items-center mt-2 text-sm text-slate-600">
+                    <span className="text-slate-500">입금자명</span>
+                    <span className="font-semibold">{payment.account_holder}</span>
+                  </div>
+                )}
+
                 {payment.status === 'pending' && (
                   <div className="mt-4 bg-blue-50 rounded-xl p-3">
                     <p className="text-[11px] text-blue-600 leading-relaxed">

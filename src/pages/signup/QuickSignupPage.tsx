@@ -40,6 +40,8 @@ export default function QuickSignupPage() {
   const [selectedSido, setSelectedSido] = useState('');
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [schoolSearchResults, setSchoolSearchResults] = useState<string[]>([]);
+  const [isPhoneChecked, setIsPhoneChecked] = useState(false);
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
   const mbtiOptions = ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'];
   const heightOptions = ['150~155', '155~160', '160~165', '165~170', '170~175', '175~180', '180~185', '185~190'];
@@ -71,6 +73,41 @@ export default function QuickSignupPage() {
       ...prev,
       phoneNumber: formatted
     }));
+    setIsPhoneChecked(false); // 번호 변경 시 중복확인 초기화
+  };
+
+  // 전화번호 중복확인
+  const handleCheckPhone = async () => {
+    if (!formData.phoneNumber) {
+      alert('전화번호를 입력해주세요.');
+      return;
+    }
+
+    const phoneRegex = /^010-\d{4}-\d{4}$/;
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      alert('올바른 전화번호 형식이 아닙니다. (010-XXXX-XXXX)');
+      return;
+    }
+
+    setCheckingPhone(true);
+    try {
+      const cleanedPhone = formData.phoneNumber.replace(/[^\d]/g, '');
+      const { user: existingUser } = await firebase.users.findUserByPhoneNumber(cleanedPhone);
+      
+      if (existingUser) {
+        alert('이미 가입된 전화번호입니다.');
+        setIsPhoneChecked(false);
+      } else {
+        alert('사용 가능한 전화번호입니다.');
+        setIsPhoneChecked(true);
+      }
+    } catch (error) {
+      console.error('중복확인 오류:', error);
+      alert('중복확인 중 오류가 발생했습니다.');
+      setIsPhoneChecked(false);
+    } finally {
+      setCheckingPhone(false);
+    }
   };
 
   // 이미지 파일 선택
@@ -133,6 +170,11 @@ export default function QuickSignupPage() {
       return;
     }
 
+    if (!isPhoneChecked) {
+      alert('전화번호 중복확인을 해주세요.');
+      return;
+    }
+
     if (!formData.password || formData.password.length < 4) {
       alert('비밀번호는 4자 이상이어야 합니다.');
       return;
@@ -151,6 +193,9 @@ export default function QuickSignupPage() {
     setLoading(true);
 
     try {
+      // 전화번호에서 하이픈 제거
+      const cleanedPhone = formData.phoneNumber.replace(/[^\d]/g, '');
+
       // 이미지 업로드
       const imageUrl = await uploadImage();
       if (!imageUrl) {
@@ -159,9 +204,6 @@ export default function QuickSignupPage() {
         return;
       }
 
-      // 전화번호에서 하이픈 제거
-      const cleanedPhone = formData.phoneNumber.replace(/[^\d]/g, '');
-
       // 비밀번호 해싱
       const hashedPassword = await hashPassword(formData.password);
 
@@ -169,7 +211,7 @@ export default function QuickSignupPage() {
       const { user: data, error } = await firebase.users.createUser({
         firebase_uid: '',
         phone_number: cleanedPhone,
-        password: hashedPassword,
+        password_hash: hashedPassword,
         name: formData.name.trim(),
         age: formData.age ? parseInt(formData.age) : undefined,
         gender: formData.gender,
@@ -299,17 +341,31 @@ export default function QuickSignupPage() {
               <input type="number" name="age" value={formData.age} onChange={handleChange} placeholder="나이" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" min="18" max="100" />
             </div>
 
-            {/* 전화번호 */}
-            <input 
-              type="tel" 
-              name="phoneNumber" 
-              value={formData.phoneNumber} 
-              onChange={handlePhoneChange} 
-              placeholder="전화번호 * (010-1234-5678)" 
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" 
-              maxLength={13} 
-              required 
-            />
+            {/* 전화번호 + 중복확인 */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">전화번호 *</label>
+              <div className="flex gap-2">
+                <input 
+                  type="tel" 
+                  name="phoneNumber" 
+                  value={formData.phoneNumber} 
+                  onChange={handlePhoneChange} 
+                  placeholder="010-1234-5678" 
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" 
+                  maxLength={13} 
+                  required
+                  disabled={isPhoneChecked}
+                />
+                <button
+                  type="button"
+                  onClick={handleCheckPhone}
+                  disabled={!formData.phoneNumber || formData.phoneNumber.length < 13 || checkingPhone || isPhoneChecked}
+                  className="px-3 py-2 bg-purple-500 text-white rounded-lg text-xs font-medium hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {checkingPhone ? '확인중...' : isPhoneChecked ? '✓ 완료' : '중복확인'}
+                </button>
+              </div>
+            </div>
             
             {/* 비밀번호 */}
             <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="비밀번호 * (4자 이상)" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" minLength={4} required />

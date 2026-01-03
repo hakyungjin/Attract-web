@@ -40,6 +40,11 @@ let cachedPosts: Post[] | null = null;
 let lastLoadTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
 
+const syncPostCache = (nextPosts: Post[]) => {
+  cachedPosts = nextPosts;
+  lastLoadTime = Date.now();
+};
+
 export default function CommunityTab() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<'dating' | 'chat'>('dating');
@@ -157,8 +162,7 @@ export default function CommunityTab() {
         }));
 
         setPosts(formattedPosts);
-        cachedPosts = formattedPosts;
-        lastLoadTime = Date.now();
+        syncPostCache(formattedPosts);
       } else {
         setPosts([]);
       }
@@ -215,7 +219,11 @@ export default function CommunityTab() {
   };
 
   const handleUpdatePost = (updatedPost: Post) => {
-    setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
+    setPosts(prev => {
+      const next = prev.map(p => p.id === updatedPost.id ? updatedPost : p);
+      syncPostCache(next);
+      return next;
+    });
   };
 
   const handleCreatePost = async () => {
@@ -251,15 +259,22 @@ export default function CommunityTab() {
           image: data.image_url,
           likes: 0,
           comments: [],
+          commentsCount: 0,
           timeAgo: '방금 전',
           isLiked: false,
           age: data.age,
           location: data.location,
           job: data.job,
           views: 0,
-          category: (data.category as 'dating' | 'chat') || 'dating'
+          category: (data.category as 'dating' | 'chat') || 'dating',
+          userId: currentUser.id,
+          authorData: currentUser
         };
-        setPosts([newPostObj, ...posts]);
+        setPosts(prev => {
+          const next = [newPostObj, ...prev];
+          syncPostCache(next);
+          return next;
+        });
         setNewPost('');
         setShowNewPost(false);
       }
@@ -287,7 +302,11 @@ export default function CommunityTab() {
         onBack={handleBackFromDetail}
         onUpdatePost={handleUpdatePost}
         onDeletePost={(postId) => {
-          setPosts(posts.filter(p => p.id !== postId));
+          setPosts(prev => {
+            const next = prev.filter(p => p.id !== postId);
+            syncPostCache(next);
+            return next;
+          });
           setSelectedPost(null);
         }}
       />

@@ -30,9 +30,7 @@ export default function ProfileEditPage() {
     drinking: '가끔',
     interests: [] as string[],
     avatar: '',
-    photos: [] as string[], // 여러 장 사진
-    bankAccount: '1001-6739-5888', // 토스뱅크 계좌
-    accountHolder: '' // 입금자 명
+    photos: [] as string[] // 여러 장 사진
   });
 
   const [newInterest, setNewInterest] = useState('');
@@ -88,9 +86,7 @@ export default function ProfileEditPage() {
             drinking: userData.drinking || '가끔',
             interests: userData.interests || [],
             avatar: profileImage,
-            photos: userData.photos || (profileImage ? [profileImage] : []),
-            bankAccount: (userData as any).bank_account || '1001-6739-5888',
-            accountHolder: (userData as any).account_holder || ''
+            photos: userData.photos || (profileImage ? [profileImage] : [])
           });
         }
       } catch (error) {
@@ -141,23 +137,34 @@ export default function ProfileEditPage() {
     setIsUploading(true);
 
     try {
-      // 프로필 이미지 URL 결정 (base64는 제외, URL만 사용)
+      // 프로필 이미지 URL 결정
       let finalProfileImage = '';
+      
+      // 1순위: 새로 업로드한 이미지
       if (uploadedImageUrl) {
-        // 새로 업로드된 이미지 URL 사용
         finalProfileImage = uploadedImageUrl;
-      } else if (formData.avatar && !formData.avatar.startsWith('data:')) {
-        // 기존 이미지 URL 유지 (base64가 아닌 경우만)
+      } 
+      // 2순위: 기존 프로필 이미지 (URL인 경우)
+      else if (formData.avatar && !formData.avatar.startsWith('data:')) {
         finalProfileImage = formData.avatar;
-      } else if (formData.photos.length > 0 && !formData.photos[0].startsWith('data:')) {
-        // photos 배열에서 URL 가져오기
-        finalProfileImage = formData.photos[0];
       }
 
-      // photos 배열에서 URL만 필터링 (base64 제외)
-      const validPhotos = formData.photos.filter(photo => 
-        photo && !photo.startsWith('data:')
-      );
+      // photos 배열 구성 (프로필 이미지를 첫 번째로)
+      const validPhotos: string[] = [];
+      
+      // 프로필 이미지가 있으면 첫 번째에 추가
+      if (finalProfileImage) {
+        validPhotos.push(finalProfileImage);
+      }
+      
+      // 나머지 photos에서 유효한 URL만 추가 (중복 제외)
+      formData.photos.forEach(photo => {
+        if (photo && 
+            !photo.startsWith('data:') && 
+            photo !== finalProfileImage) {
+          validPhotos.push(photo);
+        }
+      });
 
       // 데이터베이스에 저장할 데이터 준비
       const profileData: Record<string, any> = {
@@ -175,20 +182,10 @@ export default function ProfileEditPage() {
         smoking: formData.smoking,
         drinking: formData.drinking,
         interests: formData.interests,
-        bank_account: formData.bankAccount,
-        account_holder: formData.accountHolder,
+        profile_image: finalProfileImage || '', // 항상 저장 (빈 문자열이라도)
+        photos: validPhotos, // 항상 저장
         updated_at: new Date().toISOString()
       };
-
-      // 프로필 이미지가 있을 때만 추가
-      if (finalProfileImage) {
-        profileData.profile_image = finalProfileImage;
-      }
-
-      // photos 배열 저장 (유효한 URL만)
-      if (validPhotos.length > 0) {
-        profileData.photos = validPhotos;
-      }
 
       // users 컬렉션에 데이터 저장 (update)
       const { error: dbError } = await firebase.users.updateUser(authUser.id, profileData);
@@ -259,17 +256,17 @@ export default function ProfileEditPage() {
       const publicUrl = await getDownloadURL(storageRef);
 
       logger.info('생성된 공개 URL:', { url: publicUrl });
+      
+      // 업로드된 URL 저장
       setUploadedImageUrl(publicUrl);
 
-      // 미리보기용으로 로컬 이미지도 설정
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          avatar: reader.result as string
-        }));
-      };
-      reader.readAsDataURL(file);
+      // formData.avatar를 업로드된 URL로 즉시 업데이트 (미리보기용)
+      setFormData(prev => ({
+        ...prev,
+        avatar: publicUrl
+      }));
+
+      logger.info('프로필 이미지 업로드 완료:', publicUrl);
 
     } catch (error: any) {
       logger.error('이미지 업로드 중 오류:', error);
@@ -832,46 +829,6 @@ export default function ProfileEditPage() {
           </div>
         </div>
 
-        {/* 계좌 정보 */}
-        <div className="bg-white rounded-3xl shadow-sm p-6 mb-4">
-          <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-            <i className="ri-bank-card-line mr-2 text-cyan-500"></i>
-            계좌 정보
-          </h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                토스뱅크 계좌번호
-              </label>
-              <div className="bg-gray-100 px-4 py-3 rounded-xl font-medium text-gray-800">
-                {formData.bankAccount}
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                <i className="ri-information-line mr-1"></i>
-                입금 받을 계좌번호입니다
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                입금자 명 (입금받을 때 수수료 확인용)
-              </label>
-              <input
-                type="text"
-                value={formData.accountHolder}
-                onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                placeholder="입금자 명을 입력하세요"
-                maxLength={50}
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                예: 김철수, 박영희 등
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* 관심사 */}
         <div className="bg-white rounded-3xl shadow-sm p-6">
           <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
@@ -894,18 +851,18 @@ export default function ProfileEditPage() {
               </span>
             ))}
           </div>
-          <div className="flex space-x-2">
+          <div className="flex gap-2">
             <input
               type="text"
               value={newInterest}
               onChange={(e) => setNewInterest(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleAddInterest()}
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="flex-1 min-w-0 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               placeholder="관심사 추가"
             />
             <button
               onClick={handleAddInterest}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-medium hover:from-cyan-600 hover:to-blue-700 transition-all cursor-pointer whitespace-nowrap"
+              className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-medium hover:from-cyan-600 hover:to-blue-700 transition-all cursor-pointer whitespace-nowrap"
             >
               추가
             </button>

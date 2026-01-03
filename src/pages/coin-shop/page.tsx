@@ -32,6 +32,7 @@ export default function CoinShopPage() {
   const [userCoins, setUserCoins] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [depositorName, setDepositorName] = useState('');
 
   // 코인 패키지 및 사용자 코인 로드
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function CoinShopPage() {
 
   const handlePurchase = (pkg: CoinPackage) => {
     setSelectedPackage(pkg);
+    setDepositorName(user?.name || '');
     setShowAccountModal(true);
   };
 
@@ -98,6 +100,11 @@ export default function CoinShopPage() {
   const handleConfirmPayment = async () => {
     if (!selectedPackage || !user?.id) return;
 
+    if (!depositorName.trim()) {
+      alert('입금자명을 입력해주세요.');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const { error } = await firebase.payments.createPaymentRequest({
@@ -107,6 +114,8 @@ export default function CoinShopPage() {
         package_id: selectedPackage.id,
         coins: selectedPackage.coins + (selectedPackage.bonus || selectedPackage.bonus_coins || 0),
         price: selectedPackage.price,
+        bank_account: '신한 110-123-456789',
+        account_holder: depositorName.trim(),
       });
 
       if (error) throw error;
@@ -412,7 +421,7 @@ export default function CoinShopPage() {
       )}
 
       {/* 무통장 입금 안내 모달 */}
-      {showAccountModal && (
+      {showAccountModal && selectedPackage && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl animate-scale-in">
             <div className="p-6 text-center">
@@ -448,11 +457,13 @@ export default function CoinShopPage() {
                 </div>
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-xs text-gray-400">입금 금액</span>
-                  <span className="text-lg font-bold text-blue-600">10,000원</span>
+                  <span className="text-lg font-bold text-blue-600">{selectedPackage.price.toLocaleString()}원</span>
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                   <span className="text-xs text-gray-400">지급 자석</span>
-                  <span className="text-sm font-bold text-gray-800">120개 (+20 보너스)</span>
+                  <span className="text-sm font-bold text-gray-800">
+                    {selectedPackage.coins.toLocaleString()}개{(selectedPackage.bonus || selectedPackage.bonus_coins) ? ` (+${(selectedPackage.bonus || selectedPackage.bonus_coins)})` : ''}
+                  </span>
                 </div>
               </div>
 
@@ -461,6 +472,23 @@ export default function CoinShopPage() {
                   <i className="ri-time-line mr-1"></i>
                   입금 확인은 약 <strong>5분 정도</strong> 소요됩니다.<br />
                   확인 즉시 자석이 자동으로 지급됩니다.
+                </p>
+              </div>
+
+              <div className="mb-4 text-left">
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  입금자명 <span className="text-pink-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={depositorName}
+                  onChange={(e) => setDepositorName(e.target.value)}
+                  placeholder="송금 시 표시될 이름"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  maxLength={20}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  송금 시 표시될 입금자명을 정확히 입력해주세요.
                 </p>
               </div>
 

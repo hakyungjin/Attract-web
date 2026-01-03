@@ -216,18 +216,23 @@ export default function ProfileDetailPage() {
         }
 
         // Firebase 알림 생성 (두 명의 사용자에게)
+        const notificationData: any = { type: 'match' };
+        if (chatRoom?.id) {
+          notificationData.roomId = chatRoom.id;
+        }
+
         await firebase.notifications.createNotification(toUserId, {
           type: 'match',
           title: '매칭 성사! 💕',
           message: `${authUser.name || '누군가'}님과 매칭되었습니다!`,
-          data: { roomId: chatRoom?.id }
+          data: notificationData
         });
 
         await firebase.notifications.createNotification(fromUserId, {
           type: 'match',
           title: '매칭 성사! 💕',
           message: `${profile.name}님과 매칭되었습니다!`,
-          data: { roomId: chatRoom?.id }
+          data: notificationData
         });
 
         await sendMatchSuccessPush(toUserId, authUser.name || '누군가', chatRoom?.id);

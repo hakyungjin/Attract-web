@@ -67,25 +67,25 @@ export default function MatchingTab() {
   // 컴포넌트 마운트 시 로그인 사용자 성별에 따라 반대 성별로 초기화
   useEffect(() => {
     const loadCurrentUserInfo = async () => {
-      if (authUser?.id) {
-        try {
-          const { user: userData } = await firebase.users.getUserById(authUser.id);
+      if (authUser?.gender) {
+        setSelectedGender(authUser.gender === 'male' ? 'female' : 'male');
+        return;
+      }
 
-          if (userData?.gender) {
-            // 내 성별의 반대 성별을 보여줌
-            if (userData.gender === 'male') {
-              setSelectedGender('female');
-            } else if (userData.gender === 'female') {
-              setSelectedGender('male');
-            }
-          }
-        } catch (error) {
-          console.error('사용자 정보 로드 실패:', error);
+      if (!authUser?.id) return;
+
+      try {
+        const { user: userData } = await firebase.users.getUserById(authUser.id);
+
+        if (userData?.gender) {
+          setSelectedGender(userData.gender === 'male' ? 'female' : 'male');
         }
+      } catch (error) {
+        console.error('사용자 정보 로드 실패:', error);
       }
     };
     loadCurrentUserInfo();
-  }, [authUser?.id]);
+  }, [authUser?.gender, authUser?.id]);
 
   // 마운트 시 데이터 로드 (캐시 확인)
   useEffect(() => {
@@ -106,6 +106,22 @@ export default function MatchingTab() {
     }
   }, [selectedGender]);
 
+  const normalizeGender = (gender: string = '') => {
+    if (gender === '남성' || gender === '남자') return 'male';
+    if (gender === '여성' || gender === '여자') return 'female';
+    return gender;
+  };
+
+  const genderVariants = useMemo(
+    () =>
+      selectedGender === 'male'
+        ? ['male', '남성', '남자']
+        : selectedGender === 'female'
+          ? ['female', '여성', '여자']
+          : [],
+    [selectedGender]
+  );
+
   const loadProfiles = async (loadMore = false) => {
     if (!selectedGender) return;
     if (isLoadingRef.current && !loadMore) return; // 이미 로딩 중이면 중복 호출 방지
@@ -117,7 +133,7 @@ export default function MatchingTab() {
 
       // Firebase에서 성별로 사용자 조회
       const { users: data, error, lastDoc: newLastDoc } = await firebase.users.getUsersByGender(
-        selectedGender,
+        genderVariants,
         authUser?.id, // 로그인한 사용자 제외
         PROFILES_PER_PAGE,
         loadMore ? lastDoc : undefined
@@ -204,11 +220,6 @@ export default function MatchingTab() {
     }
   };
 
-  const filteredProfiles = useMemo(
-    () => profiles.filter(profile => profile.gender === selectedGender),
-    [profiles, selectedGender]
-  );
-
   const handleProfileClick = (profile: Profile) => {
     // DB 필드명(snake_case)을 인터페이스 필드명(camelCase)으로 변환
     const mappedProfile = {
@@ -232,7 +243,7 @@ export default function MatchingTab() {
   }
 
   // 데이터 없음
-  if (filteredProfiles.length === 0) {
+  if (profiles.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4 px-4">
         <i className="ri-search-line text-6xl text-slate-300"></i>
@@ -262,7 +273,7 @@ export default function MatchingTab() {
 
       {/* 포스트잇 그리드 */}
       <div className="grid grid-cols-2 gap-3">
-        {filteredProfiles.map((profile) => (
+        {profiles.map((profile) => (
           <div
             key={profile.id}
             onClick={() => handleProfileClick(profile)}

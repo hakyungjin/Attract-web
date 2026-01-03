@@ -128,6 +128,8 @@ export interface PaymentRequest {
   package_id: string;
   coins: number;
   price: number;
+  bank_account?: string; // 입금 계좌 정보
+  account_holder?: string; // 입금자 명
   status: 'pending' | 'completed' | 'cancelled';
   created_at: any;
   updated_at?: any;
@@ -355,15 +357,25 @@ export const userService = {
    * 성별로 사용자 조회 (페이지네이션, 특정 사용자 제외)
    */
   async getUsersByGender(
-    gender: string,
+    gender: string | string[],
     excludeUserId?: string,
     limitCount = 20,
     lastDoc?: any
   ): Promise<{ users: User[]; error: any; lastDoc?: any; totalCount: number }> {
     try {
       const usersRef = collection(db, 'users');
+      const genderValues = Array.isArray(gender)
+        ? gender.filter(Boolean)
+        : [gender];
+
+      if (genderValues.length === 0) {
+        return { users: [], error: null, lastDoc: undefined, totalCount: 0 };
+      }
+
       const constraints: QueryConstraint[] = [
-        where('gender', '==', gender),
+        genderValues.length === 1
+          ? where('gender', '==', genderValues[0])
+          : where('gender', 'in', genderValues),
         orderBy('created_at', 'desc'),
         limit(limitCount)
       ];
@@ -451,24 +463,21 @@ export const matchingService = {
   async getReceivedRequests(userId: string, status?: string): Promise<{ requests: MatchingRequest[]; error: any }> {
     try {
       const requestsRef = collection(db, 'matching_requests');
-      let q;
-      if (status) {
-        q = query(
-          requestsRef,
-          where('to_user_id', '==', userId),
-          where('status', '==', status),
-          orderBy('created_at', 'desc')
-        );
-      } else {
-        q = query(
-          requestsRef,
-          where('to_user_id', '==', userId),
-          orderBy('created_at', 'desc')
-        );
-      }
+      
+      // 기본 쿼리: to_user_id만으로 필터링하고 orderBy
+      const q = query(
+        requestsRef,
+        where('to_user_id', '==', userId),
+        orderBy('created_at', 'desc')
+      );
 
       const snapshot = await getDocs(q);
-      const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchingRequest));
+      let requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchingRequest));
+
+      // 상태로 필터링이 필요하면 클라이언트 쪽에서 필터링
+      if (status) {
+        requests = requests.filter(req => req.status === status);
+      }
 
       return { requests, error: null };
     } catch (error: any) {
@@ -483,24 +492,21 @@ export const matchingService = {
   async getSentRequests(userId: string, status?: string): Promise<{ requests: MatchingRequest[]; error: any }> {
     try {
       const requestsRef = collection(db, 'matching_requests');
-      let q;
-      if (status) {
-        q = query(
-          requestsRef,
-          where('from_user_id', '==', userId),
-          where('status', '==', status),
-          orderBy('created_at', 'desc')
-        );
-      } else {
-        q = query(
-          requestsRef,
-          where('from_user_id', '==', userId),
-          orderBy('created_at', 'desc')
-        );
-      }
+      
+      // 기본 쿼리: from_user_id만으로 필터링하고 orderBy
+      const q = query(
+        requestsRef,
+        where('from_user_id', '==', userId),
+        orderBy('created_at', 'desc')
+      );
 
       const snapshot = await getDocs(q);
-      const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchingRequest));
+      let requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchingRequest));
+
+      // 상태로 필터링이 필요하면 클라이언트 쪽에서 필터링
+      if (status) {
+        requests = requests.filter(req => req.status === status);
+      }
 
       return { requests, error: null };
     } catch (error: any) {

@@ -13,7 +13,7 @@ export default function Home() {
   const location = useLocation();
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('matching');
-  const [coins] = useState(150);
+  const [coins, setCoins] = useState(0);
   const [isInChatView, setIsInChatView] = useState(false);
 
   // location state에서 activeTab 확인
@@ -44,6 +44,28 @@ export default function Home() {
       }
     }
   }, [loading, user, navigate]);
+
+  // 현재 로그인 사용자의 보유 자석 로드
+  useEffect(() => {
+    const fetchCoins = async () => {
+      if (!user?.id) {
+        setCoins(0);
+        return;
+      }
+      try {
+        const { user: userData, error } = await firebase.users.getUserById(user.id);
+        if (!error && userData) {
+          setCoins(userData.coins || 0);
+        } else {
+          setCoins(0);
+        }
+      } catch (err) {
+        setCoins(0);
+      }
+    };
+
+    fetchCoins();
+  }, [user?.id]);
 
   // 로딩 중일 때 표시
   if (loading) {

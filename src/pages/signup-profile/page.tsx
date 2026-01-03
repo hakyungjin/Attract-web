@@ -47,7 +47,8 @@ export default function SignupProfilePage() {
     const phoneNumber = (location.state as any)?.phoneNumber;
     if (phoneNumber) {
       const loadUserData = async () => {
-        const { user } = await firebase.users.findUserByPhoneNumber(phoneNumber);
+        const cleanPhoneNumber = phoneNumber.replace(/-/g, '');
+        const { user } = await firebase.users.findUserByPhoneNumber(cleanPhoneNumber);
 
         if (user) {
           setFormData(prev => ({
@@ -139,8 +140,9 @@ export default function SignupProfilePage() {
 
     setIsSaving(true);
     try {
-      // 먼저 사용자 찾기
-      const { user } = await firebase.users.findUserByPhoneNumber(formData.phone_number);
+      // 먼저 사용자 찾기 (하이픈 제거하여 정규화)
+      const cleanPhoneNumber = formData.phone_number.replace(/-/g, '');
+      const { user } = await firebase.users.findUserByPhoneNumber(cleanPhoneNumber);
 
       if (!user) {
         alert('사용자를 찾을 수 없습니다.');
@@ -545,17 +547,11 @@ export default function SignupProfilePage() {
           </div>
 
           {/* 버튼 */}
-          <div className="flex gap-3 pt-6">
-            <button
-              onClick={() => navigate('/')}
-              className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer font-semibold"
-            >
-              나중에
-            </button>
+          <div className="pt-6">
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-colors disabled:opacity-50 cursor-pointer font-semibold"
+              className="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-colors disabled:opacity-50 cursor-pointer font-semibold"
             >
               {isSaving ? '저장 중...' : '완성'}
             </button>

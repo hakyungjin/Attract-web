@@ -1,1 +1,0 @@
-import{r as a,s as t,a as s,g as r}from"./index-CkhljOBK.js";const n=async(n,o="avatars",$)=>{try{const i=n.name.split(".").pop(),c=`${Date.now()}_${Math.random().toString(36).substring(2,9)}.${i}`,e=a(t,$?`${o}/${$}/${c}`:`${o}/${c}`);await s(e,n);return await r(e)}catch(i){throw i}};export{n as u};

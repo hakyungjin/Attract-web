@@ -415,6 +415,7 @@ export default function AdminPage() {
                   <div>
                     <p className="font-bold text-gray-800 text-sm">{payment.user_name}</p>
                     <p className="text-xs text-gray-500">{payment.user_phone}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">입금자: {payment.account_holder || '-'}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-gray-800 text-sm">{payment.coins.toLocaleString()} 자석</p>

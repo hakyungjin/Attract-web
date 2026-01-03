@@ -102,11 +102,15 @@ export default function MatchingRequestsPage() {
     try {
       const currentUserId = String(authUser.id);
 
+      console.log('📋 매칭 요청 로드 시작:', { currentUserId });
+
       // 1. 받은 요청 조회 (pending만) - Firebase 사용
       const { requests: receivedData, error: receivedError } = await firebase.matching.getReceivedRequests(currentUserId, 'pending');
+      console.log('📥 받은 요청 조회 결과:', { count: receivedData?.length, error: receivedError });
 
       // 2. 보낸 요청 조회 (모든 상태) - Firebase 사용
       const { requests: sentData, error: sentError } = await firebase.matching.getSentRequests(currentUserId);
+      console.log('📤 보낸 요청 조회 결과:', { count: sentData?.length, error: sentError });
 
       if (receivedError || sentError) {
         logger.error('매칭 요청 조회 실패', receivedError || sentError);
@@ -152,10 +156,24 @@ export default function MatchingRequestsPage() {
 
       // 5. 받은 요청 데이터 매핑
       if (receivedData) {
+        console.log('📋 받은 요청 원본 데이터:', receivedData);
+        console.log('👥 사용자 맵:', usersMap);
+
         const received: MatchRequest[] = receivedData
-          .filter(req => usersMap[req.from_user_id]) // 사용자 정보가 있는 경우만
+          .filter(req => {
+            const hasUser = usersMap[req.from_user_id];
+            console.log(`📋 요청 필터링: ${req.id}, from_user: ${req.from_user_id}, hasUser: ${!!hasUser}`);
+            return hasUser;
+          })
           .map(req => {
             const user = usersMap[req.from_user_id];
+            // Firestore Timestamp를 Date로 변환
+            const createdDate = req.created_at?.toDate ? req.created_at.toDate() : 
+                               req.created_at?.seconds ? new Date(req.created_at.seconds * 1000) :
+                               new Date(req.created_at);
+            
+            console.log(`📋 요청 매핑: ${req.id}, status: ${req.status}, user: ${user.name}`);
+            
             return {
               id: req.id.toString(),
               userId: req.from_user_id,
@@ -167,22 +185,36 @@ export default function MatchingRequestsPage() {
               mbti: user.mbti,
               bio: user.bio || '자기소개가 없습니다.',
               avatar: user.profile_image || getDefaultAvatar(user.gender),
-              timestamp: new Date(req.created_at).toLocaleString('ko-KR'),
-              createdAt: new Date(req.created_at),
+              timestamp: createdDate.toLocaleString('ko-KR'),
+              createdAt: createdDate,
               status: req.status as 'pending' | 'accepted' | 'rejected' | 'expired'
             };
           })
           .filter(r => r.status === 'pending');
 
+        console.log('✅ 최종 받은 요청:', received);
         setReceivedRequests(received);
       }
 
       // 6. 보낸 요청 데이터 매핑
       if (sentData) {
+        console.log('📤 보낸 요청 원본 데이터:', sentData);
+        
         const sent: MatchRequest[] = sentData
-          .filter(req => usersMap[req.to_user_id]) // 사용자 정보가 있는 경우만
+          .filter(req => {
+            const hasUser = usersMap[req.to_user_id];
+            console.log(`📤 요청 필터링: ${req.id}, to_user: ${req.to_user_id}, hasUser: ${!!hasUser}`);
+            return hasUser;
+          })
           .map(req => {
             const user = usersMap[req.to_user_id];
+            // Firestore Timestamp를 Date로 변환
+            const createdDate = req.created_at?.toDate ? req.created_at.toDate() : 
+                               req.created_at?.seconds ? new Date(req.created_at.seconds * 1000) :
+                               new Date(req.created_at);
+            
+            console.log(`📤 요청 매핑: ${req.id}, status: ${req.status}, user: ${user.name}`);
+            
             return {
               id: req.id.toString(),
               userId: req.to_user_id,
@@ -194,12 +226,13 @@ export default function MatchingRequestsPage() {
               mbti: user.mbti,
               bio: user.bio || '자기소개가 없습니다.',
               avatar: user.profile_image || getDefaultAvatar(user.gender),
-              timestamp: new Date(req.created_at).toLocaleString('ko-KR'),
-              createdAt: new Date(req.created_at),
+              timestamp: createdDate.toLocaleString('ko-KR'),
+              createdAt: createdDate,
               status: req.status as 'pending' | 'accepted' | 'rejected' | 'expired'
             };
           });
 
+        console.log('✅ 최종 보낸 요청:', sent);
         setSentRequests(sent);
       }
     } catch (error) {

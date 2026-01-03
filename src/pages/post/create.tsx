@@ -77,32 +77,71 @@ export default function CreatePostPage() {
       return;
     }
 
+    if (!currentUser.id) {
+      console.error('사용자 ID가 없습니다:', currentUser);
+      alert('사용자 정보를 확인할 수 없습니다. 다시 로그인해주세요.');
+      return;
+    }
+
     setPosting(true);
 
     try {
+      console.log('게시글 작성 시작:', {
+        userId: currentUser.id,
+        category,
+        contentLength: content.length
+      });
+
       // Firebase 게시글 생성
-      const { error } = await firebase.posts.createPost(currentUser.id, {
+      const postData: any = {
         author_name: currentUser.name || '익명',
         avatar_url: currentUser.profile_image || currentUser.avatar_url || '',
         title: content.substring(0, 50),
         content: content.trim(),
         images: images,
-        image_url: images.length > 0 ? images[0] : undefined,
         likes: 0,
         views: 0,
-        category: category,
-        age: currentUser.age,
-        location: currentUser.location,
-        job: currentUser.school || currentUser.job,
-      });
+        category: category
+      };
 
-      if (error) throw error;
+      // 선택적 필드는 값이 있을 때만 추가 (undefined 방지)
+      if (images.length > 0) {
+        postData.image_url = images[0];
+      }
+      if (currentUser.age) {
+        postData.age = currentUser.age;
+      }
+      if (currentUser.location) {
+        postData.location = currentUser.location;
+      }
+      if (currentUser.school || currentUser.job) {
+        postData.job = currentUser.school || currentUser.job;
+      }
 
+      console.log('전송할 데이터:', postData);
+
+      const { post, error } = await firebase.posts.createPost(currentUser.id, postData);
+
+      if (error) {
+        console.error('Firebase 에러:', error);
+        throw error;
+      }
+
+      if (!post) {
+        throw new Error('게시물이 생성되지 않았습니다.');
+      }
+
+      console.log('게시물 작성 성공:', post);
       alert('게시물이 작성되었습니다!');
       navigate('/', { state: { activeTab: 'community' } });
     } catch (error: any) {
       console.error('게시물 작성 실패:', error);
-      alert(`게시물 작성에 실패했습니다: ${error.message}`);
+      console.error('에러 상세:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      alert(`게시물 작성에 실패했습니다.\n${error.message || '알 수 없는 오류가 발생했습니다.'}`);
     } finally {
       setPosting(false);
     }

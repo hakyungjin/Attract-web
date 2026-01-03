@@ -305,7 +305,7 @@ export default function LoginPage() {
                     disabled={!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber) || sendingCode || isCodeVerified}
                     className="px-4 py-3 bg-cyan-500 text-white rounded-xl text-sm font-medium hover:bg-cyan-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                   >
-                    {sendingCode ? '발송중...' : isCodeVerified ? '✓ 완료' : '발송'}
+                    {sendingCode ? '확인중...' : isCodeVerified ? '✓ 완료' : '중복확인'}
                   </button>
                 </div>
                 

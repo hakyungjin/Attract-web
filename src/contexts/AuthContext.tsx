@@ -10,6 +10,7 @@ interface AuthUser {
   profile_image?: string;
   is_admin?: boolean;
   profile_completed?: boolean;
+  gender?: string;
 }
 
 interface AuthContextType {
@@ -78,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile_image: users.profile_image,
         is_admin: users.is_admin || false,
         profile_completed: users.profile_completed || false,
+        gender: users.gender,
       };
 
       setUser(authUser);
@@ -139,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone_number: newUser.phone_number,
         name: newUser.name,
         profile_image: newUser.profile_image,
+        gender: newUser.gender,
       };
 
       setUser(authUser);
