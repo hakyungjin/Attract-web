@@ -1,6 +1,6 @@
 {
   "hosting": {
-    
+    "site": "attract",
     "public": "out",
     "ignore": [
       "firebase.json",
