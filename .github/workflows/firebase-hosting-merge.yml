@@ -17,4 +17,5 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CAMPUS_4F167 }}
           channelId: live
-          projectId: campus-4f167
+          projectId: attract--web
+          target: attract
