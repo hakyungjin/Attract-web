@@ -9,6 +9,9 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT_ID: attract--web
+      FIREBASE_HOSTING_SITE: attract
     steps:
       - uses: actions/checkout@v4
       - run: npm install && npm run build
@@ -17,5 +20,5 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CAMPUS_4F167 }}
           channelId: live
-          projectId: attract--web
-          target: attract
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}
+          target: ${{ env.FIREBASE_HOSTING_SITE }}
