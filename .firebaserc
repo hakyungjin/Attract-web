@@ -1,9 +1,9 @@
 {
   "projects": {
-    "default": "attract--web"
+    "default": "campus-4f167"
   },
   "targets": {
-    "attract--web": {
+    "campus-4f167": {
       "hosting": {
         "production": [
           "attract"
