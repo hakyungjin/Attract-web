@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { sendVerificationSMS, verifyCode } from '../../services/ssodaaSmsService';
+import { firebase } from '../../lib/firebaseService';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -22,12 +22,9 @@ export default function LoginPage() {
     gender: 'male'
   });
   
-  // SMS 인증 상태
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isCodeSent, setIsCodeSent] = useState(false);
-  const [isCodeVerified, setIsCodeVerified] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [verifyingCode, setVerifyingCode] = useState(false);
+  // 중복확인 상태
+  const [isPhoneChecked, setIsPhoneChecked] = useState(false);
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
   // 전화번호 포맷팅 (010-XXXX-XXXX)
   const formatPhoneNumber = (value: string) => {
@@ -98,54 +95,37 @@ export default function LoginPage() {
   };
 
   /**
-   * 인증번호 발송
+   * 전화번호 중복확인
    */
-  const handleSendVerificationCode = async () => {
+  const handleCheckPhone = async () => {
     if (!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber)) {
       alert('올바른 전화번호를 입력해주세요.');
       return;
     }
 
-    setSendingCode(true);
+    setCheckingPhone(true);
     try {
-      const success = await sendVerificationSMS(formData.phoneNumber);
-      if (success) {
-        setIsCodeSent(true);
-        alert('인증번호가 발송되었습니다. 3분 내에 입력해주세요.');
-      } else {
-        alert('인증번호 발송에 실패했습니다. 다시 시도해주세요.');
+      const cleanPhoneNumber = formData.phoneNumber.replace(/-/g, '');
+      const { user: existingUser } = await signUpPhone(cleanPhoneNumber, '', { name: '' });
+
+      // signUpPhone이 에러를 반환하면 중복
+      if (existingUser || !existingUser) {
+        // 실제 중복 확인을 위해 findUserByPhoneNumber 사용
+        const { user } = await firebase.users.findUserByPhoneNumber(cleanPhoneNumber);
+        if (user) {
+          alert('이미 가입된 전화번호입니다.');
+          setIsPhoneChecked(false);
+        } else {
+          alert('사용 가능한 전화번호입니다.');
+          setIsPhoneChecked(true);
+        }
       }
     } catch (error: any) {
-      console.error('인증번호 발송 오류:', error);
-      alert(`인증번호 발송 실패: ${error.message || '알 수 없는 오류'}`);
+      console.error('중복확인 오류:', error);
+      alert(`중복확인 실패: ${error.message || '알 수 없는 오류'}`);
+      setIsPhoneChecked(false);
     } finally {
-      setSendingCode(false);
-    }
-  };
-
-  /**
-   * 인증번호 확인
-   */
-  const handleVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
-      alert('6자리 인증번호를 입력해주세요.');
-      return;
-    }
-
-    setVerifyingCode(true);
-    try {
-      const isValid = await verifyCode(formData.phoneNumber, verificationCode);
-      if (isValid) {
-        setIsCodeVerified(true);
-        alert('인증이 완료되었습니다!');
-      } else {
-        alert('인증번호가 일치하지 않거나 만료되었습니다.');
-      }
-    } catch (error: any) {
-      console.error('인증번호 확인 오류:', error);
-      alert(`인증 확인 실패: ${error.message || '알 수 없는 오류'}`);
-    } finally {
-      setVerifyingCode(false);
+      setCheckingPhone(false);
     }
   };
 
@@ -162,9 +142,9 @@ export default function LoginPage() {
       return;
     }
 
-    // 전화번호 인증 확인
-    if (!isCodeVerified) {
-      alert('전화번호 인증을 완료해주세요.');
+    // 전화번호 중복확인
+    if (!isPhoneChecked) {
+      alert('전화번호 중복확인을 완료해주세요.');
       return;
     }
 
@@ -191,7 +171,7 @@ export default function LoginPage() {
 
       // 중복 확인 완료 - 회원가입 진행
       alert('중복 확인이 완료되었습니다. 회원가입을 계속 진행해주세요.');
-      navigate('/signup', { state: { phoneNumber: cleanPhoneNumber, name: formData.name } });
+      navigate('/signup-profile', { state: { phoneNumber: cleanPhoneNumber, name: formData.name } });
     } catch (error: any) {
       alert(`회원가입 오류: ${error.message}`);
     } finally {
@@ -297,45 +277,23 @@ export default function LoginPage() {
                     className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                     placeholder="010-1234-5678"
                     maxLength={13}
-                    disabled={isCodeVerified}
+                    disabled={isPhoneChecked}
                   />
                   <button
                     type="button"
-                    onClick={handleSendVerificationCode}
-                    disabled={!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber) || sendingCode || isCodeVerified}
+                    onClick={handleCheckPhone}
+                    disabled={!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber) || checkingPhone || isPhoneChecked}
                     className="px-4 py-3 bg-cyan-500 text-white rounded-xl text-sm font-medium hover:bg-cyan-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                   >
-                    {sendingCode ? '확인중...' : isCodeVerified ? '✓ 완료' : '중복확인'}
+                    {checkingPhone ? '확인중...' : isPhoneChecked ? '✓ 완료' : '중복확인'}
                   </button>
                 </div>
-                
-                {/* 인증번호 입력 (인증번호 발송 후 표시) */}
-                {isCodeSent && !isCodeVerified && (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                      placeholder="인증번호 6자리 입력"
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      maxLength={6}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleVerifyCode}
-                      disabled={!verificationCode || verificationCode.length !== 6 || verifyingCode}
-                      className="px-4 py-3 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                      {verifyingCode ? '확인중...' : '인증 확인'}
-                    </button>
-                  </div>
-                )}
-                
-                {/* 인증 완료 표시 */}
-                {isCodeVerified && (
+
+                {/* 중복확인 완료 표시 */}
+                {isPhoneChecked && (
                   <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
                     <i className="ri-checkbox-circle-fill"></i>
-                    <span>전화번호 인증이 완료되었습니다.</span>
+                    <span>사용 가능한 전화번호입니다.</span>
                   </div>
                 )}
               </div>
@@ -416,7 +374,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading || !isCodeVerified}
+                disabled={loading || !isPhoneChecked}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white py-4 rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? '가입 중...' : '회원가입'}
